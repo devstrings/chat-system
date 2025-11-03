@@ -13,28 +13,41 @@ export default function Message({ message, isOwn }) {
     if (message.sender?.username) {
       return message.sender.username.charAt(0).toUpperCase();
     }
-    if (message.senderUsername) {
-      return message.senderUsername.charAt(0).toUpperCase();
-    }
     return "U";
   };
 
   const getSenderName = () => {
-    return message.sender?.username || message.senderUsername || "Unknown";
+    return message.sender?.username || "Unknown";
   };
 
-  const getFileIcon = (fileType) => {
-    if (fileType?.startsWith("image/")) return "🖼️";
-    if (fileType?.startsWith("video/")) return "🎥";
-    if (fileType?.includes("pdf")) return "📄";
-    if (fileType?.includes("doc")) return "📝";
-    return "📎";
-  };
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "";
-    const mb = (bytes / 1024 / 1024).toFixed(2);
-    return `${mb} MB`;
+  //  Get status icon - WhatsApp style
+  const getStatusIcon = () => {
+    const status = message.status || 'sent';
+    
+    console.log("Message status:", message._id, status); // Debug log
+    
+    if (status === 'read') {
+      // Double tick - Blue (Read)
+      return (
+        <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+        </svg>
+      );
+    } else if (status === 'delivered') {
+      // Double tick - Gray (Delivered)
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+        </svg>
+      );
+    } else {
+      // Single tick - Gray (Sent)
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/>
+        </svg>
+      );
+    }
   };
 
   return (
@@ -55,19 +68,18 @@ export default function Message({ message, isOwn }) {
               : "bg-gray-800 bg-opacity-80 text-gray-100 rounded-bl-sm border border-gray-700 border-opacity-50"
           }`}
         >
-          {/* Sender name */}
+          {/* Sender name (only for received messages) */}
           {!isOwn && (
             <p className="text-xs font-semibold text-blue-400 mb-1">
               {getSenderName()}
             </p>
           )}
 
-          {/* NEW: Display attachments */}
+          {/* Attachments */}
           {message.attachments && message.attachments.length > 0 && (
             <div className="mb-2">
               {message.attachments.map((file, index) => (
                 <div key={index} className="mb-2">
-                  {/* Image preview */}
                   {file.fileType?.startsWith("image/") ? (
                     <a href={file.url} target="_blank" rel="noopener noreferrer">
                       <img 
@@ -77,7 +89,6 @@ export default function Message({ message, isOwn }) {
                       />
                     </a>
                   ) : (
-                    /* File download link */
                     <a 
                       href={file.url} 
                       target="_blank" 
@@ -88,16 +99,10 @@ export default function Message({ message, isOwn }) {
                           : "bg-gray-700 hover:bg-gray-600"
                       }`}
                     >
-                      <span className="text-2xl">{getFileIcon(file.fileType)}</span>
+                      <span className="text-2xl"></span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{file.filename}</p>
-                        {file.fileSize && (
-                          <p className="text-xs opacity-70">{formatFileSize(file.fileSize)}</p>
-                        )}
                       </div>
-                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
                     </a>
                   )}
                 </div>
@@ -112,7 +117,7 @@ export default function Message({ message, isOwn }) {
             </p>
           )}
 
-          {/* Timestamp */}
+          {/*  Timestamp + Status (only for own messages) */}
           <div className={`flex items-center gap-1 mt-1 ${
             isOwn ? "justify-end" : "justify-start"
           }`}>
@@ -122,10 +127,11 @@ export default function Message({ message, isOwn }) {
               {formatTime(message.createdAt)}
             </p>
 
+            {/*  Status ticks (ONLY for own messages) */}
             {isOwn && (
-              <svg className="w-3.5 h-3.5 text-blue-100 text-opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+              <div className="flex-shrink-0">
+                {getStatusIcon()}
+              </div>
             )}
           </div>
 

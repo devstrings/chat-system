@@ -3,18 +3,24 @@ import {
   getOrCreateConversation, 
   getMessages, 
   getUserConversations,
-  clearChat  //  NEW
+  clearChat
 } from "../controllers/messageController.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes protected
-router.post("/conversation", verifyToken, getOrCreateConversation);
-router.get("/conversation/:conversationId", verifyToken, getMessages);
+
+
+// Get all conversations for user
 router.get("/conversations", verifyToken, getUserConversations);
 
-//  NEW: Clear chat route
+// Get or create conversation
+router.post("/conversation", verifyToken, getOrCreateConversation);
+
+// Clear chat (delete messages) - Must be before /:conversationId
 router.delete("/conversation/:conversationId", verifyToken, clearChat);
+
+// Get messages for a conversation last
+router.get("/:conversationId", verifyToken, getMessages);
 
 export default router;

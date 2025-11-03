@@ -13,7 +13,7 @@ router.post("/file", verifyToken, upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    console.log("📎 File received:", req.file);
+    console.log(" File received:", req.file);
 
     // Option 1: Use Cloudinary (cloud storage)
     // const cloudinaryResult = await uploadToCloudinary(req.file.path);

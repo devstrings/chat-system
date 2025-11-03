@@ -8,7 +8,8 @@ export default function Sidebar({
   onlineUsers = new Set(),
   currentUsername = "",
   onLogout,
-  unreadCounts = {} //  NEW: Unread counts object
+  unreadCounts = {},
+  lastMessages = {}
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -18,10 +19,17 @@ export default function Sidebar({
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Count online users from filtered list
-  const onlineCount = filteredUsers.filter(user => onlineUsers.has(user._id)).length;
+  //  Sort users by last message time (most recent first)
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const timeA = lastMessages[a._id]?.time ? new Date(lastMessages[a._id].time).getTime() : 0;
+    const timeB = lastMessages[b._id]?.time ? new Date(lastMessages[b._id].time).getTime() : 0;
+    return timeB - timeA; // Most recent first
+  });
 
-  //  Calculate total unread messages
+  // Count online users from sorted list
+  const onlineCount = sortedUsers.filter(user => onlineUsers.has(user._id)).length;
+
+  // Calculate total unread messages
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   return (
@@ -84,12 +92,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Users Count */}
+      {/* Users Count & Stats */}
       <div className="px-4 py-2 bg-gray-900 bg-opacity-30">
         <p className="text-xs text-gray-400 font-medium">
-          {filteredUsers.length} {filteredUsers.length === 1 ? "contact" : "contacts"}
+          {sortedUsers.length} {sortedUsers.length === 1 ? "contact" : "contacts"}
           {searchQuery && ` found`} • {onlineCount} online
-          {/*  Show total unread */}
           {totalUnread > 0 && (
             <span className="text-red-400 ml-2">
               • {totalUnread} unread
@@ -100,7 +107,7 @@ export default function Sidebar({
 
       {/* Users List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredUsers.length === 0 ? (
+        {sortedUsers.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
               {searchQuery ? (
@@ -122,14 +129,16 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="py-2">
-            {filteredUsers.map((user) => (
+            {sortedUsers.map((user) => (
               <UserItem
                 key={user._id}
                 user={user}
                 selected={user._id === selectedUserId}
                 onClick={() => onSelectUser(user)}
                 isOnline={onlineUsers.has(user._id)}
-                unreadCount={unreadCounts[user._id] || 0} //  Pass unread count
+                unreadCount={unreadCounts[user._id] || 0}
+                lastMessage={lastMessages[user._id]?.text || ""}
+                lastMessageTime={lastMessages[user._id]?.time || null}
               />
             ))}
           </div>

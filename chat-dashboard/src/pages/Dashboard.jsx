@@ -20,16 +20,16 @@ export default function Dashboard() {
   const [searchInChat, setSearchInChat] = useState("");
   const [showSearchBox, setShowSearchBox] = useState(false);
   
-  //  Unread counts
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [lastMessages, setLastMessages] = useState({});
   
-  //  Use ref to track selected user in socket listener
   const selectedUserRef = useRef(null);
 
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
+  //  Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
@@ -50,7 +50,6 @@ export default function Dashboard() {
 
         const payload = JSON.parse(atob(token.split('.')[1]));
         setCurrentUserId(payload.id);
-        console.log(" Current User ID:", payload.id);
       } catch (err) {
         console.error("Error fetching users:", err);
         if (err.response?.status === 401) {
@@ -65,7 +64,65 @@ export default function Dashboard() {
     fetchUsers();
   }, [navigate]);
 
-  // Online status management
+  //  Load last messages for all users on mount
+  useEffect(() => {
+    if (!currentUserId || users.length === 0) return;
+
+    const loadLastMessages = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        
+        for (const user of users) {
+          // Get conversation with this user
+          const convRes = await axios.post(
+            "http://localhost:5000/api/messages/conversation",
+            { otherUserId: user._id },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          const conversationId = convRes.data._id;
+
+          // Get messages from this conversation
+          const msgRes = await axios.get(
+            `http://localhost:5000/api/messages/${conversationId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          const messages = msgRes.data;
+          if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            const messageText = lastMsg.text || (lastMsg.attachments?.length > 0 ? " Attachment" : "");
+            
+            setLastMessages(prev => ({
+              ...prev,
+              [user._id]: {
+                text: messageText,
+                time: lastMsg.createdAt
+              }
+            }));
+
+            // Count unread messages (messages from others that are not read)
+            const unreadCount = messages.filter(
+              msg => msg.sender._id !== currentUserId && msg.status !== 'read'
+            ).length;
+
+            if (unreadCount > 0) {
+              setUnreadCounts(prev => ({
+                ...prev,
+                [user._id]: unreadCount
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading last messages:", err);
+      }
+    };
+
+    loadLastMessages();
+  }, [currentUserId, users]);
+
+  //  Online status management
   useEffect(() => {
     if (!socket) return;
 
@@ -100,86 +157,87 @@ export default function Dashboard() {
     };
   }, [socket]);
 
-  //  FIXED: Listen for incoming messages with proper checks
+  //  Listen for incoming messages + update last message
   useEffect(() => {
-    if (!socket || !currentUserId) {
-      console.log(" Socket or currentUserId not ready");
-      return;
-    }
-
-    console.log(" Setting up message listener for user:", currentUserId);
+    if (!socket || !currentUserId) return;
 
     const handleNewMessage = (msg) => {
-      console.log(" Message received:", msg);
-      console.log(" From:", msg.sender._id || msg.sender);
-      console.log(" Current user:", currentUserId);
-      console.log(" Selected user:", selectedUserRef.current?._id);
-
-      // Get sender ID
       const senderId = msg.sender._id || msg.sender;
+      const messageText = msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : "");
 
-      // Check if message is from someone else
-      if (senderId === currentUserId) {
-        console.log(" Message from self, ignoring");
-        return;
-      }
+      console.log(" Received message:", msg);
 
-      console.log(" Message from someone else!");
+      //  Update last message for sender
+      setLastMessages((prev) => ({
+        ...prev,
+        [senderId]: {
+          text: messageText,
+          time: msg.createdAt
+        }
+      }));
 
-      // Check if chat is currently open
-      if (selectedUserRef.current?._id === senderId) {
-        console.log(" Chat is open, not incrementing unread");
-        return;
-      }
-
-      console.log(" Incrementing unread count for user:", senderId);
-
-      // Increment unread count
-      setUnreadCounts((prev) => {
-        const newCount = (prev[senderId] || 0) + 1;
-        console.log(" Unread count updated:", { userId: senderId, count: newCount });
-        return {
+      // Update unread count if message is from someone else and chat is not open
+      if (senderId !== currentUserId && selectedUserRef.current?._id !== senderId) {
+        setUnreadCounts((prev) => ({
           ...prev,
-          [senderId]: newCount
-        };
-      });
+          [senderId]: (prev[senderId] || 0) + 1
+        }));
+      }
+    };
+
+    //  Listen for message status updates
+    const handleStatusUpdate = (data) => {
+      console.log(" Message status updated:", data);
+      // This will trigger ChatWindow to re-fetch and update
     };
 
     socket.on("receiveMessage", handleNewMessage);
+    socket.on("messageStatusUpdate", handleStatusUpdate);
 
     return () => {
-      console.log(" Removing message listener");
       socket.off("receiveMessage", handleNewMessage);
+      socket.off("messageStatusUpdate", handleStatusUpdate);
     };
   }, [socket, currentUserId]);
 
-  // Get or create conversation
+  //  Get or create conversation + mark as read
   useEffect(() => {
-    if (!selectedUser) return;
+    if (!selectedUser || !selectedUser._id) {
+      setConversationId(null);
+      return;
+    }
 
     const getConversation = async () => {
       try {
         const token = localStorage.getItem("token");
+        console.log(" Getting conversation for user:", selectedUser._id);
+        
         const res = await axios.post(
           "http://localhost:5000/api/messages/conversation",
           { otherUserId: selectedUser._id },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        
+        console.log(" Conversation ID:", res.data._id);
         setConversationId(res.data._id);
 
-        //  Clear unread count when opening chat
-        console.log("🧹 Clearing unread count for:", selectedUser._id);
+        // Clear unread count
         setUnreadCounts((prev) => ({
           ...prev,
           [selectedUser._id]: 0
         }));
+
+        //  Emit mark as read
+        if (socket) {
+          socket.emit("markAsRead", { conversationId: res.data._id });
+        }
       } catch (err) {
-        console.error("Get conversation error:", err);
+        console.error(" Get conversation error:", err);
       }
     };
 
     getConversation();
-  }, [selectedUser]);
+  }, [selectedUser?._id, socket]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -195,18 +253,20 @@ export default function Dashboard() {
         `http://localhost:5000/api/messages/conversation/${conversationId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert("Chat cleared successfully!");
+      alert("Chat cleared!");
+      
+      // Clear last message for this user
+      setLastMessages(prev => {
+        const updated = { ...prev };
+        delete updated[selectedUser._id];
+        return updated;
+      });
+      
       window.location.reload();
     } catch (err) {
-      console.error("Clear chat error:", err);
       alert("Could not clear chat.");
     }
   };
-
-  //  Debug: Log unread counts whenever they change
-  useEffect(() => {
-    console.log("Current unread counts:", unreadCounts);
-  }, [unreadCounts]);
 
   if (loading) {
     return (
@@ -229,6 +289,7 @@ export default function Dashboard() {
         currentUsername={username}
         onLogout={handleLogout}
         unreadCounts={unreadCounts}
+        lastMessages={lastMessages}
       />
 
       <div className="flex-1 flex flex-col">
@@ -286,15 +347,11 @@ export default function Dashboard() {
 
                     {showChatMenu && (
                       <>
-                        <div 
-                          className="fixed inset-0 z-10" 
-                          onClick={() => setShowChatMenu(false)}
-                        ></div>
-                        
+                        <div className="fixed inset-0 z-10" onClick={() => setShowChatMenu(false)}></div>
                         <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
                           <button 
                             onClick={() => {
-                              alert(` ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
+                              alert(`👤 ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
                               setShowChatMenu(false);
                             }}
                             className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
@@ -307,7 +364,7 @@ export default function Dashboard() {
                           
                           <button 
                             onClick={() => {
-                              if (confirm(`🗑️ Clear chat with ${selectedUser.username}?`)) {
+                              if (confirm(` Clear chat with ${selectedUser.username}?`)) {
                                 handleClearChat();
                               }
                               setShowChatMenu(false);
@@ -339,10 +396,7 @@ export default function Dashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   {searchInChat && (
-                    <button
-                      onClick={() => setSearchInChat("")}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-200"
-                    >
+                    <button onClick={() => setSearchInChat("")} className="absolute right-3 top-3 text-gray-400 hover:text-gray-200">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -352,12 +406,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            <ChatWindow 
-              conversationId={conversationId} 
-              currentUserId={currentUserId}
-              searchQuery={searchInChat}
-            />
-
+            <ChatWindow conversationId={conversationId} currentUserId={currentUserId} searchQuery={searchInChat} />
             <MessageInput conversationId={conversationId} />
           </>
         ) : (
@@ -369,9 +418,7 @@ export default function Dashboard() {
                 </svg>
               </div>
               <h3 className="text-2xl font-semibold text-white mb-2">Welcome to Chat System</h3>
-              <p className="text-gray-400 max-w-md">
-                Select a conversation to start messaging
-              </p>
+              <p className="text-gray-400">Select a conversation to start messaging</p>
             </div>
           </div>
         )}

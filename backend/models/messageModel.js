@@ -15,13 +15,25 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: "" 
   },
-  //  NEW: Attachments field
   attachments: [{
     url: { type: String, required: true },
     filename: { type: String, required: true },
-    fileType: { type: String }, // image, video, document
-    fileSize: { type: Number }, // in bytes
+    fileType: { type: String },
+    fileSize: { type: Number },
   }],
+  //   Message status
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
+  },
+  //  Delivery and read timestamps
+  deliveredAt: { 
+    type: Date 
+  },
+  readAt: { 
+    type: Date 
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 
