@@ -24,7 +24,10 @@ export default function Message({ message, isOwn }) {
   const getStatusIcon = () => {
     const status = message.status || 'sent';
     
-    console.log("Message status:", message._id, status); // Debug log
+    //  Debug log - Remove after testing
+    if (isOwn) {
+      console.log(`Message ${message._id} status:`, status, message);
+    }
     
     if (status === 'read') {
       // Double tick - Blue (Read)
@@ -99,7 +102,7 @@ export default function Message({ message, isOwn }) {
                           : "bg-gray-700 hover:bg-gray-600"
                       }`}
                     >
-                      <span className="text-2xl"></span>
+                      <span className="text-2xl">📎</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{file.filename}</p>
                       </div>

@@ -91,7 +91,7 @@ export default function Dashboard() {
           const messages = msgRes.data;
           if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1];
-            const messageText = lastMsg.text || (lastMsg.attachments?.length > 0 ? " Attachment" : "");
+            const messageText = lastMsg.text || (lastMsg.attachments?.length > 0 ? "📎 Attachment" : "");
             
             setLastMessages(prev => ({
               ...prev,
@@ -122,9 +122,12 @@ export default function Dashboard() {
     loadLastMessages();
   }, [currentUserId, users]);
 
-  //  Online status management
+  //  Online status management + Notify server when online
   useEffect(() => {
     if (!socket) return;
+
+    //  Tell server user is online (for pending message delivery)
+    socket.emit("userOnline");
 
     socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
       setOnlineUsers(new Set(onlineList));
@@ -167,7 +170,7 @@ export default function Dashboard() {
 
       console.log(" Received message:", msg);
 
-      //  Update last message for sender
+      // Update last message for sender
       setLastMessages((prev) => ({
         ...prev,
         [senderId]: {
@@ -351,7 +354,7 @@ export default function Dashboard() {
                         <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
                           <button 
                             onClick={() => {
-                              alert(`👤 ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
+                              alert(` ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
                               setShowChatMenu(false);
                             }}
                             className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
