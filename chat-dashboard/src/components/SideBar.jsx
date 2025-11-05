@@ -7,6 +7,7 @@ export default function Sidebar({
   onSelectUser, 
   onlineUsers = new Set(),
   currentUsername = "",
+  currentUserId = "", // ✅ NEW
   onLogout,
   unreadCounts = {},
   lastMessages = {}
@@ -19,7 +20,7 @@ export default function Sidebar({
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  //  Sort users by last message time (most recent first)
+  // ✅ Sort users by last message time (most recent first)
   const sortedUsers = [...filteredUsers].sort((a, b) => {
     const timeA = lastMessages[a._id]?.time ? new Date(lastMessages[a._id].time).getTime() : 0;
     const timeB = lastMessages[b._id]?.time ? new Date(lastMessages[b._id].time).getTime() : 0;
@@ -139,6 +140,10 @@ export default function Sidebar({
                 unreadCount={unreadCounts[user._id] || 0}
                 lastMessage={lastMessages[user._id]?.text || ""}
                 lastMessageTime={lastMessages[user._id]?.time || null}
+                lastMessageSender={lastMessages[user._id]?.sender || null}
+                lastMessageStatus={lastMessages[user._id]?.status || "sent"} 
+                currentUserId={currentUserId} 
+
               />
             ))}
           </div>

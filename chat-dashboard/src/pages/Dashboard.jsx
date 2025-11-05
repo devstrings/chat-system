@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
-import Sidebar from "../components/Sidebar";
+import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import axios from "axios";
@@ -29,7 +29,7 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  //  Initial data fetch
+  // ✅ Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
@@ -42,29 +42,34 @@ export default function Dashboard() {
     setUsername(storedUsername);
 
     const fetchUsers = async () => {
-      try {
-        const res = await axios.get("http://localhost:5000/api/users", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUsers(res.data);
+  try {
+    const res = await axios.get("http://localhost:5000/api/users", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setUsers(res.data);
 
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setCurrentUserId(payload.id);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        if (err.response?.status === 401) {
-          localStorage.clear();
-          navigate("/login");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const id = payload.id || payload.userId || payload._id;
+
+    console.log(" Full Token Payload:", payload);
+    console.log(" Setting currentUserId to:", id);
+    setCurrentUserId(id);
+
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    if (err.response?.status === 401) {
+      localStorage.clear();
+      navigate("/login");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchUsers();
   }, [navigate]);
 
-  //  Load last messages for all users on mount
+  // ✅ Load last messages for all users on mount
   useEffect(() => {
     if (!currentUserId || users.length === 0) return;
 
@@ -97,7 +102,10 @@ export default function Dashboard() {
               ...prev,
               [user._id]: {
                 text: messageText,
-                time: lastMsg.createdAt
+                time: lastMsg.createdAt,
+                sender: lastMsg.sender?._id || lastMsg.sender || null,
+                        status: lastMsg.status || "sent"   // <-- ADD THIS
+
               }
             }));
 
@@ -122,11 +130,11 @@ export default function Dashboard() {
     loadLastMessages();
   }, [currentUserId, users]);
 
-  //  Online status management + Notify server when online
+  // ✅ Online status management + Notify server when online
   useEffect(() => {
     if (!socket) return;
 
-    //  Tell server user is online (for pending message delivery)
+    // ✅ Tell server user is online (for pending message delivery)
     socket.emit("userOnline");
 
     socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
@@ -160,7 +168,7 @@ export default function Dashboard() {
     };
   }, [socket]);
 
-  //  Listen for incoming messages + update last message
+  // ✅ Listen for incoming messages + update last message
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
@@ -168,9 +176,9 @@ export default function Dashboard() {
       const senderId = msg.sender._id || msg.sender;
       const messageText = msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : "");
 
-      console.log(" Received message:", msg);
+      console.log("📩 Received message:", msg);
 
-      // Update last message for sender
+      // ✅ Update last message for sender
       setLastMessages((prev) => ({
         ...prev,
         [senderId]: {
@@ -188,9 +196,9 @@ export default function Dashboard() {
       }
     };
 
-    //  Listen for message status updates
+    // ✅ Listen for message status updates
     const handleStatusUpdate = (data) => {
-      console.log(" Message status updated:", data);
+      console.log("📬 Message status updated:", data);
       // This will trigger ChatWindow to re-fetch and update
     };
 
@@ -203,7 +211,7 @@ export default function Dashboard() {
     };
   }, [socket, currentUserId]);
 
-  //  Get or create conversation + mark as read
+  // ✅ Get or create conversation + mark as read
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
       setConversationId(null);
@@ -213,7 +221,7 @@ export default function Dashboard() {
     const getConversation = async () => {
       try {
         const token = localStorage.getItem("token");
-        console.log(" Getting conversation for user:", selectedUser._id);
+        console.log("🔄 Getting conversation for user:", selectedUser._id);
         
         const res = await axios.post(
           "http://localhost:5000/api/messages/conversation",
@@ -221,7 +229,7 @@ export default function Dashboard() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
-        console.log(" Conversation ID:", res.data._id);
+        console.log("✅ Conversation ID:", res.data._id);
         setConversationId(res.data._id);
 
         // Clear unread count
@@ -230,12 +238,12 @@ export default function Dashboard() {
           [selectedUser._id]: 0
         }));
 
-        //  Emit mark as read
+        // ✅ Emit mark as read
         if (socket) {
           socket.emit("markAsRead", { conversationId: res.data._id });
         }
       } catch (err) {
-        console.error(" Get conversation error:", err);
+        console.error("❌ Get conversation error:", err);
       }
     };
 
@@ -271,16 +279,24 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
-          <p className="text-gray-300 text-lg">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+  //       <div className="text-center">
+  //         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
+  //         <p className="text-gray-300 text-lg">Loading...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+if (loading || !currentUserId) {
+  console.log(" Waiting for currentUserId...");
+  return (
+    <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-300">
+      <p>Loading dashboard...</p>
+    </div>
+  );
+}
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -293,6 +309,7 @@ export default function Dashboard() {
         onLogout={handleLogout}
         unreadCounts={unreadCounts}
         lastMessages={lastMessages}
+        currentUserId={currentUserId}  
       />
 
       <div className="flex-1 flex flex-col">
@@ -354,7 +371,7 @@ export default function Dashboard() {
                         <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
                           <button 
                             onClick={() => {
-                              alert(` ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
+                              alert(`👤 ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? '🟢 Online' : '⚫ Offline'}`);
                               setShowChatMenu(false);
                             }}
                             className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
@@ -367,7 +384,7 @@ export default function Dashboard() {
                           
                           <button 
                             onClick={() => {
-                              if (confirm(` Clear chat with ${selectedUser.username}?`)) {
+                              if (confirm(`🗑️ Clear chat with ${selectedUser.username}?`)) {
                                 handleClearChat();
                               }
                               setShowChatMenu(false);
@@ -409,7 +426,23 @@ export default function Dashboard() {
               )}
             </div>
 
-            <ChatWindow conversationId={conversationId} currentUserId={currentUserId} searchQuery={searchInChat} />
+            {/* <ChatWindow conversationId={conversationId} currentUserId={currentUserId} searchQuery={searchInChat} /> */}
+            <ChatWindow 
+  conversationId={conversationId}
+  currentUserId={currentUserId}
+  searchQuery={searchInChat}
+  onUpdateLastMessageStatus={(newStatus) => {
+    if (!selectedUser) return;
+    setLastMessages((prev) => ({
+      ...prev,
+      [selectedUser._id]: {
+        ...prev[selectedUser._id],
+        status: newStatus
+      }
+    }));
+  }}
+/>
+
             <MessageInput conversationId={conversationId} />
           </>
         ) : (

@@ -31,6 +31,8 @@ export function handleMessage(io, socket) {
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: lastMessageText,
         lastMessageTime: Date.now(),
+          lastMessageSender: socket.user.id, 
+
       });
 
       // Prepare message data
