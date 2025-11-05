@@ -11,11 +11,9 @@ export default function UserItem({
   lastMessageSender = null, 
   currentUserId = null,
   lastMessageStatus = "sent",
-
-
 }) {
-  
-  // Format time - WhatsApp style
+
+  // Format time WhatsApp-style
   const formatTime = (date) => {
     if (!date) return "";
     const now = new Date();
@@ -30,12 +28,10 @@ export default function UserItem({
     if (hours < 24) return `${hours}h`;
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days}d`;
-    
-    // Show date for older messages
     return msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Truncate message - WhatsApp style
+  // Truncate message
   const truncateMessage = (msg, length = 30) => {
     if (!msg || msg.trim() === "") return "";
     if (msg.length <= length) return msg;
@@ -43,36 +39,35 @@ export default function UserItem({
   };
 
   const displayMessage = truncateMessage(lastMessage);
-
-  //  Check if last message was sent by current user
   const isOwnMessage = lastMessageSender && currentUserId && lastMessageSender === currentUserId;
 
-  //  DEBUG: Remove after testing
-  if (displayMessage) {
-    console.log(`👤 ${user.username}:`, {
-      lastMessage: displayMessage,
-      lastMessageSender,
-      currentUserId,
-      isOwnMessage
-    });
+// UserItem.jsx - CORRECT VERSION
+const getMessageStatusIcon = () => {
+  if (!isOwnMessage) return null;
+
+  if (lastMessageStatus === 'read') {
+    // Double tick - Blue
+    return (
+      <svg className="w-3 h-3 text-blue-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+      </svg>
+    );
+  } else if (lastMessageStatus === 'delivered') {
+    // Double tick - Gray
+    return (
+      <svg className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+      </svg>
+    );
+  } else {
+    // Single tick - Gray
+    return (
+      <svg className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/>
+      </svg>
+    );
   }
-
-  //  Get status icon for sidebar (double tick)
-  const getMessageStatusIcon = () => {
-  if (!isOwnMessage) return null; // Only show for own messages
-  const color = lastMessageStatus === "read" ? "text-blue-400" : "text-gray-400";
-
-  return (
-    <svg
-      className={`w-3 h-3 flex-shrink-0 mr-1 ${color}`}
-      fill="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z" />
-    </svg>
-  );
 };
-
 
   return (
     <div
@@ -83,22 +78,20 @@ export default function UserItem({
       }`}
       onClick={onClick}
     >
-      {/* Avatar with Online Status */}
+      {/* Avatar */}
       <div className="relative flex-shrink-0">
         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold shadow-md transition-transform duration-200 ${
-          selected 
-            ? "bg-white bg-opacity-20" 
-            : "bg-gradient-to-br from-purple-500 to-pink-500"
+          selected ? "bg-white bg-opacity-20" : "bg-gradient-to-br from-purple-500 to-pink-500"
         }`}>
           {user.username.charAt(0).toUpperCase()}
         </div>
-        
-        {/* Online Status Indicator */}
+
+        {/* Online status */}
         {isOnline && (
           <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse"></div>
         )}
 
-        {/* Unread Badge on Avatar */}
+        {/* Unread badge */}
         {unreadCount > 0 && !selected && (
           <div className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-gray-900">
             <span className="text-white text-xs font-bold">
@@ -108,42 +101,30 @@ export default function UserItem({
         )}
       </div>
 
-      {/* User Info */}
+      {/* User info */}
       <div className="flex-1 min-w-0">
-        {/* Top row: Username + Time */}
+        {/* Username + Time */}
         <div className="flex items-center justify-between mb-1">
           <h3 className={`font-semibold truncate ${
             selected ? "text-white" : unreadCount > 0 ? "text-white" : "text-gray-200"
           }`}>
             {user.username}
           </h3>
-          
-          {/* Time (only show if message exists) */}
           {lastMessageTime && (
             <span className={`text-xs flex-shrink-0 ml-2 ${
-              selected 
-                ? "text-white text-opacity-70" 
-                : unreadCount > 0 
-                  ? "text-blue-400 font-semibold" 
-                  : "text-gray-500"
+              selected ? "text-white text-opacity-70" : unreadCount > 0 ? "text-blue-400 font-semibold" : "text-gray-500"
             }`}>
               {formatTime(lastMessageTime)}
             </span>
           )}
         </div>
-        
-        {/* Bottom row: Last Message Preview with Ticks */}
+
+        {/* Last message + tick */}
         {displayMessage && (
           <div className="flex items-center">
-            {/* Show double tick if we sent the last message */}
             {getMessageStatusIcon()}
-            
             <p className={`text-xs truncate ${
-              selected 
-                ? "text-white text-opacity-70" 
-                : unreadCount > 0 
-                  ? "text-gray-200 font-medium" 
-                  : "text-gray-400"
+              selected ? "text-white text-opacity-70" : unreadCount > 0 ? "text-gray-200 font-medium" : "text-gray-400"
             }`}>
               {displayMessage}
             </p>
@@ -151,7 +132,7 @@ export default function UserItem({
         )}
       </div>
 
-      {/* Chevron Icon (only when selected) */}
+      {/* Chevron */}
       {selected && (
         <svg className="w-5 h-5 text-white text-opacity-70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

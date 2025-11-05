@@ -1,69 +1,75 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
 const SocketContext = createContext();
 
 export function SocketProvider({ children }) {
-  const token = localStorage.getItem("token");
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    // ⚠️ Token na ho to skip
     if (!token) {
-      console.log(" No token found, skipping socket connection");
+      console.log("🚫 No token found, skipping socket connection.");
       return;
     }
 
-    console.log(" Attempting socket connection...");
+    console.log("🔌 Connecting socket with token:", token);
 
-    const socket = io("http://localhost:5000", {
+    // ✅ Socket connection
+    const newSocket = io("http://localhost:5000", {
       auth: { token },
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
-      timeout: 10000
     });
 
-    socketRef.current = socket;
+    setSocket(newSocket);
 
-    socket.on("connect", () => {
-      console.log(" Socket connected:", socket.id);
+    // 🔗 Connected
+    newSocket.on("connect", () => {
+      console.log("✅ Socket connected:", newSocket.id);
       setConnected(true);
     });
 
-    socket.on("disconnect", (reason) => {
-      console.log(" Socket disconnected:", reason);
+    // ❌ Disconnected
+    newSocket.on("disconnect", (reason) => {
+      console.warn("⚠️ Socket disconnected:", reason);
       setConnected(false);
     });
 
-    socket.on("connect_error", (err) => {
-      console.error(" Socket connection error:", err.message);
+    // ⚠️ Error during connection
+    newSocket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err.message);
       setConnected(false);
     });
 
-    //  CRITICAL: Listen for online/offline events
-    socket.on("userOnline", (data) => {
-      console.log(" User came online:", data);
+    // 👥 Online/offline events
+    newSocket.on("userOnline", (data) => {
+      console.log("🟢 User came online:", data);
     });
 
-    socket.on("userOffline", (data) => {
-      console.log(" User went offline:", data);
+    newSocket.on("userOffline", (data) => {
+      console.log("🔴 User went offline:", data);
     });
 
+    // 🧹 Cleanup
     return () => {
-      console.log(" Disconnecting socket...");
-      socket.off("userOnline");
-      socket.off("userOffline");
-      socket.disconnect();
+      console.log("🧹 Cleaning up socket...");
+      newSocket.removeAllListeners();
+      newSocket.disconnect();
     };
-  }, [token]);
+  }, []); // ✅ only runs once on mount (not every render)
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, connected }}>
+    <SocketContext.Provider value={{ socket, connected }}>
       {children}
     </SocketContext.Provider>
   );
 }
 
+// ✅ Custom hook
 export const useSocket = () => useContext(SocketContext);

@@ -42,29 +42,24 @@ export default function Dashboard() {
     setUsername(storedUsername);
 
     const fetchUsers = async () => {
-  try {
-    const res = await axios.get("http://localhost:5000/api/users", {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setUsers(res.data);
+      try {
+        const res = await axios.get("http://localhost:5000/api/users", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUsers(res.data);
 
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const id = payload.id || payload.userId || payload._id;
-
-    console.log(" Full Token Payload:", payload);
-    console.log(" Setting currentUserId to:", id);
-    setCurrentUserId(id);
-
-  } catch (err) {
-    console.error("Error fetching users:", err);
-    if (err.response?.status === 401) {
-      localStorage.clear();
-      navigate("/login");
-    }
-  } finally {
-    setLoading(false);
-  }
-};
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUserId(payload.id);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        if (err.response?.status === 401) {
+          localStorage.clear();
+          navigate("/login");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchUsers();
   }, [navigate]);
@@ -103,9 +98,8 @@ export default function Dashboard() {
               [user._id]: {
                 text: messageText,
                 time: lastMsg.createdAt,
-                sender: lastMsg.sender?._id || lastMsg.sender || null,
-                        status: lastMsg.status || "sent"   // <-- ADD THIS
-
+                sender: lastMsg.sender._id || lastMsg.sender, // ✅ Store sender ID
+                status: lastMsg.status || 'sent' // ✅ Store status
               }
             }));
 
@@ -178,12 +172,14 @@ export default function Dashboard() {
 
       console.log("📩 Received message:", msg);
 
-      // ✅ Update last message for sender
+      // ✅ Update last message for sender WITH STATUS
       setLastMessages((prev) => ({
         ...prev,
         [senderId]: {
           text: messageText,
-          time: msg.createdAt
+          time: msg.createdAt,
+          sender: senderId,
+          status: msg.status || 'sent' // ✅ ADD STATUS
         }
       }));
 
@@ -279,24 +275,16 @@ export default function Dashboard() {
     }
   };
 
-  // if (loading) {
-  //   return (
-  //     <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-  //       <div className="text-center">
-  //         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
-  //         <p className="text-gray-300 text-lg">Loading...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-if (loading || !currentUserId) {
-  console.log(" Waiting for currentUserId...");
-  return (
-    <div className="flex items-center justify-center h-screen bg-gray-900 text-gray-300">
-      <p>Loading dashboard...</p>
-    </div>
-  );
-}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
+          <p className="text-gray-300 text-lg">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -306,10 +294,10 @@ if (loading || !currentUserId) {
         onSelectUser={setSelectedUser}
         onlineUsers={onlineUsers}
         currentUsername={username}
+        currentUserId={currentUserId} // ✅ Pass user ID
         onLogout={handleLogout}
         unreadCounts={unreadCounts}
         lastMessages={lastMessages}
-        currentUserId={currentUserId}  
       />
 
       <div className="flex-1 flex flex-col">
@@ -426,23 +414,7 @@ if (loading || !currentUserId) {
               )}
             </div>
 
-            {/* <ChatWindow conversationId={conversationId} currentUserId={currentUserId} searchQuery={searchInChat} /> */}
-            <ChatWindow 
-  conversationId={conversationId}
-  currentUserId={currentUserId}
-  searchQuery={searchInChat}
-  onUpdateLastMessageStatus={(newStatus) => {
-    if (!selectedUser) return;
-    setLastMessages((prev) => ({
-      ...prev,
-      [selectedUser._id]: {
-        ...prev[selectedUser._id],
-        status: newStatus
-      }
-    }));
-  }}
-/>
-
+            <ChatWindow conversationId={conversationId} currentUserId={currentUserId} searchQuery={searchInChat} />
             <MessageInput conversationId={conversationId} />
           </>
         ) : (
