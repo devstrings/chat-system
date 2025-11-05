@@ -7,7 +7,7 @@ export default function Sidebar({
   onSelectUser, 
   onlineUsers = new Set(),
   currentUsername = "",
-  currentUserId = "", // ✅ NEW
+  currentUserId = "", 
   onLogout,
   unreadCounts = {},
   lastMessages = {}
@@ -20,7 +20,7 @@ export default function Sidebar({
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ✅ Sort users by last message time (most recent first)
+  //  Sort users by last message time (most recent first)
   const sortedUsers = [...filteredUsers].sort((a, b) => {
     const timeA = lastMessages[a._id]?.time ? new Date(lastMessages[a._id].time).getTime() : 0;
     const timeB = lastMessages[b._id]?.time ? new Date(lastMessages[b._id].time).getTime() : 0;

@@ -44,7 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
 
-app.get("/", (_, res) => res.send("✅ Chat server active!"));
+app.get("/", (_, res) => res.send(" Chat server active!"));
 
 // In-memory online users
 const onlineUsers = new Map();
@@ -66,18 +66,18 @@ io.use((socket, next) => {
 // Socket connection
 io.on("connection", (socket) => {
   const userId = socket.user.id;
-  console.log(`✅ Socket connected: ${socket.id} (User: ${userId})`);
+  console.log(` Socket connected: ${socket.id} (User: ${userId})`);
 
   onlineUsers.set(userId, socket.id);
   
   const onlineUserIds = Array.from(onlineUsers.keys());
-  console.log(`✅ Total online users: ${onlineUserIds.length}`);
+  console.log(` Total online users: ${onlineUserIds.length}`);
   
   // Broadcast to ALL clients
   io.emit("userOnline", { userId, onlineUsers: onlineUserIds });
   socket.emit("onlineUsersList", { onlineUsers: onlineUserIds });
 
-  // ✅ USE MESSAGE HANDLER (with status support)
+  //  USE MESSAGE HANDLER (with status support)
   handleMessage(io, socket);
 
   // Typing indicator
@@ -91,7 +91,7 @@ io.on("connection", (socket) => {
 
   // Disconnect
   socket.on("disconnect", (reason) => {
-    console.log(`❌ User ${userId} disconnected (Reason: ${reason})`);
+    console.log(` User ${userId} disconnected (Reason: ${reason})`);
     
     onlineUsers.delete(userId);
     
@@ -101,4 +101,4 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(` Server running on port ${PORT}`));

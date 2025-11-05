@@ -7,7 +7,7 @@ export default function ChatWindow({
   conversationId,
   currentUserId,
   searchQuery = "",
-  onUpdateLastMessageStatus, // ✅ added
+  onUpdateLastMessageStatus, //  for sidebar sync
 }) {
   const { socket } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -19,7 +19,7 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  // Fetch messages when conversation changes
+  //  Fetch messages when chat changes
   useEffect(() => {
     if (!conversationId) {
       console.log(" No conversation ID, skipping message fetch");
@@ -40,17 +40,16 @@ export default function ChatWindow({
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log(" Fetched messages:", res.data.length, "messages");
+        console.log(" Fetched", res.data.length, "messages");
         setMessages(res.data);
 
-        //  Mark messages as read when opening chat
+        //  Mark as read when opening chat
         if (socket && res.data.length > 0) {
-          console.log(" Marking messages as read");
+          console.log(" Marking as read (on open)");
           socket.emit("markAsRead", { conversationId });
         }
       } catch (err) {
         console.error(" Error fetching messages:", err);
-        console.error("Error details:", err.response?.data);
       } finally {
         setLoading(false);
       }
@@ -59,36 +58,50 @@ export default function ChatWindow({
     fetchMessages();
   }, [conversationId, socket]);
 
-  //  Listen for new messages
+  // Socket listeners
   useEffect(() => {
     if (!socket) return;
 
+    //  Receive new message
     const handleReceiveMessage = (msg) => {
       console.log(" New message received:", msg);
 
-      // Only add if message belongs to current conversation
       if (msg.conversationId === conversationIdRef.current) {
         setMessages((prev) => [...prev, msg]);
 
-        //  Auto mark as read if chat is open
+        //  Sidebar instantly reflects last message
+        if (onUpdateLastMessageStatus) {
+          onUpdateLastMessageStatus(msg.status || "sent");
+        }
+
+        //  Auto mark as read (delay for render)
         if (socket && msg.sender._id !== currentUserId) {
-          socket.emit("markAsRead", { conversationId: msg.conversationId });
+          setTimeout(() => {
+            socket.emit("markAsRead", { conversationId: msg.conversationId });
+          }, 300);
         }
       }
     };
 
-    //  Listen for status updates (delivered/read)
+    //  Handle single message status update
     const handleStatusUpdate = (data) => {
-      console.log(" Status update:", data);
+      console.log(" Status update received:", data);
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === data.messageId ? { ...msg, status: data.status } : msg
+          msg._id === data.messageId || msg._id === data._id
+            ? { ...msg, status: data.status }
+            : msg
         )
       );
+
+      //  If latest message is now read, inform sidebar
+      if (onUpdateLastMessageStatus && data.status === "read") {
+        onUpdateLastMessageStatus("read");
+      }
     };
 
-    //  Listen for bulk read updates
+    //  Handle bulk read (all messages read)
     const handleMessagesRead = (data) => {
       console.log(" Messages marked as read:", data);
 
@@ -101,7 +114,6 @@ export default function ChatWindow({
           )
         );
 
-        // ✅ tell parent that last message is now read
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus("read");
         }
@@ -119,18 +131,19 @@ export default function ChatWindow({
     };
   }, [socket, currentUserId, onUpdateLastMessageStatus]);
 
-  //  Auto scroll to bottom
+  //  Auto scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  //  Filter messages based on search query
+  //  Filter messages by search
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
         msg.text?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : messages;
 
+  //  Loading state
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -142,6 +155,7 @@ export default function ChatWindow({
     );
   }
 
+  //  No messages found
   if (filteredMessages.length === 0 && searchQuery) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -167,6 +181,7 @@ export default function ChatWindow({
     );
   }
 
+  //  No messages yet
   if (filteredMessages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -193,7 +208,7 @@ export default function ChatWindow({
     );
   }
 
-  //  Group messages by date
+  //  Group by date
   const groupedMessages = filteredMessages.reduce((groups, msg) => {
     const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
       weekday: "long",
@@ -202,25 +217,24 @@ export default function ChatWindow({
       day: "numeric",
     });
 
-    if (!groups[date]) {
-      groups[date] = [];
-    }
+    if (!groups[date]) groups[date] = [];
     groups[date].push(msg);
     return groups;
   }, {});
 
+  //  Render UI
   return (
     <div className="flex-1 overflow-y-auto bg-gray-900 bg-opacity-30 px-6 py-4">
       {Object.entries(groupedMessages).map(([date, msgs]) => (
         <div key={date}>
-          {/* Date divider */}
+          {/*  Date divider */}
           <div className="flex items-center justify-center my-4">
             <div className="bg-gray-800 bg-opacity-70 px-4 py-1 rounded-full shadow-md">
               <p className="text-xs text-gray-400 font-medium">{date}</p>
             </div>
           </div>
 
-          {/* Messages for this date */}
+          {/*  Messages */}
           {msgs.map((msg) => (
             <Message
               key={msg._id}
@@ -233,7 +247,6 @@ export default function ChatWindow({
           ))}
         </div>
       ))}
-
       <div ref={messagesEndRef} />
     </div>
   );

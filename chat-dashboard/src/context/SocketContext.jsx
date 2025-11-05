@@ -12,13 +12,13 @@ export function SocketProvider({ children }) {
 
     // ⚠️ Token na ho to skip
     if (!token) {
-      console.log("🚫 No token found, skipping socket connection.");
+      console.log(" No token found, skipping socket connection.");
       return;
     }
 
-    console.log("🔌 Connecting socket with token:", token);
+    console.log(" Connecting socket with token:", token);
 
-    // ✅ Socket connection
+    // ocket connection
     const newSocket = io("http://localhost:5000", {
       auth: { token },
       transports: ["websocket"],
@@ -29,40 +29,40 @@ export function SocketProvider({ children }) {
 
     setSocket(newSocket);
 
-    // 🔗 Connected
+    //  Connected
     newSocket.on("connect", () => {
-      console.log("✅ Socket connected:", newSocket.id);
+      console.log(" Socket connected:", newSocket.id);
       setConnected(true);
     });
 
-    // ❌ Disconnected
+    //  Disconnected
     newSocket.on("disconnect", (reason) => {
-      console.warn("⚠️ Socket disconnected:", reason);
+      console.warn(" Socket disconnected:", reason);
       setConnected(false);
     });
 
-    // ⚠️ Error during connection
+    // Error during connection
     newSocket.on("connect_error", (err) => {
-      console.error("❌ Socket connection error:", err.message);
+      console.error(" Socket connection error:", err.message);
       setConnected(false);
     });
 
-    // 👥 Online/offline events
+    //  Online/offline events
     newSocket.on("userOnline", (data) => {
-      console.log("🟢 User came online:", data);
+      console.log(" User came online:", data);
     });
 
     newSocket.on("userOffline", (data) => {
-      console.log("🔴 User went offline:", data);
+      console.log(" User went offline:", data);
     });
 
-    // 🧹 Cleanup
+    // Cleanup
     return () => {
-      console.log("🧹 Cleaning up socket...");
+      console.log(" Cleaning up socket...");
       newSocket.removeAllListeners();
       newSocket.disconnect();
     };
-  }, []); // ✅ only runs once on mount (not every render)
+  }, []); //  only runs once on mount (not every render)
 
   return (
     <SocketContext.Provider value={{ socket, connected }}>
@@ -71,5 +71,5 @@ export function SocketProvider({ children }) {
   );
 }
 
-// ✅ Custom hook
+//  Custom hook
 export const useSocket = () => useContext(SocketContext);
