@@ -102,6 +102,7 @@ export default function Dashboard() {
                 time: lastMsg.createdAt,
                 sender: lastMsg.sender._id || lastMsg.sender, //  Store sender ID
                 status: lastMsg.status || "sent", //  Store status
+                lastMessageId: lastMsg._id
               },
             }));
 
@@ -184,6 +185,7 @@ export default function Dashboard() {
           status: msg.status || "sent",
           conversationId: msg.conversationId,
           lastMessageId: msg._id,
+          
         },
       }));
 
@@ -203,32 +205,25 @@ export default function Dashboard() {
     };
 
     //  Listen for message status updates
-    const handleStatusUpdate = ({ messageId, conversationId, status }) => {
-      console.log("Message status updated:", {
-        messageId,
-        conversationId,
-        status,
-      });
-
-      //  Update last message tick (sidebar)
-      setLastMessages((prev) => {
-        const updated = { ...prev };
-        for (const [userId, data] of Object.entries(updated)) {
-          if (
-            data?.lastMessageId === messageId ||
-            data?.conversationId === conversationId
-          ) {
-            updated[userId] = { ...data, status };
-          }
-        }
-        return updated;
-      });
-
-      //  Notify ChatWindow (only if open)
-      if (selectedUserRef.current && selectedUserRef.current._id) {
-        socket.emit("triggerLocalStatusUpdate", { messageId, status });
+   // ✅ CORRECT:
+const handleStatusUpdate = ({ messageId, status }) => {
+  console.log("📬 Status update received:", { messageId, status });
+  
+  // Update lastMessages state for sidebar
+  setLastMessages((prev) => {
+    const updated = {};
+    for (const [userId, msgData] of Object.entries(prev)) {
+      updated[userId] = msgData; // Copy existing
+      
+      // If this is the last message, update its status
+      if (msgData?.lastMessageId === messageId) {
+        updated[userId] = { ...msgData, status };
+        console.log(`✅ Updated ${userId} message status to ${status}`);
       }
-    };
+    }
+    return updated;
+  });
+};
 
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
