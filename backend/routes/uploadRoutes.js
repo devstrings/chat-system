@@ -1,12 +1,10 @@
 import express from "express";
 import upload from "../middleware/upload.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import { uploadToCloudinary } from "../config/cloudinary.js";
 import fs from "fs";
 
 const router = express.Router();
 
-//  Upload file endpoint
 router.post("/file", verifyToken, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -15,21 +13,11 @@ router.post("/file", verifyToken, upload.single("file"), async (req, res) => {
 
     console.log(" File received:", req.file);
 
-    // Option 1: Use Cloudinary (cloud storage)
-    // const cloudinaryResult = await uploadToCloudinary(req.file.path);
-    // fs.unlinkSync(req.file.path); // Delete local file after upload
-    // return res.json({
-    //   url: cloudinaryResult.url,
-    //   filename: req.file.originalname,
-    //   fileType: req.file.mimetype,
-    //   fileSize: req.file.size,
-    // });
-
-    // Option 2: Use local storage (simpler)
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    // SECURE: Return only filename, not full path
+    const fileUrl = `/api/download/file/${req.file.filename}`;
     
     res.json({
-      url: fileUrl,
+      url: fileUrl, // Protected URL
       filename: req.file.originalname,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
@@ -37,6 +25,12 @@ router.post("/file", verifyToken, upload.single("file"), async (req, res) => {
 
   } catch (error) {
     console.error("Upload error:", error);
+    
+    // Delete file if error occurs
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
     res.status(500).json({ message: "File upload failed", error: error.message });
   }
 });

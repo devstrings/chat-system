@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export default function Message({ message, isOwn }) {
+  const [imageUrls, setImageUrls] = useState({});
+  const [imageLoading, setImageLoading] = useState({});
+
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString("en-US", {
       hour: "numeric",
@@ -20,31 +23,108 @@ export default function Message({ message, isOwn }) {
     return message.sender?.username || "Unknown";
   };
 
+  //  Fetch secure images with authentication
+  useEffect(() => {
+    const fetchSecureImages = async () => {
+      if (!message.attachments || message.attachments.length === 0) return;
+
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      for (const [index, file] of message.attachments.entries()) {
+        // Only fetch images
+        if (file.fileType?.startsWith("image/")) {
+          setImageLoading(prev => ({ ...prev, [index]: true }));
+
+          try {
+            const response = await fetch(`http://localhost:5000${file.url}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to load image');
+            }
+
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            setImageUrls(prev => ({ ...prev, [index]: imageUrl }));
+          } catch (error) {
+            console.error('Error loading image:', error);
+          } finally {
+            setImageLoading(prev => ({ ...prev, [index]: false }));
+          }
+        }
+      }
+    };
+
+    fetchSecureImages();
+
+    // Cleanup blob URLs on unmount
+    return () => {
+      Object.values(imageUrls).forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [message.attachments]);
+
+  //  Download file with authentication
+  const handleFileDownload = async (file) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("Please login to download files");
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000${file.url}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download file');
+    }
+  };
+
   //  Get status icon - WhatsApp style
   const getStatusIcon = () => {
     const status = message.status || 'sent';
     
-    //  Debug log - Remove after testing
     if (isOwn) {
       console.log(`Message ${message._id} status:`, status, message);
     }
     
     if (status === 'read') {
-      // Double tick - Blue (Read)
       return (
         <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
           <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
         </svg>
       );
     } else if (status === 'delivered') {
-      // Double tick - Gray (Delivered)
       return (
         <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
           <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
         </svg>
       );
     } else {
-      // Single tick - Gray (Sent)
       return (
         <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
           <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/>
@@ -84,29 +164,52 @@ export default function Message({ message, isOwn }) {
               {message.attachments.map((file, index) => (
                 <div key={index} className="mb-2">
                   {file.fileType?.startsWith("image/") ? (
-                    <a href={file.url} target="_blank" rel="noopener noreferrer">
-                      <img 
-                        src={file.url} 
-                        alt={file.filename}
-                        className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
-                      />
-                    </a>
+                    <div className="relative">
+                      {imageLoading[index] ? (
+                        // Loading spinner for images
+                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                          <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </div>
+                      ) : imageUrls[index] ? (
+                        // Display secure image
+                        <img 
+                          src={imageUrls[index]} 
+                          alt={file.filename}
+                          className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
+                          onClick={() => window.open(imageUrls[index], '_blank')}
+                        />
+                      ) : (
+                        // Error fallback
+                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                          <p className="text-gray-400 text-sm">Failed to load image</p>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <a 
-                      href={file.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-2 p-2 rounded-lg transition ${
+                    // Document/File download button
+                    <button
+                      onClick={() => handleFileDownload(file)}
+                      className={`flex items-center gap-2 p-3 rounded-lg transition w-full ${
                         isOwn 
                           ? "bg-white bg-opacity-20 hover:bg-opacity-30" 
                           : "bg-gray-700 hover:bg-gray-600"
                       }`}
                     >
-                      <span className="text-2xl">📎</span>
-                      <div className="flex-1 min-w-0">
+                      <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <div className="flex-1 min-w-0 text-left">
                         <p className="text-sm font-medium truncate">{file.filename}</p>
+                        <p className="text-xs opacity-70">
+                          {(file.fileSize / 1024).toFixed(1)} KB • Click to download
+                        </p>
                       </div>
-                    </a>
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
                   )}
                 </div>
               ))}
