@@ -11,8 +11,8 @@ import { config } from "./config/index.js";
 import connectDB from "./config/db.js";
 import { connectRedis } from "./config/redis.js"; 
 
-// Routes
-import routes from "./routes/index.js";
+// Routes - function import
+import setupRoutes from "./routes/index.js"; // 
 
 // Socket setup import
 import { setupSocket } from "./socket/index.js";
@@ -42,7 +42,9 @@ const startServer = async () => {
     app.use(cors());
     app.use(express.json());
     // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-    app.use("/api", routes);
+
+    
+    setupRoutes(app);
 
     app.get("/", (_, res) => res.send("Chat server active!"));
 

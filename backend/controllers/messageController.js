@@ -1,5 +1,6 @@
 import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
+import Attachment from "../models/Attachment.js"; // ✅ ADDED
 
 // Get or create conversation between two users
 export const getOrCreateConversation = async (req, res) => {
@@ -39,11 +40,32 @@ export const getMessages = async (req, res) => {
 
     const messages = await Message.find({ conversationId })
       .populate("sender", "username email")
+      .populate({
+        path: "attachments",
+        select: "fileName fileType sizeInKilobytes serverFileName status"
+      })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit);
 
-    res.json(messages);
+    // Transform attachments to match frontend expectations
+    const transformedMessages = messages.map(msg => {
+      const messageObj = msg.toObject();
+      
+      if (messageObj.attachments && messageObj.attachments.length > 0) {
+        messageObj.attachments = messageObj.attachments.map(att => ({
+          url: `/api/file/get/${att.serverFileName}`,
+          filename: att.fileName,
+          fileType: att.fileType,
+          fileSize: att.sizeInKilobytes * 1024,
+          attachmentId: att._id
+        }));
+      }
+      
+      return messageObj;
+    });
+
+    res.json(transformedMessages);
   } catch (err) {
     console.error("Get messages error:", err);
     res.status(500).json({ message: "Failed to fetch messages", error: err.message });
@@ -59,6 +81,7 @@ export const getUserConversations = async (req, res) => {
       participants: currentUserId
     })
       .populate("participants", "username email")
+      .populate("lastMessageSender", "username") // ✅ ADDED populate
       .sort({ lastMessageTime: -1 });
 
     res.json(conversations);
@@ -68,7 +91,7 @@ export const getUserConversations = async (req, res) => {
   }
 };
 
-//  NEW: Clear chat (delete all messages in conversation)
+// Clear chat (delete all messages in conversation)
 export const clearChat = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -88,10 +111,17 @@ export const clearChat = async (req, res) => {
     // Delete all messages in this conversation
     const result = await Message.deleteMany({ conversationId });
 
+    // Mark attachments as deleted instead of actually deleting
+    await Attachment.updateMany(
+      { conversationId },
+      { status: 'deleted' }
+    );
+
     // Update conversation
     await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: "",
-      lastMessageTime: Date.now()
+      lastMessageTime: Date.now(),
+      lastMessageSender: null // ✅ RESET sender
     });
 
     res.json({ 

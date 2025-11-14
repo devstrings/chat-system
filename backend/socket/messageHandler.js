@@ -2,23 +2,39 @@ import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
 
 export function handleMessage(io, socket) {
-  console.log(` User connected: ${socket.user.id}`);
+  console.log(`✅ User connected: ${socket.user.id}`);
 
   //  Send message
   socket.on("sendMessage", async ({ conversationId, text, attachments = [] }) => {
     try {
-      console.log(" Sending message:", { conversationId, text, senderId: socket.user.id });
+      console.log("📤 Sending message:", { conversationId, text, senderId: socket.user.id });
+
+      //  Extract attachment IDs from attachment objects
+      let attachmentIds = [];
+      if (attachments && attachments.length > 0) {
+        attachmentIds = attachments.map(att => att.attachmentId).filter(Boolean);
+        console.log("📎 Attachment IDs:", attachmentIds);
+      }
 
       //  Create message with 'sent' status
       const msg = await Message.create({
         conversationId,
         sender: socket.user.id,
         text: text || "",
-        attachments: attachments || [],
+        attachments: attachmentIds,
         status: "sent",
       });
 
+      console.log("✅ Message created:", msg._id);
+
+      //  Populate sender AND attachments properly
       await msg.populate("sender", "username email");
+      await msg.populate({
+        path: "attachments",
+        select: "fileName fileType sizeInKilobytes serverFileName"
+      });
+
+      console.log("✅ Populated attachments:", msg.attachments);
 
       //  Get conversation & find participants
       const conversation = await Conversation.findById(conversationId).populate(
@@ -27,17 +43,37 @@ export function handleMessage(io, socket) {
       );
 
       if (!conversation) {
-        console.warn(" Conversation not found:", conversationId);
+        console.warn("⚠️ Conversation not found:", conversationId);
         return;
       }
 
       //  Update conversation with last message
-      const lastMessageText = text || (attachments.length > 0 ? "📎 Attachment" : "");
+      // ✅ FIX: Use attachmentIds.length instead of attachments.length
+      const lastMessageText = text || (attachmentIds.length > 0 ? "📎 Attachment" : "");
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: lastMessageText,
         lastMessageTime: Date.now(),
         lastMessageSender: socket.user.id,
       });
+
+      //  Transform attachments for frontend (with safety checks)
+      const transformedAttachments = msg.attachments && msg.attachments.length > 0
+        ? msg.attachments.map(att => {
+            if (!att || !att.serverFileName) {
+              console.warn("⚠️ Invalid attachment:", att);
+              return null;
+            }
+            return {
+              url: `/api/file/get/${att.serverFileName}`,
+              filename: att.fileName,
+              fileType: att.fileType,
+              fileSize: att.sizeInKilobytes * 1024,
+              attachmentId: att._id
+            };
+          }).filter(Boolean)
+        : [];
+
+      console.log("✅ Transformed attachments:", transformedAttachments);
 
       //  Prepare message data
       const messageData = {
@@ -49,12 +85,12 @@ export function handleMessage(io, socket) {
           email: msg.sender.email,
         },
         text: msg.text,
-        attachments: msg.attachments || [],
+        attachments: transformedAttachments,
         status: msg.status,
         createdAt: msg.createdAt,
       };
 
-      console.log(" Broadcasting message with status:", messageData.status);
+      console.log("✅ Broadcasting message:", messageData);
 
       //  Emit only to conversation participants
       conversation.participants.forEach((participant) => {
@@ -63,6 +99,7 @@ export function handleMessage(io, socket) {
         );
 
         if (targetSocket) {
+          console.log(`✅ Emitting to user: ${participant._id}`);
           targetSocket.emit("receiveMessage", messageData);
         }
       });
@@ -78,8 +115,7 @@ export function handleMessage(io, socket) {
         );
 
         if (receiverSocket) {
-          //  Receiver is online
-          console.log(` Receiver is ONLINE, marking as delivered`);
+          console.log(`✅ Receiver ONLINE, marking delivered`);
           setTimeout(async () => {
             try {
               await Message.findByIdAndUpdate(msg._id, {
@@ -87,9 +123,8 @@ export function handleMessage(io, socket) {
                 deliveredAt: new Date(),
               });
 
-              console.log(" Message delivered:", msg._id);
+              console.log("✅ Message delivered:", msg._id);
 
-              // Notify both users
               [socket, receiverSocket].forEach((s) =>
                 s.emit("messageStatusUpdate", {
                   messageId: msg._id,
@@ -98,23 +133,24 @@ export function handleMessage(io, socket) {
                 })
               );
             } catch (err) {
-              console.error(" Delivery update error:", err);
+              console.error("❌ Delivery error:", err);
             }
           }, 500);
         } else {
-          console.log(` Receiver is OFFLINE, message stays 'sent'`);
+          console.log(`⚠️ Receiver OFFLINE`);
         }
       }
     } catch (err) {
-      console.error(" sendMessage error:", err);
+      console.error("❌ sendMessage error:", err);
+      console.error("❌ Stack:", err.stack);
       socket.emit("errorMessage", { message: "Message send failed" });
     }
   });
 
-  //  Handle user coming online - Deliver pending messages
+  //  Handle user coming online
   socket.on("userOnline", async () => {
     try {
-      console.log(` User ${socket.user.id} came online, checking pending messages`);
+      console.log(`✅ User ${socket.user.id} online`);
 
       const conversations = await Conversation.find({
         participants: socket.user.id,
@@ -128,7 +164,7 @@ export function handleMessage(io, socket) {
         });
 
         if (pendingMessages.length > 0) {
-          console.log(` Delivering ${pendingMessages.length} pending messages`);
+          console.log(`✅ Delivering ${pendingMessages.length} messages`);
 
           await Message.updateMany(
             {
@@ -152,14 +188,14 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error(" userOnline error:", err);
+      console.error("❌ userOnline error:", err);
     }
   });
 
   //  Mark messages as read
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
-      console.log(` Marking messages as read in conversation: ${conversationId}`);
+      console.log(`✅ Marking read: ${conversationId}`);
 
       const result = await Message.updateMany(
         {
@@ -174,12 +210,10 @@ export function handleMessage(io, socket) {
       );
 
       if (result.modifiedCount > 0) {
-        console.log(` Marked ${result.modifiedCount} messages as read`);
+        console.log(` Marked ${result.modifiedCount} as read`);
 
-        //  find conversation participants
         const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
 
-        //  send read status only to conversation participants
         for (const participant of conversation.participants) {
           const targetSocket = [...io.sockets.sockets.values()].find(
             (s) => s.user && s.user.id === participant._id.toString()
@@ -194,12 +228,11 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error(" markAsRead error:", err);
+      console.error("markAsRead error:", err);
     }
   });
 
-  //  Handle disconnect
   socket.on("disconnect", () => {
-    console.log(` User disconnected: ${socket.user.id}`);
+    console.log(`❌ User disconnected: ${socket.user.id}`);
   });
 }

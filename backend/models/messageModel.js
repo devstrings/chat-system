@@ -15,11 +15,10 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: "" 
   },
+  // Updated: Now references Attachment model
   attachments: [{
-    url: { type: String, required: true },
-    filename: { type: String, required: true },
-    fileType: { type: String },
-    fileSize: { type: Number },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Attachment"
   }],
   //   Message status
   status: {

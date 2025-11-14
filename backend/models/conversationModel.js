@@ -16,7 +16,10 @@ const conversationSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   },
-  //  NEW: Unread message count
+  lastMessageSender: { // ✅ ADDED
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User" 
+  },
   unreadCount: {
     type: Number,
     default: 0
@@ -29,5 +32,6 @@ const conversationSchema = new mongoose.Schema({
 
 // Index for faster queries
 conversationSchema.index({ participants: 1 });
+conversationSchema.index({ lastMessageTime: -1 }); // ✅ ADDED for sorting
 
 export default mongoose.model("Conversation", conversationSchema);

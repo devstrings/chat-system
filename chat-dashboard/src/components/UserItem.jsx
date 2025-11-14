@@ -43,8 +43,7 @@ export default function UserItem({
 
 // UserItem.jsx - CORRECT VERSION
 const getMessageStatusIcon = () => {
-  if (!isOwnMessage) return null;
-
+if (!isOwnMessage || !lastMessage) return null;
   if (lastMessageStatus === 'read') {
     // Double tick - Blue
     return (
