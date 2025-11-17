@@ -1,6 +1,6 @@
 import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
-import Attachment from "../models/Attachment.js"; // ✅ ADDED
+import Attachment from "../models/Attachment.js"; 
 
 // Get or create conversation between two users
 export const getOrCreateConversation = async (req, res) => {
@@ -81,7 +81,7 @@ export const getUserConversations = async (req, res) => {
       participants: currentUserId
     })
       .populate("participants", "username email")
-      .populate("lastMessageSender", "username") // ✅ ADDED populate
+      .populate("lastMessageSender", "username") 
       .sort({ lastMessageTime: -1 });
 
     res.json(conversations);
@@ -121,7 +121,7 @@ export const clearChat = async (req, res) => {
     await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: "",
       lastMessageTime: Date.now(),
-      lastMessageSender: null // ✅ RESET sender
+      lastMessageSender: null 
     });
 
     res.json({ 

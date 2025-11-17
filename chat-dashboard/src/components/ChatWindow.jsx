@@ -22,7 +22,7 @@ export default function ChatWindow({
   //  Fetch messages when chat changes
   useEffect(() => {
     if (!conversationId) {
-      console.log("❌ No conversation ID, skipping message fetch");
+      console.log(" No conversation ID, skipping message fetch");
       setMessages([]);
       setLoading(false);
       return;
@@ -33,23 +33,23 @@ export default function ChatWindow({
         setLoading(true);
         const token = localStorage.getItem("token");
 
-        console.log("🔍 Fetching messages for conversation:", conversationId);
+        console.log(" Fetching messages for conversation:", conversationId);
 
         const res = await axios.get(
           `http://localhost:5000/api/messages/${conversationId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log("✅ Fetched", res.data.length, "messages");
+        console.log(" Fetched", res.data.length, "messages");
         setMessages(res.data);
 
         //  Mark as read when opening chat
         if (socket && res.data.length > 0) {
-          console.log("✅ Marking as read (on open)");
+          console.log(" Marking as read (on open)");
           socket.emit("markAsRead", { conversationId });
         }
       } catch (err) {
-        console.error("❌ Error fetching messages:", err);
+        console.error(" Error fetching messages:", err);
       } finally {
         setLoading(false);
       }
@@ -64,7 +64,7 @@ export default function ChatWindow({
 
     //  Receive new message
     const handleReceiveMessage = (msg) => {
-      console.log("📬 New message received:", msg);
+      console.log(" New message received:", msg);
 
       if (msg.conversationId === conversationIdRef.current) {
         setMessages((prev) => [...prev, msg]);
@@ -83,16 +83,16 @@ export default function ChatWindow({
       }
     };
 
-    //  ✅ FIX: Handle single message status update (both messageId and _id)
+    //   FIX: Handle single message status update (both messageId and _id)
     const handleStatusUpdate = (data) => {
-      console.log("📬 Status update received:", data);
+      console.log(" Status update received:", data);
 
-      // ✅ Handle both messageId and _id fields
+      // Handle both messageId and _id fields
       const msgId = data.messageId || data._id;
       const status = data.status;
 
       if (!msgId || !status) {
-        console.warn("⚠️ Invalid status update:", data);
+        console.warn(" Invalid status update:", data);
         return;
       }
 
@@ -130,7 +130,7 @@ export default function ChatWindow({
 
     //  Handle bulk read (all messages read)
     const handleMessagesRead = (data) => {
-      console.log("✅ Messages marked as read:", data);
+      console.log(" Messages marked as read:", data);
 
       if (data.conversationId === conversationIdRef.current) {
         setMessages((prev) =>

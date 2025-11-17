@@ -6,7 +6,7 @@ export const getUsers = async (req, res) => {
     const currentUserId = req.user.id; // from verifyToken middleware
 
     const users = await User.find({ _id: { $ne: currentUserId } })
-      .select("-password") // Don't send passwords
+      .select("-password") 
       .sort({ username: 1 });
 
     res.json(users);

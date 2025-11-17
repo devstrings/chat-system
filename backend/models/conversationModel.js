@@ -16,7 +16,7 @@ const conversationSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   },
-  lastMessageSender: { // ✅ ADDED
+  lastMessageSender: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "User" 
   },
@@ -32,6 +32,6 @@ const conversationSchema = new mongoose.Schema({
 
 // Index for faster queries
 conversationSchema.index({ participants: 1 });
-conversationSchema.index({ lastMessageTime: -1 }); // ✅ ADDED for sorting
+conversationSchema.index({ lastMessageTime: -1 }); 
 
 export default mongoose.model("Conversation", conversationSchema);

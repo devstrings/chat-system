@@ -29,7 +29,7 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  // 📥 Initial data fetch
+  //  Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
@@ -51,7 +51,7 @@ export default function Dashboard() {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.id);
       } catch (err) {
-        console.error("❌ Error fetching users:", err);
+        console.error(" Error fetching users:", err);
         if (err.response?.status === 401) {
           localStorage.clear();
           navigate("/login");
@@ -64,7 +64,7 @@ export default function Dashboard() {
     fetchUsers();
   }, [navigate]);
 
-  // 📨 Load last messages for all users on mount
+  //  Load last messages for all users on mount
   useEffect(() => {
     if (!currentUserId || users.length === 0) return;
 
@@ -91,7 +91,7 @@ export default function Dashboard() {
             const lastMsg = messages[messages.length - 1];
             const messageText =
               lastMsg.text ||
-              (lastMsg.attachments?.length > 0 ? "📎 Attachment" : "");
+              (lastMsg.attachments?.length > 0 ? " Attachment" : "");
 
             setLastMessages((prev) => ({
               ...prev,
@@ -117,14 +117,14 @@ export default function Dashboard() {
           }
         }
       } catch (err) {
-        console.error("❌ Error loading last messages:", err);
+        console.error(" Error loading last messages:", err);
       }
     };
 
     loadLastMessages();
   }, [currentUserId, users]);
 
-  // 🟢 Online status management
+  //  Online status management
   useEffect(() => {
     if (!socket) return;
 
@@ -161,7 +161,7 @@ export default function Dashboard() {
     };
   }, [socket]);
 
-  // 📬 Listen for incoming messages
+  //  Listen for incoming messages
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
@@ -169,14 +169,14 @@ export default function Dashboard() {
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
       const messageText =
-        msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : "");
+        msg.text || (msg.attachments?.length > 0 ? " Attachment" : "");
 
-      console.log("📬 Received message:", msg);
+      console.log(" Received message:", msg);
 
       const associatedUserId =
         senderId === currentUserId ? receiverId : senderId;
 
-      // ✅ Update last message
+      //  Update last message
       setLastMessages((prev) => ({
         ...prev,
         [associatedUserId]: {
@@ -189,7 +189,7 @@ export default function Dashboard() {
         },
       }));
 
-      console.log("✅ Updated lastMessages for user:", associatedUserId);
+      console.log(" Updated lastMessages for user:", associatedUserId);
 
       // Update unread count
       if (
@@ -203,17 +203,17 @@ export default function Dashboard() {
       }
     };
 
-    // ✅ Handle status updates
+    //  Handle status updates
     const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
       const msgId = messageId || _id;
-      console.log("📬 Status update received:", {
+      console.log(" Status update received:", {
         msgId,
         status,
         conversationId,
       });
 
       if (!msgId || !status) {
-        console.warn("⚠️ Invalid status update data");
+        console.warn(" Invalid status update data");
         return;
       }
 
@@ -227,7 +227,7 @@ export default function Dashboard() {
               status,
             };
             console.log(
-              `✅ Updated sidebar status to ${status} for user ${userId}`
+              ` Updated sidebar status to ${status} for user ${userId}`
             );
           }
         }
@@ -245,7 +245,7 @@ export default function Dashboard() {
     };
   }, [socket, currentUserId]);
 
-  // 🔍 Get conversation
+  //  Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
       setConversationId(null);
@@ -255,7 +255,7 @@ export default function Dashboard() {
     const getConversation = async () => {
       try {
         const token = localStorage.getItem("token");
-        console.log("🔍 Getting conversation for user:", selectedUser._id);
+        console.log(" Getting conversation for user:", selectedUser._id);
 
         const res = await axios.post(
           "http://localhost:5000/api/messages/conversation",
@@ -263,7 +263,7 @@ export default function Dashboard() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log("✅ Conversation ID:", res.data._id);
+        console.log(" Conversation ID:", res.data._id);
         setConversationId(res.data._id);
 
         setUnreadCounts((prev) => ({
@@ -275,7 +275,7 @@ export default function Dashboard() {
           socket.emit("markAsRead", { conversationId: res.data._id });
         }
       } catch (err) {
-        console.error("❌ Get conversation error:", err);
+        console.error(" Get conversation error:", err);
       }
     };
 
@@ -454,7 +454,7 @@ export default function Dashboard() {
                             onClick={() => {
                               if (
                                 confirm(
-                                  `🗑️ Clear chat with ${selectedUser.username}?`
+                                  ` Clear chat with ${selectedUser.username}?`
                                 )
                               ) {
                                 handleClearChat();

@@ -1,25 +1,25 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// 🧩 Pages
+//  Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 
-// 🧠 Context
+//  Context
 import { SocketProvider } from "./context/SocketContext";
 
-// 🔒 Protected Route Component
+//  Protected Route Component
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   if (!token) {
-    console.warn("🚫 No token found — redirecting to login...");
+    console.warn(" No token found — redirecting to login...");
     return <Navigate to="/login" replace />;
   }
   return children;
 }
 
-// 🧱 Main App Component
+//  Main App Component
 export default function App() {
   return (
     <BrowserRouter>
@@ -36,9 +36,7 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              
-                <Dashboard />
-              
+             <Dashboard />
             </ProtectedRoute>
           }
         />

@@ -7,7 +7,7 @@ import "./styles/index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <AuthProvider>
-    <SocketProvider>  {/* ✅ Sirf yahan rakho */}
+    <SocketProvider>  
       <App />
     </SocketProvider>
   </AuthProvider>
