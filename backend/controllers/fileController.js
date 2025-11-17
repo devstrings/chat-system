@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import Attachment from "../models/Attachment.js";
+import Conversation from "../models/conversationModel.js";
 
 // Allowed MIME types and extensions
 const ALLOWED_TYPES = [
@@ -28,38 +29,95 @@ const calculateFileHash = (filePath) =>
     stream.on("error", (err) => reject(err));
   });
 
-// Download file controller (authenticated)
+// Download file controller (authenticated & authorized)
 export const downloadFile = async (req, res) => {
   try {
     const filename = req.params.filename;
+    const userId = req.user.userId; // from JWT token (verifyToken middleware)
 
     // Prevent path traversal
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
       return res.status(400).json({ message: "Invalid filename" });
     }
 
+    // Find attachment in database
+    const attachment = await Attachment.findOne({ 
+      serverFileName: filename,
+      status: "completed"
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    // Find conversation and verify user access
+    const conversation = await Conversation.findById(attachment.conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Check if user is participant in the conversation
+    const isParticipant = conversation.participants.some(
+      participantId => participantId.toString() === userId.toString()
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({ 
+        message: "Access denied: You don't have permission to access this file" 
+      });
+    }
+
+    // Construct file path
     const filePath = path.join(process.cwd(), "uploads", filename);
 
-    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found on server" });
+    }
 
-    // Optional: check if user has permission to access this file
-
+    // Set proper headers for download
+    res.setHeader('Content-Type', attachment.fileType);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachment.fileName}"`);
+    
+    // Send file
     res.sendFile(filePath);
+
   } catch (error) {
     console.error("File download error:", error);
     res.status(500).json({ message: "File download failed" });
   }
 };
 
-// Upload file controller (authenticated)
+// Upload file controller (authenticated & authorized)
 export const uploadFile = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const { conversationId } = req.body;
+    const userId = req.user.userId; // from JWT token
+
     if (!conversationId) {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ message: "Conversation ID required" });
+    }
+
+    // Verify user is participant in the conversation
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const isParticipant = conversation.participants.some(
+      participantId => participantId.toString() === userId.toString()
+    );
+
+    if (!isParticipant) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ 
+        message: "Access denied: You are not a participant in this conversation" 
+      });
     }
 
     // File type check
