@@ -11,6 +11,12 @@ const messageSchema = new mongoose.Schema({
     ref: "User", 
     required: true 
   },
+  // ✅ ADD THIS: Track who should receive the message
+  receiver: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User", 
+    required: true 
+  },
   text: { 
     type: String,
     default: "" 

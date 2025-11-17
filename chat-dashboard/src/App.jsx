@@ -36,9 +36,9 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <SocketProvider>
+              
                 <Dashboard />
-              </SocketProvider>
+              
             </ProtectedRoute>
           }
         />

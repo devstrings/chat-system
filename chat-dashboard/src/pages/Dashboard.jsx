@@ -29,7 +29,7 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  //  Initial data fetch
+  // 📥 Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
@@ -51,7 +51,7 @@ export default function Dashboard() {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.id);
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error("❌ Error fetching users:", err);
         if (err.response?.status === 401) {
           localStorage.clear();
           navigate("/login");
@@ -64,7 +64,7 @@ export default function Dashboard() {
     fetchUsers();
   }, [navigate]);
 
-  //  Load last messages for all users on mount
+  // 📨 Load last messages for all users on mount
   useEffect(() => {
     if (!currentUserId || users.length === 0) return;
 
@@ -73,7 +73,6 @@ export default function Dashboard() {
         const token = localStorage.getItem("token");
 
         for (const user of users) {
-          // Get conversation with this user
           const convRes = await axios.post(
             "http://localhost:5000/api/messages/conversation",
             { otherUserId: user._id },
@@ -82,7 +81,6 @@ export default function Dashboard() {
 
           const conversationId = convRes.data._id;
 
-          // Get messages from this conversation
           const msgRes = await axios.get(
             `http://localhost:5000/api/messages/${conversationId}`,
             { headers: { Authorization: `Bearer ${token}` } }
@@ -100,13 +98,12 @@ export default function Dashboard() {
               [user._id]: {
                 text: messageText,
                 time: lastMsg.createdAt,
-                sender: lastMsg.sender._id || lastMsg.sender, //  Store sender ID
-                status: lastMsg.status || "sent", //  Store status
-                lastMessageId: lastMsg._id
+                sender: lastMsg.sender._id || lastMsg.sender,
+                status: lastMsg.status || "sent",
+                lastMessageId: lastMsg._id,
               },
             }));
 
-            // Count unread messages (messages from others that are not read)
             const unreadCount = messages.filter(
               (msg) => msg.sender._id !== currentUserId && msg.status !== "read"
             ).length;
@@ -120,18 +117,17 @@ export default function Dashboard() {
           }
         }
       } catch (err) {
-        console.error("Error loading last messages:", err);
+        console.error("❌ Error loading last messages:", err);
       }
     };
 
     loadLastMessages();
   }, [currentUserId, users]);
 
-  //  Online status management + Notify server when online
+  // 🟢 Online status management
   useEffect(() => {
     if (!socket) return;
 
-    //  Tell server user is online (for pending message delivery)
     socket.emit("userOnline");
 
     socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
@@ -165,31 +161,37 @@ export default function Dashboard() {
     };
   }, [socket]);
 
-  //  Listen for incoming messages + update last message
+  // 📬 Listen for incoming messages
   useEffect(() => {
     if (!socket || !currentUserId) return;
+
     const handleNewMessage = (msg) => {
       const senderId = msg.sender?._id || msg.sender;
+      const receiverId = msg.receiver;
       const messageText =
         msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : "");
 
-      console.log(" Received message:", msg);
+      console.log("📬 Received message:", msg);
 
-      //  Update last message in sidebar
+      const associatedUserId =
+        senderId === currentUserId ? receiverId : senderId;
+
+      // ✅ Update last message
       setLastMessages((prev) => ({
         ...prev,
-        [senderId === currentUserId ? msg.receiver : senderId]: {
+        [associatedUserId]: {
           text: messageText,
-          time: msg.createdAt,
+          time: msg.createdAt || new Date().toISOString(),
           sender: senderId,
           status: msg.status || "sent",
           conversationId: msg.conversationId,
           lastMessageId: msg._id,
-          
         },
       }));
 
-      //  Update unread counts (only if chat not open)
+      console.log("✅ Updated lastMessages for user:", associatedUserId);
+
+      // Update unread count
       if (
         senderId !== currentUserId &&
         selectedUserRef.current?._id !== senderId
@@ -199,31 +201,40 @@ export default function Dashboard() {
           [senderId]: (prev[senderId] || 0) + 1,
         }));
       }
-
-      //  Force re-render of sidebar
-      setUsers((prev) => [...prev]);
     };
 
-    //  Listen for message status updates
-   // ✅ CORRECT:
-const handleStatusUpdate = ({ messageId, status }) => {
-  console.log("📬 Status update received:", { messageId, status });
-  
-  // Update lastMessages state for sidebar
-  setLastMessages((prev) => {
-    const updated = {};
-    for (const [userId, msgData] of Object.entries(prev)) {
-      updated[userId] = msgData; // Copy existing
-      
-      // If this is the last message, update its status
-      if (msgData?.lastMessageId === messageId) {
-        updated[userId] = { ...msgData, status };
-        console.log(`✅ Updated ${userId} message status to ${status}`);
+    // ✅ Handle status updates
+    const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
+      const msgId = messageId || _id;
+      console.log("📬 Status update received:", {
+        msgId,
+        status,
+        conversationId,
+      });
+
+      if (!msgId || !status) {
+        console.warn("⚠️ Invalid status update data");
+        return;
       }
-    }
-    return updated;
-  });
-};
+
+      setLastMessages((prev) => {
+        const updated = { ...prev };
+
+        for (const [userId, msgData] of Object.entries(prev)) {
+          if (msgData?.lastMessageId === msgId) {
+            updated[userId] = {
+              ...msgData,
+              status,
+            };
+            console.log(
+              `✅ Updated sidebar status to ${status} for user ${userId}`
+            );
+          }
+        }
+
+        return updated;
+      });
+    };
 
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
@@ -234,7 +245,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
     };
   }, [socket, currentUserId]);
 
-  //  Get or create conversation + mark as read
+  // 🔍 Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
       setConversationId(null);
@@ -244,7 +255,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
     const getConversation = async () => {
       try {
         const token = localStorage.getItem("token");
-        console.log(" Getting conversation for user:", selectedUser._id);
+        console.log("🔍 Getting conversation for user:", selectedUser._id);
 
         const res = await axios.post(
           "http://localhost:5000/api/messages/conversation",
@@ -252,21 +263,19 @@ const handleStatusUpdate = ({ messageId, status }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log(" Conversation ID:", res.data._id);
+        console.log("✅ Conversation ID:", res.data._id);
         setConversationId(res.data._id);
 
-        // Clear unread count
         setUnreadCounts((prev) => ({
           ...prev,
           [selectedUser._id]: 0,
         }));
 
-        //  Emit mark as read
         if (socket) {
           socket.emit("markAsRead", { conversationId: res.data._id });
         }
       } catch (err) {
-        console.error(" Get conversation error:", err);
+        console.error("❌ Get conversation error:", err);
       }
     };
 
@@ -289,7 +298,6 @@ const handleStatusUpdate = ({ messageId, status }) => {
       );
       alert("Chat cleared!");
 
-      // Clear last message for this user
       setLastMessages((prev) => {
         const updated = { ...prev };
         delete updated[selectedUser._id];
@@ -321,7 +329,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
         onSelectUser={setSelectedUser}
         onlineUsers={onlineUsers}
         currentUsername={username}
-        currentUserId={currentUserId} //  Pass user ID
+        currentUserId={currentUserId}
         onLogout={handleLogout}
         unreadCounts={unreadCounts}
         lastMessages={lastMessages}
@@ -366,6 +374,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
                   <button
                     onClick={() => setShowSearchBox(!showSearchBox)}
                     className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
+                    title="Search in chat"
                   >
                     <svg
                       className="w-5 h-5"
@@ -386,6 +395,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
                     <button
                       onClick={() => setShowChatMenu(!showChatMenu)}
                       className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
+                      title="Chat options"
                     >
                       <svg
                         className="w-5 h-5"
@@ -482,7 +492,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
                     placeholder="Search in messages..."
                     value={searchInChat}
                     onChange={(e) => setSearchInChat(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-10 py-2 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   />
                   <svg
                     className="w-4 h-4 text-gray-500 absolute left-3 top-3"
@@ -500,7 +510,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
                   {searchInChat && (
                     <button
                       onClick={() => setSearchInChat("")}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-200"
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-200 transition-colors"
                     >
                       <svg
                         className="w-4 h-4"
@@ -537,6 +547,7 @@ const handleStatusUpdate = ({ messageId, status }) => {
                 }
               }}
             />
+
             <MessageInput conversationId={conversationId} />
           </>
         ) : (
