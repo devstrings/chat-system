@@ -91,6 +91,11 @@ export const downloadFile = async (req, res) => {
 // Upload file controller (authenticated & authorized)
 export const uploadFile = async (req, res) => {
   try {
+    console.log(" Upload started");
+    console.log("File:", req.file);
+    console.log("Body:", req.body);
+    console.log("User ID:", req.user?.userId);
+
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const { conversationId } = req.body;
@@ -134,7 +139,9 @@ export const uploadFile = async (req, res) => {
     }
 
     // Calculate hash
+    console.log(" Calculating file hash...");
     const fileHash = await calculateFileHash(req.file.path);
+    console.log("Hash:", fileHash);
 
     // Check for duplicate in the same conversation
     const existingAttachment = await Attachment.findOne({
@@ -144,6 +151,7 @@ export const uploadFile = async (req, res) => {
     });
 
     if (existingAttachment) {
+      console.log(" Duplicate file found, reusing existing");
       fs.unlinkSync(req.file.path);
       return res.json({
         url: `/api/file/get/${existingAttachment.serverFileName}`,
@@ -151,11 +159,13 @@ export const uploadFile = async (req, res) => {
         fileType: existingAttachment.fileType,
         fileSize: req.file.size,
         attachmentId: existingAttachment._id,
+        isDuplicate: true,
         message: "File already exists, reused existing file"
       });
     }
 
     // Save new attachment
+    console.log(" Saving new attachment to database...");
     const attachment = await Attachment.create({
       conversationId,
       fileName: req.file.originalname,
@@ -163,20 +173,52 @@ export const uploadFile = async (req, res) => {
       sizeInKilobytes: Math.round(req.file.size / 1024),
       fileType: req.file.mimetype,
       serverFileName: req.file.filename,
+      uploadedBy: userId,  
       status: "completed"
     });
+
+    console.log(" Upload successful:", attachment._id);
 
     res.json({
       url: `/api/file/get/${req.file.filename}`,
       filename: req.file.originalname,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
-      attachmentId: attachment._id
+      attachmentId: attachment._id,
+      isDuplicate: false
     });
 
   } catch (error) {
-    console.error("Upload error:", error);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ message: "File upload failed", error: error.message });
+    console.error(" Upload error:", error);
+    console.error("Error details:", error.message);
+    console.error("Error code:", error.code);
+    
+    // Cleanup uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+      console.log(" Cleaned up uploaded file");
+    }
+    
+    // Handle duplicate key error (concurrent uploads)
+    if (error.code === 11000) {
+      console.log("Duplicate key error - file already exists");
+      return res.status(200).json({
+        message: "File already exists in this conversation",
+        isDuplicate: true
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: "Validation failed", 
+        error: error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: "File upload failed", 
+      error: error.message 
+    });
   }
 };
