@@ -23,7 +23,22 @@ export default function Message({ message, isOwn }) {
     return message.sender?.username || "Unknown";
   };
 
-  //  Fetch secure images with authentication
+  // Get file icon based on type
+  const getFileIcon = (fileType) => {
+    if (fileType?.startsWith("image/")) return "🖼️";
+    if (fileType?.startsWith("video/")) return "🎥";
+    if (fileType === "application/pdf") return "📕";
+    if (fileType?.includes("word")) return "📄";
+    if (fileType === "text/plain") return "📝";
+    return "📎";
+  };
+
+  // Get file name (supports multiple field names from backend)
+  const getFileName = (file) => {
+    return file.filename || file.fileName || file.originalName || "Unknown file";
+  };
+
+  // Fetch secure images with authentication
   useEffect(() => {
     const fetchSecureImages = async () => {
       if (!message.attachments || message.attachments.length === 0) return;
@@ -70,7 +85,7 @@ export default function Message({ message, isOwn }) {
     };
   }, [message.attachments]);
 
-  //  Download file with authentication
+  // Download file with authentication
   const handleFileDownload = async (file) => {
     try {
       const token = localStorage.getItem("token");
@@ -93,7 +108,7 @@ export default function Message({ message, isOwn }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = file.filename;
+      a.download = getFileName(file); // Use the helper function
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -104,7 +119,7 @@ export default function Message({ message, isOwn }) {
     }
   };
 
-  //  Get status icon - WhatsApp style
+  // Get status icon - WhatsApp style
   const getStatusIcon = () => {
     const status = message.status || 'sent';
     
@@ -161,58 +176,74 @@ export default function Message({ message, isOwn }) {
           {/* Attachments */}
           {message.attachments && message.attachments.length > 0 && (
             <div className="mb-2">
-              {message.attachments.map((file, index) => (
-                <div key={index} className="mb-2">
-                  {file.fileType?.startsWith("image/") ? (
-                    <div className="relative">
-                      {imageLoading[index] ? (
-                        // Loading spinner for images
-                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
-                          <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        </div>
-                      ) : imageUrls[index] ? (
-                        // Display secure image
-                        <img 
-                          src={imageUrls[index]} 
-                          alt={file.filename}
-                          className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
-                          onClick={() => window.open(imageUrls[index], '_blank')}
-                        />
-                      ) : (
-                        // Error fallback
-                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
-                          <p className="text-gray-400 text-sm">Failed to load image</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    // Document/File download button
-                    <button
-                      onClick={() => handleFileDownload(file)}
-                      className={`flex items-center gap-2 p-3 rounded-lg transition w-full ${
-                        isOwn 
-                          ? "bg-white bg-opacity-20 hover:bg-opacity-30" 
-                          : "bg-gray-700 hover:bg-gray-600"
-                      }`}
-                    >
-                      <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-medium truncate">{file.filename}</p>
-                        <p className="text-xs opacity-70">
-                          {(file.fileSize / 1024).toFixed(1)} KB • Click to download
-                        </p>
+              {message.attachments.map((file, index) => {
+                const fileName = getFileName(file);
+                const fileIcon = getFileIcon(file.fileType);
+                
+                return (
+                  <div key={index} className="mb-2">
+                    {file.fileType?.startsWith("image/") ? (
+                      <div className="relative">
+                        {imageLoading[index] ? (
+                          // Loading spinner for images
+                          <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                            <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </div>
+                        ) : imageUrls[index] ? (
+                          <div>
+                            {/* Display secure image */}
+                            <img 
+                              src={imageUrls[index]} 
+                              alt={fileName}
+                              className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
+                              onClick={() => window.open(imageUrls[index], '_blank')}
+                            />
+                            {/* Image filename below */}
+                            <p className="text-xs mt-1 opacity-70 truncate">
+                              {fileIcon} {fileName}
+                            </p>
+                          </div>
+                        ) : (
+                          // Error fallback
+                          <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                            <p className="text-gray-400 text-sm">Failed to load image</p>
+                          </div>
+                        )}
                       </div>
-                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      // Document/File download button
+                      <button
+                        onClick={() => handleFileDownload(file)}
+                        className={`flex items-center gap-2 p-3 rounded-lg transition w-full ${
+                          isOwn 
+                            ? "bg-white bg-opacity-20 hover:bg-opacity-30" 
+                            : "bg-gray-700 hover:bg-gray-600"
+                        }`}
+                      >
+                        {/* File icon */}
+                        <div className="text-2xl flex-shrink-0">
+                          {fileIcon}
+                        </div>
+                        
+                        {/* File info */}
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-sm font-medium truncate">{fileName}</p>
+                          <p className="text-xs opacity-70">
+                            {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'} • Click to download
+                          </p>
+                        </div>
+                        
+                        {/* Download icon */}
+                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -223,7 +254,7 @@ export default function Message({ message, isOwn }) {
             </p>
           )}
 
-          {/*  Timestamp + Status (only for own messages) */}
+          {/* Timestamp + Status (only for own messages) */}
           <div className={`flex items-center gap-1 mt-1 ${
             isOwn ? "justify-end" : "justify-start"
           }`}>
@@ -233,7 +264,7 @@ export default function Message({ message, isOwn }) {
               {formatTime(message.createdAt)}
             </p>
 
-            {/*  Status ticks (ONLY for own messages) */}
+            {/* Status ticks (ONLY for own messages) */}
             {isOwn && (
               <div className="flex-shrink-0">
                 {getStatusIcon()}

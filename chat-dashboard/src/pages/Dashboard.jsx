@@ -29,6 +29,25 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
+  // ✅ NEW: Helper function to format attachment text
+  const formatAttachmentText = (attachments) => {
+    if (!attachments || attachments.length === 0) return "";
+    
+    const file = attachments[0];
+    const fileName = file.filename || file.fileName || "File";
+    const fileType = file.fileType || file.type || "";
+    
+    // Get appropriate icon
+    let icon = "📎";
+    if (fileType.startsWith("image/")) icon = "🖼️";
+    else if (fileType.startsWith("video/")) icon = "🎥";
+    else if (fileType === "application/pdf") icon = "📕";
+    else if (fileType.includes("word")) icon = "📄";
+    else if (fileType === "text/plain") icon = "📝";
+    
+    return `${icon} ${fileName}`;
+  };
+
   //  Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -89,9 +108,12 @@ export default function Dashboard() {
           const messages = msgRes.data;
           if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1];
-            const messageText =
-              lastMsg.text ||
-              (lastMsg.attachments?.length > 0 ? " Attachment" : "");
+            
+            // ✅ FIXED: Use formatted attachment text
+            const messageText = lastMsg.text || 
+              (lastMsg.attachments?.length > 0 
+                ? formatAttachmentText(lastMsg.attachments) 
+                : "");
 
             setLastMessages((prev) => ({
               ...prev,
@@ -101,6 +123,7 @@ export default function Dashboard() {
                 sender: lastMsg.sender._id || lastMsg.sender,
                 status: lastMsg.status || "sent",
                 lastMessageId: lastMsg._id,
+                attachments: lastMsg.attachments // Store attachments for Sidebar
               },
             }));
 
@@ -168,8 +191,12 @@ export default function Dashboard() {
     const handleNewMessage = (msg) => {
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
-      const messageText =
-        msg.text || (msg.attachments?.length > 0 ? " Attachment" : "");
+      
+      // ✅ FIXED: Use formatted attachment text
+      const messageText = msg.text || 
+        (msg.attachments?.length > 0 
+          ? formatAttachmentText(msg.attachments) 
+          : "");
 
       console.log(" Received message:", msg);
 
@@ -186,6 +213,7 @@ export default function Dashboard() {
           status: msg.status || "sent",
           conversationId: msg.conversationId,
           lastMessageId: msg._id,
+          attachments: msg.attachments // Store attachments
         },
       }));
 

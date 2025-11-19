@@ -13,8 +13,7 @@ const attachmentSchema = new mongoose.Schema({
   },
   fileHash: {
     type: String,
-    required: true,
-    
+    required: true
   },
   sizeInKilobytes: {
     type: Number,
@@ -28,6 +27,11 @@ const attachmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  uploadedBy: {  
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
   status: {
     type: String,
     enum: ['uploading', 'completed', 'failed', 'deleted'],
@@ -37,7 +41,10 @@ const attachmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
+//  ADD THIS - Per-conversation deduplication
+attachmentSchema.index({ conversationId: 1, fileHash: 1 }, { unique: true });
+
+// Existing indexes
 attachmentSchema.index({ conversationId: 1, createdAt: -1 });
 attachmentSchema.index({ fileHash: 1 });
 

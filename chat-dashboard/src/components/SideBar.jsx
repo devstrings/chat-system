@@ -20,11 +20,11 @@ export default function Sidebar({
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  //  Sort users by last message time (most recent first)
+  // Sort users by last message time (most recent first)
   const sortedUsers = [...filteredUsers].sort((a, b) => {
     const timeA = lastMessages[a._id]?.time ? new Date(lastMessages[a._id].time).getTime() : 0;
     const timeB = lastMessages[b._id]?.time ? new Date(lastMessages[b._id].time).getTime() : 0;
-    return timeB - timeA; // Most recent first
+    return timeB - timeA;
   });
 
   // Count online users from sorted list
@@ -32,6 +32,30 @@ export default function Sidebar({
 
   // Calculate total unread messages
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+
+  // Format last message text - UPDATED TO SHOW FILE NAMES
+  const formatLastMessageText = (message) => {
+    if (!message) return "";
+    
+    // Check if message has attachments
+    if (message.attachments && message.attachments.length > 0) {
+      const attachment = message.attachments[0];
+      const fileName = attachment.fileName || attachment.filename || "File";
+      
+      // Show file icon based on type
+      const fileType = attachment.fileType || attachment.type || "";
+      let icon = "📄";
+      
+      if (fileType.startsWith("image/")) icon = "🖼️";
+      else if (fileType.startsWith("video/")) icon = "🎥";
+      else if (fileType === "application/pdf") icon = "📕";
+      
+      return `${icon} ${fileName}`;
+    }
+    
+    // Regular text message
+    return message.text || message.content || "";
+  };
 
   return (
     <div className="w-96 bg-gray-800 border-r border-gray-700 flex flex-col">
@@ -130,22 +154,26 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="py-2">
-            {sortedUsers.map((user) => (
-              <UserItem
-                key={user._id}
-                user={user}
-                selected={user._id === selectedUserId}
-                onClick={() => onSelectUser(user)}
-                isOnline={onlineUsers.has(user._id)}
-                unreadCount={unreadCounts[user._id] || 0}
-                lastMessage={lastMessages[user._id]?.text || ""}
-                lastMessageTime={lastMessages[user._id]?.time || null}
-                lastMessageSender={lastMessages[user._id]?.sender || null}
-                lastMessageStatus={lastMessages[user._id]?.status || "sent"} 
-                currentUserId={currentUserId} 
-
-              />
-            ))}
+            {sortedUsers.map((user) => {
+              const lastMsg = lastMessages[user._id];
+              const formattedText = formatLastMessageText(lastMsg);
+              
+              return (
+                <UserItem
+                  key={user._id}
+                  user={user}
+                  selected={user._id === selectedUserId}
+                  onClick={() => onSelectUser(user)}
+                  isOnline={onlineUsers.has(user._id)}
+                  unreadCount={unreadCounts[user._id] || 0}
+                  lastMessage={formattedText}
+                  lastMessageTime={lastMsg?.time || null}
+                  lastMessageSender={lastMsg?.sender || null}
+                  lastMessageStatus={lastMsg?.status || "sent"} 
+                  currentUserId={currentUserId}
+                />
+              );
+            })}
           </div>
         )}
       </div>
