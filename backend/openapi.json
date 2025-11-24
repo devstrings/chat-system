@@ -1,0 +1,839 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Chat API",
+    "version": "1.0.0",
+    "description": "API documentation for auth, users, messages (conversations), and file upload/download.",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://api.yourapp.com/api",
+      "description": "Production Server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter JWT token in format: Bearer <token>"
+      }
+    },
+    "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "name": { 
+            "type": "string", 
+            "example": "Saeed",
+            "minLength": 2,
+            "maxLength": 50
+          },
+          "email": { 
+            "type": "string", 
+            "format": "email", 
+            "example": "saeed@example.com" 
+          },
+          "password": { 
+            "type": "string", 
+            "example": "P@ssw0rd",
+            "minLength": 6,
+            "description": "Minimum 6 characters"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": { 
+            "type": "string", 
+            "format": "email", 
+            "example": "saeed@example.com" 
+          },
+          "password": { 
+            "type": "string", 
+            "example": "P@ssw0rd" 
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": { 
+            "type": "string", 
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "JWT authentication token"
+          },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { 
+            "type": "string", 
+            "example": "64a1b2c3d4e5f6",
+            "description": "Unique user identifier"
+          },
+          "name": { 
+            "type": "string", 
+            "example": "Saeed" 
+          },
+          "email": { 
+            "type": "string", 
+            "format": "email", 
+            "example": "saeed@example.com" 
+          },
+          "avatarUrl": { 
+            "type": "string", 
+            "nullable": true,
+            "example": "https://example.com/avatars/avatar.jpg" 
+          },
+          "createdAt": { 
+            "type": "string", 
+            "format": "date-time",
+            "example": "2024-01-15T10:30:00Z"
+          }
+        }
+      },
+      "UsersList": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/User" }
+          },
+          "total": {
+            "type": "integer",
+            "example": 150,
+            "description": "Total number of users"
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 50
+          }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": { 
+            "type": "string", 
+            "example": "conv_1234" 
+          },
+          "participants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/User" }
+          },
+          "lastMessage": { 
+            "$ref": "#/components/schemas/Message",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer",
+            "example": 3,
+            "description": "Number of unread messages"
+          },
+          "updatedAt": { 
+            "type": "string", 
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": { 
+            "type": "string", 
+            "example": "msg_1234" 
+          },
+          "conversationId": { 
+            "type": "string", 
+            "example": "conv_1234" 
+          },
+          "senderId": { 
+            "type": "string", 
+            "example": "64a1b2c3d4e5f6" 
+          },
+          "text": { 
+            "type": "string", 
+            "example": "Hello, how are you?",
+            "nullable": true
+          },
+          "fileUrl": { 
+            "type": "string", 
+            "nullable": true, 
+            "example": "http://localhost:5000/api/file/get/abcd1234.jpg" 
+          },
+          "status": {
+            "type": "string",
+            "enum": ["sent", "delivered", "read"],
+            "example": "delivered",
+            "description": "Message delivery status"
+          },
+          "createdAt": { 
+            "type": "string", 
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        }
+      },
+      "MessagesList": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Message" }
+          },
+          "hasMore": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether more messages are available"
+          }
+        }
+      },
+      "FileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "filename": { 
+            "type": "string", 
+            "example": "abcd1234.jpg" 
+          },
+          "originalName": { 
+            "type": "string", 
+            "example": "photo.jpg" 
+          },
+          "mimeType": { 
+            "type": "string", 
+            "example": "image/jpeg" 
+          },
+          "size": { 
+            "type": "integer", 
+            "example": 34567,
+            "description": "File size in bytes"
+          },
+          "url": { 
+            "type": "string", 
+            "example": "http://localhost:5000/api/file/get/abcd1234.jpg" 
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { 
+            "type": "string", 
+            "example": "Error message" 
+          },
+          "error": {
+            "type": "string",
+            "example": "BAD_REQUEST"
+          },
+          "statusCode": {
+            "type": "integer",
+            "example": 400
+          },
+          "details": { 
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Operation successful"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "conversationId": {
+        "name": "conversationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "Unique conversation identifier"
+      },
+      "userId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "Unique user identifier"
+      },
+      "filename": {
+        "name": "filename",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "Stored filename to download",
+        "example": "abcd1234.jpg"
+      },
+      "pageParam": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": { 
+          "type": "integer", 
+          "default": 1,
+          "minimum": 1
+        },
+        "description": "Page number for pagination"
+      },
+      "limitParam": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { 
+          "type": "integer", 
+          "default": 50,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "description": "Number of items per page"
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Access token is missing or invalid",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "message": "Unauthorized access",
+              "error": "UNAUTHORIZED",
+              "statusCode": 401
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "The specified resource was not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "message": "Resource not found",
+              "error": "NOT_FOUND",
+              "statusCode": 404
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints for user registration and login"
+    },
+    {
+      "name": "Users",
+      "description": "User management endpoints"
+    },
+    {
+      "name": "Messages",
+      "description": "Chat and conversation management endpoints"
+    },
+    {
+      "name": "Files",
+      "description": "File upload and download endpoints"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "description": "Create a new user account with email and password",
+        "operationId": "registerUser",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - validation error",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Email already exists",
+                  "error": "BAD_REQUEST",
+                  "statusCode": 400
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login user",
+        "description": "Authenticate user and return JWT token",
+        "operationId": "loginUser",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "description": "Retrieve a paginated list of all users",
+        "operationId": "getUsers",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/pageParam" },
+          { "$ref": "#/components/parameters/limitParam" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UsersList" }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/users/search": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Search users",
+        "description": "Search users by name, email, or phone number",
+        "operationId": "searchUsers",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { 
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Search query (name / email / phone)",
+            "example": "saeed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": { 
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/User" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - query parameter missing",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get user by ID",
+        "description": "Retrieve a single user by their unique identifier",
+        "operationId": "getUserById",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/userId" }],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/messages/conversations": {
+      "get": {
+        "tags": ["Messages"],
+        "summary": "Get all conversations",
+        "description": "Retrieve all conversations for the authenticated user",
+        "operationId": "getConversations",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Conversations list retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Conversation" }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/messages/conversation": {
+      "post": {
+        "tags": ["Messages"],
+        "summary": "Get or create conversation",
+        "description": "Get an existing conversation or create a new one with specified participants",
+        "operationId": "getOrCreateConversation",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "participantIds": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Array of user IDs to include in conversation",
+                    "example": ["64a1b2c3d4e5f6", "64a1b2c3d4e5f7"]
+                  },
+                  "partnerId": { 
+                    "type": "string", 
+                    "description": "Single user ID for one-on-one conversation",
+                    "example": "64a1b2c3d4e5f6"
+                  }
+                },
+                "oneOf": [
+                  { "required": ["participantIds"] },
+                  { "required": ["partnerId"] }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing or newly created conversation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Conversation" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid participant data",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/messages/conversation/{conversationId}": {
+      "delete": {
+        "tags": ["Messages"],
+        "summary": "Clear conversation",
+        "description": "Delete all messages in a conversation (clear chat history)",
+        "operationId": "clearConversation",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/conversationId" }],
+        "responses": {
+          "200": {
+            "description": "Conversation cleared successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { 
+                      "type": "string", 
+                      "example": "Conversation cleared successfully" 
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/messages/{conversationId}": {
+      "get": {
+        "tags": ["Messages"],
+        "summary": "Get conversation messages",
+        "description": "Retrieve messages for a specific conversation with pagination support",
+        "operationId": "getMessages",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/conversationId" },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { 
+              "type": "integer", 
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Number of messages to retrieve"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": { 
+              "type": "string", 
+              "format": "date-time" 
+            },
+            "description": "Return messages created before this timestamp (for pagination)",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessagesList" }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/file/upload": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Upload file",
+        "description": "Upload a file (images, documents, or videos). Max size: 10MB",
+        "operationId": "uploadFile",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to upload. Allowed types: jpg, jpeg, png, gif, pdf, doc, docx, txt, mp4, mov, avi. Max size: 10MB"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileUploadResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file type or validation error",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Invalid file type",
+                  "error": "BAD_REQUEST",
+                  "statusCode": 400
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File size exceeds 10MB limit",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "File size exceeds limit",
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "statusCode": 413
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/file/get/{filename}": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Download file",
+        "description": "Download a previously uploaded file by its stored filename",
+        "operationId": "downloadFile",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/filename" }],
+        "responses": {
+          "200": {
+            "description": "File retrieved successfully",
+            "content": {
+              "application/octet-stream": {
+                "schema": { 
+                  "type": "string", 
+                  "format": "binary" 
+                }
+              },
+              "image/jpeg": {
+                "schema": { 
+                  "type": "string", 
+                  "format": "binary" 
+                }
+              },
+              "application/pdf": {
+                "schema": { 
+                  "type": "string", 
+                  "format": "binary" 
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "description": "Too many requests - rate limit exceeded",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Rate limit exceeded",
+                  "error": "TOO_MANY_REQUESTS",
+                  "statusCode": 429
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

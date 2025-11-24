@@ -3,10 +3,10 @@ import User from "../models/userModel.js";
 // Get all users except current user
 export const getUsers = async (req, res) => {
   try {
-    const currentUserId = req.user.id; // from verifyToken middleware
+    const currentUserId = req.user.id;
 
     const users = await User.find({ _id: { $ne: currentUserId } })
-      .select("-password") 
+      .select("username _id")  
       .sort({ username: 1 });
 
     res.json(users);
@@ -29,7 +29,7 @@ export const searchUsers = async (req, res) => {
     const users = await User.find({
       _id: { $ne: currentUserId },
       username: { $regex: query, $options: "i" }
-    }).select("-password");
+    }).select("username _id");  
 
     res.json(users);
   } catch (err) {
@@ -43,7 +43,7 @@ export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(id).select("username _id");  
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });

@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
+import swaggerUi from "swagger-ui-express";
 
 // Configs
 import { config } from "./config/index.js";
@@ -12,7 +14,7 @@ import connectDB from "./config/db.js";
 import { connectRedis } from "./config/redis.js"; 
 
 // Routes - function import
-import setupRoutes from "./routes/index.js"; // 
+import setupRoutes from "./routes/index.js"; 
 
 // Socket setup import
 import { setupSocket } from "./socket/index.js";
@@ -41,22 +43,35 @@ const startServer = async () => {
 
     app.use(cors());
     app.use(express.json());
+    // Serve uploaded files if needed
     // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-    
+    // --- Swagger UI Setup ---
+    const swaggerFilePath = path.join(__dirname, "openapi.json");
+    if (fs.existsSync(swaggerFilePath)) {
+      const swaggerDocument = JSON.parse(fs.readFileSync(swaggerFilePath, "utf-8"));
+      app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+      console.log(`Swagger docs available at http://localhost:${config.port}/api-docs`);
+    } else {
+      console.warn("OpenAPI file not found. Swagger UI not available.");
+    }
+    // ----------------------
+
+    // Setup routes
     setupRoutes(app);
 
+    // Default route
     app.get("/", (_, res) => res.send("Chat server active!"));
 
-    //  Setup Socket.io
+    // Setup Socket.io
     setupSocket(io);
 
-    //  Start server
+    // Start server
     server.listen(config.port, () =>
-      console.log(` Server running on port ${config.port}`)
+      console.log(`Server running on port ${config.port}`)
     );
   } catch (err) {
-    console.error(" Server startup failed:", err);
+    console.error("Server startup failed:", err);
   }
 };
 
