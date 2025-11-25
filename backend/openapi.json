@@ -41,16 +41,17 @@
       "RegisterRequest": {
         "type": "object",
         "properties": {
-          "name": { 
+          "username": { 
             "type": "string", 
-            "example": "Saeed",
-            "minLength": 2,
-            "maxLength": 50
+            "example": "ahmed123",
+            "minLength": 3,
+            "maxLength": 20,
+            "description": "Unique username"
           },
           "email": { 
             "type": "string", 
             "format": "email", 
-            "example": "saeed@example.com" 
+            "example": "ahmed@example.com" 
           },
           "password": { 
             "type": "string", 
@@ -59,7 +60,7 @@
             "description": "Minimum 6 characters"
           }
         },
-        "required": ["email", "password"]
+        "required": ["username", "email", "password"]
       },
       "LoginRequest": {
         "type": "object",
@@ -67,7 +68,7 @@
           "email": { 
             "type": "string", 
             "format": "email", 
-            "example": "saeed@example.com" 
+            "example": "ahmed@example.com" 
           },
           "password": { 
             "type": "string", 
@@ -84,30 +85,60 @@
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             "description": "JWT authentication token"
           },
-          "user": { "$ref": "#/components/schemas/User" }
+          "user": { "$ref": "#/components/schemas/UserFull" }
         }
       },
-      "User": {
+      "UserMinimal": {
         "type": "object",
+        "description": "Minimal user object for privacy (only username and _id exposed)",
         "properties": {
-          "id": { 
+          "_id": { 
             "type": "string", 
-            "example": "64a1b2c3d4e5f6",
+            "example": "507f1f77bcf86cd799439011",
             "description": "Unique user identifier"
           },
-          "name": { 
+          "username": { 
             "type": "string", 
-            "example": "Saeed" 
+            "example": "ahmed123",
+            "description": "Username"
+          }
+        }
+      },
+      "UserFull": {
+        "type": "object",
+        "description": "Full user object (returned on login/register)",
+        "properties": {
+          "_id": { 
+            "type": "string", 
+            "example": "507f1f77bcf86cd799439011"
+          },
+          "username": { 
+            "type": "string", 
+            "example": "ahmed123" 
           },
           "email": { 
             "type": "string", 
             "format": "email", 
-            "example": "saeed@example.com" 
+            "example": "ahmed@example.com" 
           },
-          "avatarUrl": { 
+          "avatar": { 
             "type": "string", 
             "nullable": true,
-            "example": "https://example.com/avatars/avatar.jpg" 
+            "example": "https://res.cloudinary.com/xxx/avatar.jpg" 
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true,
+            "example": "Software Developer"
+          },
+          "isOnline": {
+            "type": "boolean",
+            "example": true
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "createdAt": { 
             "type": "string", 
@@ -116,38 +147,20 @@
           }
         }
       },
-      "UsersList": {
-        "type": "object",
-        "properties": {
-          "users": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/User" }
-          },
-          "total": {
-            "type": "integer",
-            "example": 150,
-            "description": "Total number of users"
-          },
-          "page": {
-            "type": "integer",
-            "example": 1
-          },
-          "limit": {
-            "type": "integer",
-            "example": 50
-          }
-        }
-      },
       "Conversation": {
         "type": "object",
         "properties": {
-          "id": { 
+          "_id": { 
             "type": "string", 
-            "example": "conv_1234" 
+            "example": "507f1f77bcf86cd799439012" 
           },
           "participants": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/User" }
+            "items": { 
+              "type": "string",
+              "description": "User IDs"
+            },
+            "example": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439013"]
           },
           "lastMessage": { 
             "$ref": "#/components/schemas/Message",
@@ -168,33 +181,37 @@
       "Message": {
         "type": "object",
         "properties": {
-          "id": { 
+          "_id": { 
             "type": "string", 
-            "example": "msg_1234" 
+            "example": "507f1f77bcf86cd799439014" 
           },
           "conversationId": { 
             "type": "string", 
-            "example": "conv_1234" 
+            "example": "507f1f77bcf86cd799439012" 
           },
           "senderId": { 
             "type": "string", 
-            "example": "64a1b2c3d4e5f6" 
+            "example": "507f1f77bcf86cd799439011" 
           },
-          "text": { 
+          "content": { 
             "type": "string", 
             "example": "Hello, how are you?",
             "nullable": true
           },
+          "type": {
+            "type": "string",
+            "enum": ["text", "file", "image"],
+            "example": "text"
+          },
           "fileUrl": { 
             "type": "string", 
             "nullable": true, 
-            "example": "http://localhost:5000/api/file/get/abcd1234.jpg" 
+            "example": "https://res.cloudinary.com/xxx/file.jpg" 
           },
-          "status": {
-            "type": "string",
-            "enum": ["sent", "delivered", "read"],
-            "example": "delivered",
-            "description": "Message delivery status"
+          "read": {
+            "type": "boolean",
+            "example": false,
+            "description": "Message read status"
           },
           "createdAt": { 
             "type": "string", 
@@ -210,36 +227,61 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/Message" }
           },
-          "hasMore": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether more messages are available"
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "example": 1
+              },
+              "totalPages": {
+                "type": "integer",
+                "example": 5
+              },
+              "totalMessages": {
+                "type": "integer",
+                "example": 250
+              },
+              "hasMore": {
+                "type": "boolean",
+                "example": true
+              }
+            }
           }
         }
       },
       "FileUploadResponse": {
         "type": "object",
         "properties": {
-          "filename": { 
-            "type": "string", 
-            "example": "abcd1234.jpg" 
+          "message": {
+            "type": "string",
+            "example": "File uploaded successfully"
           },
-          "originalName": { 
+          "fileUrl": { 
+            "type": "string", 
+            "example": "https://res.cloudinary.com/xxx/image/upload/v1234/file.jpg",
+            "description": "Cloudinary URL"
+          },
+          "publicId": {
+            "type": "string",
+            "example": "chat-files/file-1234567890"
+          },
+          "filename": { 
             "type": "string", 
             "example": "photo.jpg" 
           },
-          "mimeType": { 
+          "size": { 
+            "type": "integer", 
+            "example": 1048576,
+            "description": "File size in bytes"
+          },
+          "mimetype": { 
             "type": "string", 
             "example": "image/jpeg" 
           },
-          "size": { 
-            "type": "integer", 
-            "example": 34567,
-            "description": "File size in bytes"
-          },
-          "url": { 
-            "type": "string", 
-            "example": "http://localhost:5000/api/file/get/abcd1234.jpg" 
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -252,15 +294,7 @@
           },
           "error": {
             "type": "string",
-            "example": "BAD_REQUEST"
-          },
-          "statusCode": {
-            "type": "integer",
-            "example": 400
-          },
-          "details": { 
-            "type": "object",
-            "nullable": true
+            "example": "Detailed error description"
           }
         }
       },
@@ -270,9 +304,6 @@
           "message": {
             "type": "string",
             "example": "Operation successful"
-          },
-          "data": {
-            "type": "object"
           }
         }
       }
@@ -283,14 +314,16 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string" },
-        "description": "Unique conversation identifier"
+        "description": "Unique conversation identifier",
+        "example": "507f1f77bcf86cd799439012"
       },
       "userId": {
         "name": "id",
         "in": "path",
         "required": true,
         "schema": { "type": "string" },
-        "description": "Unique user identifier"
+        "description": "Unique user identifier",
+        "example": "507f1f77bcf86cd799439011"
       },
       "filename": {
         "name": "filename",
@@ -298,30 +331,7 @@
         "required": true,
         "schema": { "type": "string" },
         "description": "Stored filename to download",
-        "example": "abcd1234.jpg"
-      },
-      "pageParam": {
-        "name": "page",
-        "in": "query",
-        "required": false,
-        "schema": { 
-          "type": "integer", 
-          "default": 1,
-          "minimum": 1
-        },
-        "description": "Page number for pagination"
-      },
-      "limitParam": {
-        "name": "limit",
-        "in": "query",
-        "required": false,
-        "schema": { 
-          "type": "integer", 
-          "default": 50,
-          "minimum": 1,
-          "maximum": 100
-        },
-        "description": "Number of items per page"
+        "example": "document-1234567890.pdf"
       }
     },
     "responses": {
@@ -331,9 +341,7 @@
           "application/json": {
             "schema": { "$ref": "#/components/schemas/ErrorResponse" },
             "example": {
-              "message": "Unauthorized access",
-              "error": "UNAUTHORIZED",
-              "statusCode": 401
+              "message": "No token provided"
             }
           }
         }
@@ -344,9 +352,7 @@
           "application/json": {
             "schema": { "$ref": "#/components/schemas/ErrorResponse" },
             "example": {
-              "message": "Resource not found",
-              "error": "NOT_FOUND",
-              "statusCode": 404
+              "message": "User not found"
             }
           }
         }
@@ -360,7 +366,7 @@
     },
     {
       "name": "Users",
-      "description": "User management endpoints"
+      "description": "User management endpoints (returns minimal user data: username & _id only)"
     },
     {
       "name": "Messages",
@@ -368,7 +374,7 @@
     },
     {
       "name": "Files",
-      "description": "File upload and download endpoints"
+      "description": "File upload and download endpoints (Cloudinary integration)"
     }
   ],
   "paths": {
@@ -376,7 +382,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Register a new user",
-        "description": "Create a new user account with email and password",
+        "description": "Create a new user account with username, email and password",
         "operationId": "registerUser",
         "security": [],
         "requestBody": {
@@ -397,14 +403,12 @@
             }
           },
           "400": {
-            "description": "Bad request - validation error",
+            "description": "Bad request - validation error or user already exists",
             "content": {
               "application/json": { 
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" },
                 "example": {
-                  "message": "Email already exists",
-                  "error": "BAD_REQUEST",
-                  "statusCode": 400
+                  "message": "User already exists with this email"
                 }
               }
             }
@@ -458,24 +462,39 @@
       "get": {
         "tags": ["Users"],
         "summary": "Get all users",
-        "description": "Retrieve a paginated list of all users",
+        "description": "Retrieve a list of all users except current user. Returns only username and _id for privacy. Results sorted alphabetically by username.",
         "operationId": "getUsers",
         "security": [{ "BearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/pageParam" },
-          { "$ref": "#/components/parameters/limitParam" }
-        ],
         "responses": {
           "200": {
             "description": "List of users retrieved successfully",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/UsersList" }
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/UserMinimal" }
+                },
+                "example": [
+                  { "_id": "507f1f77bcf86cd799439011", "username": "ahmed123" },
+                  { "_id": "507f1f77bcf86cd799439012", "username": "sara456" }
+                ]
               }
             }
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "description": "Failed to fetch users",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Failed to fetch users",
+                  "error": "Database connection error"
+                }
+              }
+            }
           }
         }
       }
@@ -483,21 +502,21 @@
     "/users/search": {
       "get": {
         "tags": ["Users"],
-        "summary": "Search users",
-        "description": "Search users by name, email, or phone number",
+        "summary": "Search users by username",
+        "description": "Search users by username using case-insensitive regex. Returns only username and _id. Current user excluded from results.",
         "operationId": "searchUsers",
         "security": [{ "BearerAuth": [] }],
         "parameters": [
           {
-            "name": "q",
+            "name": "query",
             "in": "query",
             "required": true,
             "schema": { 
               "type": "string",
               "minLength": 1
             },
-            "description": "Search query (name / email / phone)",
-            "example": "saeed"
+            "description": "Search query for username (case-insensitive)",
+            "example": "ahmed"
           }
         ],
         "responses": {
@@ -507,19 +526,40 @@
               "application/json": {
                 "schema": { 
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/User" }
-                }
+                  "items": { "$ref": "#/components/schemas/UserMinimal" }
+                },
+                "example": [
+                  { "_id": "507f1f77bcf86cd799439011", "username": "ahmed123" },
+                  { "_id": "507f1f77bcf86cd799439013", "username": "ahmed_ali" }
+                ]
               }
             }
           },
           "400": {
             "description": "Bad request - query parameter missing",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Search query is required"
+                }
+              }
             }
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "description": "Search failed",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Search failed",
+                  "error": "Database error"
+                }
+              }
+            }
           }
         }
       }
@@ -528,7 +568,7 @@
       "get": {
         "tags": ["Users"],
         "summary": "Get user by ID",
-        "description": "Retrieve a single user by their unique identifier",
+        "description": "Retrieve a single user by their unique identifier. Returns only username and _id for privacy. Used to display user info in chat inbox, message sender details, or profile modals.",
         "operationId": "getUserById",
         "security": [{ "BearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/userId" }],
@@ -537,15 +577,39 @@
             "description": "User found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/User" }
+                "schema": { "$ref": "#/components/schemas/UserMinimal" },
+                "example": {
+                  "_id": "507f1f77bcf86cd799439011",
+                  "username": "ahmed123"
+                }
               }
             }
           },
           "404": {
-            "$ref": "#/components/responses/NotFoundError"
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "User not found"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "description": "Failed to fetch user",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Failed to fetch user",
+                  "error": "Database error"
+                }
+              }
+            }
           }
         }
       }
@@ -579,7 +643,7 @@
       "post": {
         "tags": ["Messages"],
         "summary": "Get or create conversation",
-        "description": "Get an existing conversation or create a new one with specified participants",
+        "description": "Get an existing conversation or create a new one with specified participant",
         "operationId": "getOrCreateConversation",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
@@ -589,29 +653,28 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "participantIds": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Array of user IDs to include in conversation",
-                    "example": ["64a1b2c3d4e5f6", "64a1b2c3d4e5f7"]
-                  },
-                  "partnerId": { 
+                  "participantId": { 
                     "type": "string", 
-                    "description": "Single user ID for one-on-one conversation",
-                    "example": "64a1b2c3d4e5f6"
+                    "description": "User ID to start conversation with",
+                    "example": "507f1f77bcf86cd799439011"
                   }
                 },
-                "oneOf": [
-                  { "required": ["participantIds"] },
-                  { "required": ["partnerId"] }
-                ]
+                "required": ["participantId"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Existing or newly created conversation",
+            "description": "Existing conversation found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Conversation" }
+              }
+            }
+          },
+          "201": {
+            "description": "New conversation created",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Conversation" }
@@ -648,7 +711,11 @@
                   "properties": {
                     "message": { 
                       "type": "string", 
-                      "example": "Conversation cleared successfully" 
+                      "example": "Chat cleared successfully" 
+                    },
+                    "deletedCount": {
+                      "type": "integer",
+                      "example": 25
                     }
                   }
                 }
@@ -660,6 +727,17 @@
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "description": "Forbidden - User is not a participant",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "You are not authorized to clear this chat"
+                }
+              }
+            }
           }
         }
       }
@@ -674,6 +752,17 @@
         "parameters": [
           { "$ref": "#/components/parameters/conversationId" },
           {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { 
+              "type": "integer", 
+              "default": 1,
+              "minimum": 1
+            },
+            "description": "Page number"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -683,18 +772,7 @@
               "minimum": 1,
               "maximum": 100
             },
-            "description": "Number of messages to retrieve"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "schema": { 
-              "type": "string", 
-              "format": "date-time" 
-            },
-            "description": "Return messages created before this timestamp (for pagination)",
-            "example": "2024-01-15T14:30:00Z"
+            "description": "Number of messages per page"
           }
         ],
         "responses": {
@@ -711,6 +789,17 @@
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "description": "Forbidden - User is not a participant",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "You are not authorized to view this conversation"
+                }
+              }
+            }
           }
         }
       }
@@ -718,8 +807,8 @@
     "/file/upload": {
       "post": {
         "tags": ["Files"],
-        "summary": "Upload file",
-        "description": "Upload a file (images, documents, or videos). Max size: 10MB",
+        "summary": "Upload file to Cloudinary",
+        "description": "Upload a file (images, documents, or videos) to Cloudinary. Rate limited to 10 uploads per 15 minutes.",
         "operationId": "uploadFile",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
@@ -732,7 +821,7 @@
                   "file": {
                     "type": "string",
                     "format": "binary",
-                    "description": "File to upload. Allowed types: jpg, jpeg, png, gif, pdf, doc, docx, txt, mp4, mov, avi. Max size: 10MB"
+                    "description": "File to upload"
                   }
                 },
                 "required": ["file"]
@@ -741,7 +830,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "File uploaded successfully",
             "content": {
               "application/json": {
@@ -750,27 +839,34 @@
             }
           },
           "400": {
-            "description": "Invalid file type or validation error",
+            "description": "No file uploaded or invalid file type",
             "content": {
               "application/json": { 
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" },
                 "example": {
-                  "message": "Invalid file type",
-                  "error": "BAD_REQUEST",
-                  "statusCode": 400
+                  "message": "No file uploaded"
                 }
               }
             }
           },
           "413": {
-            "description": "File size exceeds 10MB limit",
+            "description": "File size exceeds limit",
             "content": {
               "application/json": { 
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" },
                 "example": {
-                  "message": "File size exceeds limit",
-                  "error": "PAYLOAD_TOO_LARGE",
-                  "statusCode": 413
+                  "message": "File size exceeds maximum allowed size"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": { 
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "Too many file uploads, please try again after 15 minutes"
                 }
               }
             }
@@ -784,8 +880,8 @@
     "/file/get/{filename}": {
       "get": {
         "tags": ["Files"],
-        "summary": "Download file",
-        "description": "Download a previously uploaded file by its stored filename",
+        "summary": "Download file from Cloudinary",
+        "description": "Download a previously uploaded file. Rate limited to 50 downloads per 15 minutes.",
         "operationId": "downloadFile",
         "security": [{ "BearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/filename" }],
@@ -805,6 +901,12 @@
                   "format": "binary" 
                 }
               },
+              "image/png": {
+                "schema": { 
+                  "type": "string", 
+                  "format": "binary" 
+                }
+              },
               "application/pdf": {
                 "schema": { 
                   "type": "string", 
@@ -814,20 +916,26 @@
             }
           },
           "404": {
-            "$ref": "#/components/responses/NotFoundError"
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "message": "File not found"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/UnauthorizedError"
           },
           "429": {
-            "description": "Too many requests - rate limit exceeded",
+            "description": "Rate limit exceeded",
             "content": {
               "application/json": { 
                 "schema": { "$ref": "#/components/schemas/ErrorResponse" },
                 "example": {
-                  "message": "Rate limit exceeded",
-                  "error": "TOO_MANY_REQUESTS",
-                  "statusCode": 429
+                  "message": "Too many file downloads, please try again after 15 minutes"
                 }
               }
             }
