@@ -20,18 +20,45 @@ const storage = multer.diskStorage({
   },
 });
 
-// Allowed MIME types and extensions
+// Allowed MIME types and extensions (INCLUDING AUDIO)
 const allowedMimeTypes = [
-  "image/jpeg", "image/jpg", "image/png", "image/gif",
-  "application/pdf", "application/msword",
+  "image/jpeg", 
+  "image/jpg", 
+  "image/png", 
+  "image/gif",
+  "application/pdf", 
+  "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
-  "video/mp4", "video/quicktime", "video/x-msvideo"
+  "video/mp4", 
+  "video/quicktime", 
+  "video/x-msvideo",
+  //  Audio types added
+  "audio/webm", 
+  "audio/mpeg", 
+  "audio/mp3", 
+  "audio/ogg",
+  "audio/wav"
 ];
+
 const allowedExtensions = [
-  ".jpg", ".jpeg", ".png", ".gif",
-  ".pdf", ".doc", ".docx", ".txt",
-  ".mp4", ".mov", ".avi"
+  ".jpg", 
+  ".jpeg", 
+  ".png", 
+  ".gif",
+  ".pdf", 
+  ".doc", 
+  ".docx", 
+  ".txt",
+  ".mp4", 
+  ".mov", 
+  ".avi",
+  //  Audio extensions added
+  ".webm", 
+  ".mp3", 
+  ".mpeg", 
+  ".ogg",
+  ".wav"
 ];
 
 // File filter

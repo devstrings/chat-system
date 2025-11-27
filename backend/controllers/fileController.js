@@ -10,13 +10,17 @@ const ALLOWED_TYPES = [
   "application/pdf", "text/plain",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "video/mp4", "video/quicktime", "video/x-msvideo"
+  "video/mp4", "video/quicktime", "video/x-msvideo",
+  "audio/webm", "audio/mpeg", "audio/mp3", "audio/ogg"  // Audio support added
 ];
+
 const ALLOWED_EXTENSIONS = [
   ".jpg", ".jpeg", ".png", ".gif",
   ".pdf", ".txt", ".doc", ".docx",
-  ".mp4", ".mov", ".avi"
+  ".mp4", ".mov", ".avi",
+  ".webm", ".mp3", ".mpeg", ".ogg"  // Audio extensions added
 ];
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 // Calculate SHA256 hash of file

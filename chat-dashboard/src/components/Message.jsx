@@ -3,6 +3,10 @@ import React, { useState, useEffect } from "react";
 export default function Message({ message, isOwn }) {
   const [imageUrls, setImageUrls] = useState({});
   const [imageLoading, setImageLoading] = useState({});
+  const [playingAudio, setPlayingAudio] = useState(null);
+  const [audioDuration, setAudioDuration] = useState({});
+  const [audioProgress, setAudioProgress] = useState({});
+  const audioRefs = React.useRef({});
 
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString("en-US", {
@@ -36,6 +40,74 @@ export default function Message({ message, isOwn }) {
   // Get file name (supports multiple field names from backend)
   const getFileName = (file) => {
     return file.filename || file.fileName || file.originalName || "Unknown file";
+  };
+
+  // Check if attachment is voice message
+  const isVoiceMessage = (file) => {
+    return file.fileType === 'audio/webm' || file.fileType === 'audio/mpeg' || 
+           (file.filename || file.fileName || '').includes('voice_');
+  };
+
+  // Play/Pause audio
+  const toggleAudio = (index, audioUrl) => {
+    const audio = audioRefs.current[index];
+    
+    if (!audio) {
+      // Create new audio element
+      const newAudio = new Audio();
+      const token = localStorage.getItem("token");
+      
+      // Fetch audio with authentication
+      fetch(`http://localhost:5000${audioUrl}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        newAudio.src = url;
+        newAudio.play();
+        
+        newAudio.onloadedmetadata = () => {
+          setAudioDuration(prev => ({ ...prev, [index]: newAudio.duration }));
+        };
+        
+        newAudio.ontimeupdate = () => {
+          setAudioProgress(prev => ({ 
+            ...prev, 
+            [index]: (newAudio.currentTime / newAudio.duration) * 100 
+          }));
+        };
+        
+        newAudio.onended = () => {
+          setPlayingAudio(null);
+          setAudioProgress(prev => ({ ...prev, [index]: 0 }));
+        };
+        
+        audioRefs.current[index] = newAudio;
+        setPlayingAudio(index);
+      })
+      .catch(err => console.error('Audio load error:', err));
+      
+      return;
+    }
+    
+    if (playingAudio === index) {
+      audio.pause();
+      setPlayingAudio(null);
+    } else {
+      // Pause all other audios
+      Object.values(audioRefs.current).forEach(a => a?.pause());
+      audio.play();
+      setPlayingAudio(index);
+    }
+  };
+
+  // Format audio duration
+  const formatAudioTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Fetch secure images with authentication
@@ -108,7 +180,7 @@ export default function Message({ message, isOwn }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = getFileName(file); // Use the helper function
+      a.download = getFileName(file);
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -180,68 +252,119 @@ export default function Message({ message, isOwn }) {
                 const fileName = getFileName(file);
                 const fileIcon = getFileIcon(file.fileType);
                 
-                return (
-                  <div key={index} className="mb-2">
-                    {file.fileType?.startsWith("image/") ? (
-                      <div className="relative">
-                        {imageLoading[index] ? (
-                          // Loading spinner for images
-                          <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
-                            <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                          </div>
-                        ) : imageUrls[index] ? (
-                          <div>
-                            {/* Display secure image */}
-                            <img 
-                              src={imageUrls[index]} 
-                              alt={fileName}
-                              className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
-                              onClick={() => window.open(imageUrls[index], '_blank')}
-                            />
-                            {/* Image filename below */}
-                            <p className="text-xs mt-1 opacity-70 truncate">
-                              {fileIcon} {fileName}
-                            </p>
-                          </div>
-                        ) : (
-                          // Error fallback
-                          <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
-                            <p className="text-gray-400 text-sm">Failed to load image</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      // Document/File download button
+                // Voice Message
+                if (isVoiceMessage(file)) {
+                  const duration = file.duration || audioDuration[index] || 0;
+                  const progress = audioProgress[index] || 0;
+                  const isPlaying = playingAudio === index;
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className={`flex items-center gap-2 p-3 rounded-lg ${
+                        isOwn 
+                          ? "bg-white bg-opacity-20" 
+                          : "bg-gray-700"
+                      }`}
+                    >
                       <button
-                        onClick={() => handleFileDownload(file)}
-                        className={`flex items-center gap-2 p-3 rounded-lg transition w-full ${
-                          isOwn 
-                            ? "bg-white bg-opacity-20 hover:bg-opacity-30" 
-                            : "bg-gray-700 hover:bg-gray-600"
+                        onClick={() => toggleAudio(index, file.url)}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${
+                          isOwn
+                            ? "bg-white bg-opacity-30 hover:bg-opacity-40"
+                            : "bg-blue-500 hover:bg-blue-600"
                         }`}
                       >
-                        {/* File icon */}
-                        <div className="text-2xl flex-shrink-0">
-                          {fileIcon}
+                        {isPlaying ? (
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        )}
+                      </button>
+                      
+                      <div className="flex-1 min-w-0">
+                        {/* Waveform visualization */}
+                        <div className="flex gap-0.5 items-center h-6 mb-1">
+                          {[...Array(30)].map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-0.5 rounded-full transition-all ${
+                                isOwn ? "bg-white" : "bg-blue-400"
+                              }`}
+                              style={{
+                                height: `${Math.random() * 80 + 20}%`,
+                                opacity: progress > (i / 30) * 100 ? 1 : 0.3
+                              }}
+                            />
+                          ))}
                         </div>
                         
-                        {/* File info */}
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="text-sm font-medium truncate">{fileName}</p>
-                          <p className="text-xs opacity-70">
-                            {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'} • Click to download
+                        <div className="flex items-center justify-between text-xs opacity-70">
+                          <span>Voice message</span>
+                          <span>{formatAudioTime(duration)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Image
+                if (file.fileType?.startsWith("image/")) {
+                  return (
+                    <div key={index} className="relative">
+                      {imageLoading[index] ? (
+                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                          <svg className="w-8 h-8 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </div>
+                      ) : imageUrls[index] ? (
+                        <div>
+                          <img 
+                            src={imageUrls[index]} 
+                            alt={fileName}
+                            className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition"
+                            onClick={() => window.open(imageUrls[index], '_blank')}
+                          />
+                          <p className="text-xs mt-1 opacity-70 truncate">
+                            {fileIcon} {fileName}
                           </p>
                         </div>
-                        
-                        {/* Download icon */}
-                        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                      ) : (
+                        <div className="flex items-center justify-center bg-gray-700 bg-opacity-50 rounded-lg h-48 w-64">
+                          <p className="text-gray-400 text-sm">Failed to load image</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                
+                // Document/File
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleFileDownload(file)}
+                    className={`flex items-center gap-2 p-3 rounded-lg transition w-full ${
+                      isOwn 
+                        ? "bg-white bg-opacity-20 hover:bg-opacity-30" 
+                        : "bg-gray-700 hover:bg-gray-600"
+                    }`}
+                  >
+                    <div className="text-2xl flex-shrink-0">{fileIcon}</div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-medium truncate">{fileName}</p>
+                      <p className="text-xs opacity-70">
+                        {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'} • Click to download
+                      </p>
+                    </div>
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
                 );
               })}
             </div>
