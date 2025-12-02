@@ -2,18 +2,18 @@ import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
 
 export function handleMessage(io, socket) {
-  console.log(` User connected: ${socket.user.id}`);
+  console.log(`✅ User connected: ${socket.user.id}`);
 
   //  Send message
   socket.on("sendMessage", async ({ conversationId, text, attachments = [] }) => {
     try {
-      console.log(" Sending message:", { conversationId, text, senderId: socket.user.id });
+      console.log("📤 Sending message:", { conversationId, text, senderId: socket.user.id });
 
       //  Extract attachment IDs
       let attachmentIds = [];
       if (attachments && attachments.length > 0) {
         attachmentIds = attachments.map(att => att.attachmentId).filter(Boolean);
-        console.log(" Attachment IDs:", attachmentIds);
+        console.log("📎 Attachment IDs:", attachmentIds);
       }
 
       //  Get conversation to find receiver
@@ -23,7 +23,7 @@ export function handleMessage(io, socket) {
       );
 
       if (!conversation) {
-        console.warn(" Conversation not found:", conversationId);
+        console.warn("⚠️ Conversation not found:", conversationId);
         return;
       }
 
@@ -32,17 +32,16 @@ export function handleMessage(io, socket) {
         (p) => p._id.toString() !== socket.user.id
       )?._id;
 
-      //  Create message with 'sent' status AND receiver field
+      //  Create message with 'sent' status
       const msg = await Message.create({
         conversationId,
         sender: socket.user.id,
-        receiver: receiverId, 
         text: text || "",
         attachments: attachmentIds,
         status: "sent",
       });
 
-      console.log(" Message created:", msg._id);
+      console.log("💾 Message created:", msg._id);
 
       //  Populate sender AND attachments
       await msg.populate("sender", "username email");
@@ -63,7 +62,7 @@ export function handleMessage(io, socket) {
       const transformedAttachments = msg.attachments && msg.attachments.length > 0
         ? msg.attachments.map(att => {
             if (!att || !att.serverFileName) {
-              console.warn(" Invalid attachment:", att);
+              console.warn("⚠️ Invalid attachment:", att);
               return null;
             }
             return {
@@ -85,17 +84,15 @@ export function handleMessage(io, socket) {
           username: msg.sender.username,
           email: msg.sender.email,
         },
-        receiver: receiverId, //  Include receiver
         text: msg.text,
         attachments: transformedAttachments,
         status: msg.status,
         createdAt: msg.createdAt,
       };
 
-      console.log(" Broadcasting message to both users");
+      console.log("📡 Broadcasting message to both users");
 
-      //  FIX: Emit to BOTH sender and receiver explicitly
-      // Emit to sender (confirmation)
+      //  Emit to BOTH sender and receiver explicitly
       socket.emit("receiveMessage", messageData);
 
       // Emit to receiver (if online)
@@ -105,7 +102,7 @@ export function handleMessage(io, socket) {
         );
 
         if (receiverSocket) {
-          console.log(` Receiver ONLINE, sending message`);
+          console.log(`✅ Receiver ONLINE, sending message`);
           receiverSocket.emit("receiveMessage", messageData);
 
           // Mark as delivered after 500ms
@@ -116,12 +113,11 @@ export function handleMessage(io, socket) {
                 deliveredAt: new Date(),
               });
 
-              console.log(" Message delivered:", msg._id);
+              console.log("✅ Message delivered:", msg._id);
 
-              //  FIX: Broadcast status to BOTH users
               const statusUpdate = {
                 messageId: msg._id,
-                _id: msg._id, //  Add both for compatibility
+                _id: msg._id,
                 conversationId,
                 status: "delivered",
               };
@@ -129,16 +125,16 @@ export function handleMessage(io, socket) {
               socket.emit("messageStatusUpdate", statusUpdate);
               receiverSocket.emit("messageStatusUpdate", statusUpdate);
             } catch (err) {
-              console.error(" Delivery error:", err);
+              console.error("❌ Delivery error:", err);
             }
           }, 500);
         } else {
-          console.log(` Receiver OFFLINE, message stays 'sent'`);
+          console.log(`⚠️ Receiver OFFLINE, message stays 'sent'`);
         }
       }
     } catch (err) {
-      console.error(" sendMessage error:", err);
-      console.error(" Stack:", err.stack);
+      console.error("❌ sendMessage error:", err);
+      console.error("Stack:", err.stack);
       socket.emit("errorMessage", { message: "Message send failed" });
     }
   });
@@ -146,28 +142,24 @@ export function handleMessage(io, socket) {
   //  Handle user coming online (deliver pending messages)
   socket.on("userOnline", async () => {
     try {
-      console.log(` User ${socket.user.id} came online`);
+      console.log(`🟢 User ${socket.user.id} came online`);
 
       const conversations = await Conversation.find({
         participants: socket.user.id,
       });
 
       for (const conv of conversations) {
-        // Find messages sent TO this user that are still 'sent'
         const pendingMessages = await Message.find({
           conversationId: conv._id,
-          receiver: socket.user.id, //  Use receiver field
           status: "sent",
-        });
+        }).populate("sender", "username");
 
         if (pendingMessages.length > 0) {
-          console.log(` Delivering ${pendingMessages.length} pending messages`);
+          console.log(`📬 Delivering ${pendingMessages.length} pending messages`);
 
-          // Update all to delivered
           await Message.updateMany(
             {
               conversationId: conv._id,
-              receiver: socket.user.id,
               status: "sent",
             },
             {
@@ -176,10 +168,9 @@ export function handleMessage(io, socket) {
             }
           );
 
-          // Notify sender(s) about delivery
           for (const msg of pendingMessages) {
             const senderSocket = [...io.sockets.sockets.values()].find(
-              (s) => s.user && s.user.id === msg.sender.toString()
+              (s) => s.user && s.user.id === msg.sender._id.toString()
             );
 
             const statusUpdate = {
@@ -189,7 +180,6 @@ export function handleMessage(io, socket) {
               status: "delivered",
             };
 
-            // Notify both users
             socket.emit("messageStatusUpdate", statusUpdate);
             if (senderSocket) {
               senderSocket.emit("messageStatusUpdate", statusUpdate);
@@ -198,20 +188,27 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error(" userOnline error:", err);
+      console.error("❌ userOnline error:", err);
     }
   });
 
   //  Mark messages as read
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
-      console.log(` Marking read in conversation: ${conversationId}`);
+      console.log(`👁️ Marking read in conversation: ${conversationId}`);
 
-      //  FIX: Update messages where THIS user is the receiver
+      // Get conversation to find participants
+      const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
+      
+      if (!conversation) {
+        console.warn("⚠️ Conversation not found");
+        return;
+      }
+
       const result = await Message.updateMany(
         {
           conversationId,
-          receiver: socket.user.id, //  This user received these messages
+          sender: { $ne: socket.user.id },
           status: { $ne: "read" },
         },
         {
@@ -221,18 +218,14 @@ export function handleMessage(io, socket) {
       );
 
       if (result.modifiedCount > 0) {
-        console.log(` Marked ${result.modifiedCount} messages as read`);
+        console.log(`✅ Marked ${result.modifiedCount} messages as read`);
 
-        // Get the messages that were just marked read
         const readMessages = await Message.find({
           conversationId,
-          receiver: socket.user.id,
+          sender: { $ne: socket.user.id },
           status: "read"
         }).select('_id sender');
 
-        const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
-
-        //  FIX: Emit individual status updates for each message
         for (const msg of readMessages) {
           const statusUpdate = {
             messageId: msg._id,
@@ -241,7 +234,6 @@ export function handleMessage(io, socket) {
             status: "read",
           };
 
-          // Emit to all participants
           for (const participant of conversation.participants) {
             const targetSocket = [...io.sockets.sockets.values()].find(
               (s) => s.user && s.user.id === participant._id.toString()
@@ -253,7 +245,6 @@ export function handleMessage(io, socket) {
           }
         }
 
-        // Also emit bulk read event (for backward compatibility)
         for (const participant of conversation.participants) {
           const targetSocket = [...io.sockets.sockets.values()].find(
             (s) => s.user && s.user.id === participant._id.toString()
@@ -268,11 +259,128 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error(" markAsRead error:", err);
+      console.error("❌ markAsRead error:", err);
+    }
+  });
+
+  // 🆕 DELETE MESSAGE FOR ME (✅ FIXED)
+  socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
+    try {
+      console.log("🗑️ Delete for me request:", messageId);
+
+      const message = await Message.findById(messageId).populate('conversationId');
+      if (!message) {
+        console.warn("⚠️ Message not found");
+        return;
+      }
+
+      const userId = socket.user.id;
+
+      // Verify user is participant
+      const isParticipant = message.conversationId.participants.some(
+        p => p.toString() === userId
+      );
+
+      if (!isParticipant) {
+        socket.emit("errorMessage", { message: "Unauthorized" });
+        return;
+      }
+
+      // Add to deletedFor array
+      if (!message.deletedFor.includes(userId)) {
+        message.deletedFor.push(userId);
+      }
+
+      // If all participants deleted, mark as fully deleted
+      const allDeleted = message.conversationId.participants.every(
+        p => message.deletedFor.includes(p.toString())
+      );
+
+      if (allDeleted) {
+        message.isDeleted = true;
+        message.deletedAt = new Date();
+      }
+
+      await message.save();
+
+      // ✅ Emit ONLY to the user who deleted
+      socket.emit("messageDeleted", {
+        messageId,
+        conversationId,
+        deletedFor: [userId],
+        isDeleted: message.isDeleted
+      });
+
+      console.log("✅ Message deleted for user");
+    } catch (err) {
+      console.error("❌ Delete for me error:", err);
+    }
+  });
+
+  // 🆕 DELETE MESSAGE FOR EVERYONE (✅ FIXED)
+  socket.on("deleteMessageForEveryone", async ({ messageId, conversationId }) => {
+    try {
+      console.log("🗑️ Delete for everyone request:", messageId);
+
+      const message = await Message.findById(messageId).populate('conversationId');
+      if (!message) {
+        console.warn("⚠️ Message not found");
+        return;
+      }
+
+      const userId = socket.user.id;
+
+      // Only sender can delete for everyone
+      if (message.sender.toString() !== userId) {
+        socket.emit("errorMessage", { message: "Only sender can delete for everyone" });
+        return;
+      }
+
+      // Check time limit (5 minutes)
+      const messageAge = Date.now() - new Date(message.createdAt).getTime();
+      const fiveMinutes = 5 * 60 * 1000;
+
+      if (messageAge > fiveMinutes) {
+        socket.emit("errorMessage", { 
+          message: "Cannot delete for everyone after 5 minutes" 
+        });
+        return;
+      }
+
+      // Mark as deleted for everyone
+      message.deletedForEveryone = true;
+      message.isDeleted = true;
+      message.deletedAt = new Date();
+      message.text = "";
+      message.attachments = [];
+
+      await message.save();
+
+      // ✅ Emit to ALL participants in the conversation
+      const deleteData = {
+        messageId,
+        conversationId,
+        deletedForEveryone: true
+      };
+
+      // Emit to all participants
+      for (const participant of message.conversationId.participants) {
+        const targetSocket = [...io.sockets.sockets.values()].find(
+          (s) => s.user && s.user.id === participant.toString()
+        );
+
+        if (targetSocket) {
+          targetSocket.emit("messageDeletedForEveryone", deleteData);
+        }
+      }
+
+      console.log("✅ Message deleted for everyone");
+    } catch (err) {
+      console.error("❌ Delete for everyone error:", err);
     }
   });
 
   socket.on("disconnect", () => {
-    console.log(` User disconnected: ${socket.user.id}`);
+    console.log(`🔴 User disconnected: ${socket.user.id}`);
   });
 }

@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from "react";
+import { useSocket } from "../context/SocketContext";
+import axios from "axios";
 
-export default function Message({ message, isOwn }) {
+export default function Message({ message, isOwn, isSelectionMode, isSelected, onToggleSelect }) {
+  const { socket } = useSocket();
   const [imageUrls, setImageUrls] = useState({});
   const [imageLoading, setImageLoading] = useState({});
   const [playingAudio, setPlayingAudio] = useState(null);
   const [audioDuration, setAudioDuration] = useState({});
   const [audioProgress, setAudioProgress] = useState({});
+  const [showOptions, setShowOptions] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const audioRefs = React.useRef({});
 
   const formatTime = (date) => {
@@ -48,16 +53,85 @@ export default function Message({ message, isOwn }) {
            (file.filename || file.fileName || '').includes('voice_');
   };
 
+  // Check if message was deleted
+  const isDeletedForEveryone = message.deletedForEveryone || message.isDeletedForEveryone;
+  const isDeletedForMe = message.deletedFor?.includes(message.sender._id) || message.isDeletedForMe;
+
+  // 🆕 DELETE FUNCTIONS (✅ FIXED)
+  const handleDeleteForMe = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      await axios.delete(
+        `http://localhost:5000/api/messages/message/${message._id}/for-me`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log("✅ Message deleted for me");
+
+      // ✅ Emit socket event with conversationId
+      if (socket) {
+        socket.emit("deleteMessageForMe", { 
+          messageId: message._id,
+          conversationId: message.conversationId 
+        });
+      }
+
+      setShowDeleteModal(false);
+      setShowOptions(false);
+    } catch (err) {
+      console.error("Delete for me error:", err);
+      alert("Failed to delete message");
+    }
+  };
+
+  const handleDeleteForEveryone = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      await axios.delete(
+        `http://localhost:5000/api/messages/message/${message._id}/for-everyone`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log("✅ Message deleted for everyone");
+
+      // ✅ Emit socket event with conversationId
+      if (socket) {
+        socket.emit("deleteMessageForEveryone", { 
+          messageId: message._id,
+          conversationId: message.conversationId 
+        });
+      }
+
+      setShowDeleteModal(false);
+      setShowOptions(false);
+    } catch (err) {
+      console.error("Delete for everyone error:", err);
+      if (err.response?.status === 400) {
+        alert("Cannot delete for everyone after 5 minutes");
+      } else {
+        alert("Failed to delete message");
+      }
+    }
+  };
+
+  // Check if message is less than 5 minutes old (for delete for everyone)
+  const canDeleteForEveryone = () => {
+    if (!isOwn) return false;
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+    return messageAge <= fiveMinutes;
+  };
+
   // Play/Pause audio
   const toggleAudio = (index, audioUrl) => {
     const audio = audioRefs.current[index];
     
     if (!audio) {
-      // Create new audio element
       const newAudio = new Audio();
       const token = localStorage.getItem("token");
       
-      // Fetch audio with authentication
       fetch(`http://localhost:5000${audioUrl}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -95,7 +169,6 @@ export default function Message({ message, isOwn }) {
       audio.pause();
       setPlayingAudio(null);
     } else {
-      // Pause all other audios
       Object.values(audioRefs.current).forEach(a => a?.pause());
       audio.play();
       setPlayingAudio(index);
@@ -119,7 +192,6 @@ export default function Message({ message, isOwn }) {
       if (!token) return;
 
       for (const [index, file] of message.attachments.entries()) {
-        // Only fetch images
         if (file.fileType?.startsWith("image/")) {
           setImageLoading(prev => ({ ...prev, [index]: true }));
 
@@ -149,7 +221,6 @@ export default function Message({ message, isOwn }) {
 
     fetchSecureImages();
 
-    // Cleanup blob URLs on unmount
     return () => {
       Object.values(imageUrls).forEach(url => {
         if (url) URL.revokeObjectURL(url);
@@ -195,10 +266,6 @@ export default function Message({ message, isOwn }) {
   const getStatusIcon = () => {
     const status = message.status || 'sent';
     
-    if (isOwn) {
-      console.log(`Message ${message._id} status:`, status, message);
-    }
-    
     if (status === 'read') {
       return (
         <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
@@ -220,9 +287,52 @@ export default function Message({ message, isOwn }) {
     }
   };
 
+  // If deleted for everyone, show placeholder (✅ FIXED WIDTH)
+  if (isDeletedForEveryone) {
+    return (
+      <div className={`flex mb-4 ${isOwn ? "justify-end" : "justify-start"}`}>
+        <div className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse max-w-md" : "flex-row max-w-md"}`}>
+          {!isOwn && (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md">
+              {getSenderInitial()}
+            </div>
+          )}
+
+          {/* ✅ FIXED: Added minWidth to prevent cutting */}
+          <div 
+            className={`relative px-4 py-2 rounded-2xl shadow-lg bg-gray-800 bg-opacity-50 border border-gray-700 ${
+              isOwn ? "rounded-br-sm" : "rounded-bl-sm"
+            }`}
+            style={{ minWidth: "200px" }}
+          >
+            <p className="text-sm text-gray-500 italic flex items-center gap-2">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              This message was deleted
+            </p>
+            <p className="text-xs text-gray-600 mt-1">{formatTime(message.createdAt)}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex mb-4 ${isOwn ? "justify-end" : "justify-start"}`}>
       <div className={`flex items-end gap-2 max-w-md ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+        {/* 🆕 Selection Checkbox */}
+        {isSelectionMode && (
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(message._id)}
+              className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
         {/* Avatar */}
         {!isOwn && (
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md">
@@ -232,12 +342,53 @@ export default function Message({ message, isOwn }) {
 
         {/* Message Bubble */}
         <div
-          className={`relative px-4 py-2 rounded-2xl shadow-lg transition-all hover:shadow-xl ${
+          className={`relative px-4 py-2 rounded-2xl shadow-lg transition-all hover:shadow-xl group ${
             isOwn
               ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
               : "bg-gray-800 bg-opacity-80 text-gray-100 rounded-bl-sm border border-gray-700 border-opacity-50"
           }`}
         >
+          {/* 🆕 Options Button (Three Dots) */}
+          {!isSelectionMode && (
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => setShowOptions(!showOptions)}
+                className={`p-1 rounded-lg hover:bg-opacity-20 ${
+                  isOwn ? "hover:bg-white" : "hover:bg-gray-600"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+              </button>
+
+              {/* Options Menu */}
+              {showOptions && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowOptions(false)}
+                  ></div>
+                  
+                  <div className="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setShowDeleteModal(true);
+                        setShowOptions(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Message
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Sender name (only for received messages) */}
           {!isOwn && (
             <p className="text-xs font-semibold text-blue-400 mb-1">
@@ -287,7 +438,6 @@ export default function Message({ message, isOwn }) {
                       </button>
                       
                       <div className="flex-1 min-w-0">
-                        {/* Waveform visualization */}
                         <div className="flex gap-0.5 items-center h-6 mb-1">
                           {[...Array(30)].map((_, i) => (
                             <div
@@ -304,7 +454,7 @@ export default function Message({ message, isOwn }) {
                         </div>
                         
                         <div className="flex items-center justify-between text-xs opacity-70">
-                          <span>Voice message</span>
+                          <span>🎤 Voice message</span>
                           <span>{formatAudioTime(duration)}</span>
                         </div>
                       </div>
@@ -407,6 +557,59 @@ export default function Message({ message, isOwn }) {
           </div>
         </div>
       </div>
+
+      {/* 🆕 Delete Modal */}
+      {showDeleteModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setShowDeleteModal(false)}
+          ></div>
+          
+          <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl">
+              <h3 className="text-lg font-semibold text-white mb-4">Delete Message?</h3>
+              
+              <div className="space-y-2">
+                <button
+                  onClick={handleDeleteForMe}
+                  className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-left flex items-center gap-3"
+                >
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <div>
+                    <p className="font-medium">Delete for Me</p>
+                    <p className="text-xs text-gray-400">Only you won't see this message</p>
+                  </div>
+                </button>
+
+                {isOwn && canDeleteForEveryone() && (
+                  <button
+                    onClick={handleDeleteForEveryone}
+                    className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-3"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="font-medium">Delete for Everyone</p>
+                      <p className="text-xs text-red-200">Everyone won't see this message</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="w-full mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
