@@ -231,38 +231,42 @@ export default function Dashboard() {
       }
     };
 
-    //  Handle status updates
-    const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
-      const msgId = messageId || _id;
-      console.log(" Status update received:", {
-        msgId,
-        status,
-        conversationId,
-      });
+    
+   //  Handle status updates 
+const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
+  const msgId = messageId || _id;
+  console.log("📊 Status update received:", {
+    msgId,
+    status,
+    conversationId,
+  });
 
-      if (!msgId || !status) {
-        console.warn(" Invalid status update data");
-        return;
+  if (!msgId || !status) {
+    console.warn("⚠️ Invalid status update data");
+    return;
+  }
+
+  // Update lastMessages in a microtask to ensure state consistency
+  queueMicrotask(() => {
+    setLastMessages((prev) => {
+      const updated = { ...prev };
+
+      for (const [userId, msgData] of Object.entries(prev)) {
+        if (msgData?.lastMessageId === msgId) {
+          updated[userId] = {
+            ...msgData,
+            status,
+          };
+          console.log(
+            ` Updated sidebar status to ${status} for user ${userId}`
+          );
+        }
       }
 
-      setLastMessages((prev) => {
-        const updated = { ...prev };
-
-        for (const [userId, msgData] of Object.entries(prev)) {
-          if (msgData?.lastMessageId === msgId) {
-            updated[userId] = {
-              ...msgData,
-              status,
-            };
-            console.log(
-              ` Updated sidebar status to ${status} for user ${userId}`
-            );
-          }
-        }
-
-        return updated;
-      });
-    };
+      return updated;
+    });
+  });
+};
 
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);

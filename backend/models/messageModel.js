@@ -12,16 +12,11 @@ const messageSchema = new mongoose.Schema({
     required: true 
   },
   
-  receiver: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User", 
-    required: true 
-  },
+  
   text: { 
     type: String,
     default: "" 
   },
- 
   attachments: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Attachment"
@@ -31,7 +26,6 @@ const messageSchema = new mongoose.Schema({
     enum: ['sent', 'delivered', 'read'],
     default: 'sent'
   },
- 
   deliveredAt: { 
     type: Date 
   },
@@ -45,7 +39,40 @@ const messageSchema = new mongoose.Schema({
   readBy: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "User" 
-  }]
+  }],
+  
+  // Delete functionality
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedFor: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }],
+  deletedForEveryone: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date
+  },
+  
+  // Edit functionality
+  isEdited: {
+    type: Boolean,
+    default: false
+  },
+  editedAt: {
+    type: Date
+  },
+  originalText: {
+    type: String
+  }
 });
+
+// Index for faster queries
+messageSchema.index({ conversationId: 1, createdAt: 1 });
+messageSchema.index({ sender: 1 });
 
 export default mongoose.model("Message", messageSchema);
