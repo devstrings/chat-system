@@ -57,7 +57,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
   const isDeletedForEveryone = message.deletedForEveryone || message.isDeletedForEveryone;
   const isDeletedForMe = message.deletedFor?.includes(message.sender._id) || message.isDeletedForMe;
 
-  // 🆕 DELETE FUNCTIONS (✅ FIXED)
+  //  DELETE FUNCTIONS 
   const handleDeleteForMe = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -67,9 +67,9 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log("✅ Message deleted for me");
+      console.log(" Message deleted for me");
 
-      // ✅ Emit socket event with conversationId
+      //  Emit socket event with conversationId
       if (socket) {
         socket.emit("deleteMessageForMe", { 
           messageId: message._id,
@@ -94,9 +94,9 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log("✅ Message deleted for everyone");
+      console.log(" Message deleted for everyone");
 
-      // ✅ Emit socket event with conversationId
+      //  Emit socket event with conversationId
       if (socket) {
         socket.emit("deleteMessageForEveryone", { 
           messageId: message._id,
@@ -287,7 +287,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
     }
   };
 
-  // If deleted for everyone, show placeholder (✅ FIXED WIDTH)
+  // If deleted for everyone, show placeholder 
   if (isDeletedForEveryone) {
     return (
       <div className={`flex mb-4 ${isOwn ? "justify-end" : "justify-start"}`}>
@@ -298,7 +298,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
             </div>
           )}
 
-          {/* ✅ FIXED: Added minWidth to prevent cutting */}
+          {/*  Added minWidth to prevent cutting */}
           <div 
             className={`relative px-4 py-2 rounded-2xl shadow-lg bg-gray-800 bg-opacity-50 border border-gray-700 ${
               isOwn ? "rounded-br-sm" : "rounded-bl-sm"
@@ -321,7 +321,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
   return (
     <div className={`flex mb-4 ${isOwn ? "justify-end" : "justify-start"}`}>
       <div className={`flex items-end gap-2 max-w-md ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-        {/* 🆕 Selection Checkbox */}
+        {/*  Selection Checkbox */}
         {isSelectionMode && (
           <div className="flex items-center">
             <input
@@ -348,7 +348,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
               : "bg-gray-800 bg-opacity-80 text-gray-100 rounded-bl-sm border border-gray-700 border-opacity-50"
           }`}
         >
-          {/* 🆕 Options Button (Three Dots) */}
+          {/*  Options Button (Three Dots) */}
           {!isSelectionMode && (
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -558,7 +558,7 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
         </div>
       </div>
 
-      {/* 🆕 Delete Modal */}
+      {/*  Delete Modal */}
       {showDeleteModal && (
         <>
           <div

@@ -6,7 +6,7 @@ export const getUsers = async (req, res) => {
     const currentUserId = req.user.id;
 
     const users = await User.find({ _id: { $ne: currentUserId } })
-      .select("username _id")  
+      .select("username email _id")  
       .sort({ username: 1 });
 
     res.json(users);
@@ -16,20 +16,22 @@ export const getUsers = async (req, res) => {
   }
 };
 
-// Search users by username
+// Search users by username 
 export const searchUsers = async (req, res) => {
   try {
-    const { query } = req.query;
+    const searchQuery = req.query.q || req.query.query; // Support both parameters
     const currentUserId = req.user.id;
 
-    if (!query) {
-      return res.status(400).json({ message: "Search query is required" });
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      return res.json([]); // Return empty array instead of error
     }
 
     const users = await User.find({
       _id: { $ne: currentUserId },
-      username: { $regex: query, $options: "i" }
-    }).select("username _id");  
+      username: { $regex: searchQuery, $options: "i" }
+    })
+      .select("username email _id")
+      .limit(20); // Limit results to 20 users
 
     res.json(users);
   } catch (err) {
@@ -43,7 +45,7 @@ export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findById(id).select("username _id");  
+    const user = await User.findById(id).select("username email _id");  
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });

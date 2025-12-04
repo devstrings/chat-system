@@ -12,11 +12,11 @@ export function SocketProvider({ children }) {
 
     //  Token na ho to skip
     if (!token) {
-      console.log("⚠️ No token found, skipping socket connection.");
+      console.log(" No token found, skipping socket connection.");
       return;
     }
 
-    console.log("🔌 Connecting socket with token");
+    console.log(" Connecting socket with token");
 
     //  Socket connection
     const newSocket = io("http://localhost:5000", {
@@ -31,50 +31,50 @@ export function SocketProvider({ children }) {
 
     //  Connected
     newSocket.on("connect", () => {
-      console.log("✅ Socket connected:", newSocket.id);
+      console.log(" Socket connected:", newSocket.id);
       setConnected(true);
     });
 
     //  Disconnected
     newSocket.on("disconnect", (reason) => {
-      console.warn("⚠️ Socket disconnected:", reason);
+      console.warn(" Socket disconnected:", reason);
       setConnected(false);
     });
 
     //  Connection Error
-    newSocket.on("connect_error", (err) => {
-      console.error("❌ Socket connection error:", err.message);
+    newSocket.on("connct_error", (err) => {
+      console.error(" Socket connection error:", err.message);
       setConnected(false);
     });
 
     //  Online/Offline events (optional logging)
     newSocket.on("userOnline", (data) => {
-      console.log("🟢 User came online:", data);
+      console.log(" User came online:", data);
     });
 
     newSocket.on("userOffline", (data) => {
-      console.log("⚫ User went offline:", data);
+      console.log(" User went offline:", data);
     });
 
-    // 🆕 DELETE MESSAGE EVENTS
+    //  DELETE MESSAGE EVENTS
     newSocket.on("messageDeleted", (data) => {
-      console.log("🗑️ Message deleted:", data);
+      console.log(" Message deleted:", data);
       // This will be handled in ChatWindow component
     });
 
     newSocket.on("messageDeletedForEveryone", (data) => {
-      console.log("🗑️ Message deleted for everyone:", data);
+      console.log("Message deleted for everyone:", data);
       // This will be handled in ChatWindow component
     });
 
     newSocket.on("errorMessage", (data) => {
-      console.error("❌ Socket error:", data);
+      console.error(" Socket error:", data);
       alert(data.message);
     });
 
     //  Cleanup on unmount
     return () => {
-      console.log("🧹 Cleaning up socket...");
+      console.log(" Cleaning up socket...");
       newSocket.removeAllListeners();
       newSocket.disconnect();
     };

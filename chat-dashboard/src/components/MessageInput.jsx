@@ -70,6 +70,7 @@ export default function MessageInput({ conversationId }) {
     };
   }, [socket, conversationId, mediaRecorder]);
 
+  //  Send message via socket (backend socket handler saves it)
   const sendMessage = (attachments = []) => {
     if (!socket || (!text.trim() && attachments.length === 0) || sending) return;
 
@@ -84,7 +85,11 @@ export default function MessageInput({ conversationId }) {
       attachments
     };
 
+    console.log(" [MESSAGE_INPUT] Sending message via socket:", messageData);
+
+    // Backend socket handler will save and emit back with _id
     socket.emit("sendMessage", messageData);
+    
     setText("");
     setTimeout(() => setSending(false), 100);
   };
@@ -135,7 +140,7 @@ export default function MessageInput({ conversationId }) {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            console.log(` Upload progress: ${percentCompleted}%`);
+            console.log(`Upload progress: ${percentCompleted}%`);
           },
         }
       );
@@ -145,7 +150,7 @@ export default function MessageInput({ conversationId }) {
 
     } catch (error) {
       console.error(" Upload error:", error);
-      alert(` Upload failed!\n\n${error.response?.data?.message || error.message}`);
+      alert(`Upload failed!\n\n${error.response?.data?.message || error.message}`);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -449,7 +454,7 @@ export default function MessageInput({ conversationId }) {
       <div className="max-w-4xl mx-auto mt-2 px-1">
         <p className="text-xs text-gray-500">
           {uploading ? (
-            <span className="text-blue-400"> Uploading voice message...</span>
+            <span className="text-blue-400"> Uploading...</span>
           ) : isRecording ? (
             <span className="text-red-400"> Recording... Click send to finish</span>
           ) : (

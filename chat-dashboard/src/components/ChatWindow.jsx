@@ -14,13 +14,13 @@ export default function ChatWindow({
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const conversationIdRef = useRef(null);
-  const messagesRef = useRef(messages); // ✅ Add ref for messages
+  const messagesRef = useRef(messages);
 
-  // 🆕 Selection Mode States
+  // Selection Mode States
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
 
-  // ✅ Keep messages ref updated
+  // Keep messages ref updated
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -29,10 +29,10 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  //  Fetch messages when chat changes
+  // Fetch messages when chat changes
   useEffect(() => {
     if (!conversationId) {
-      console.log("⚠️ No conversation ID, skipping message fetch");
+      console.log("No conversation ID, skipping message fetch");
       setMessages([]);
       setLoading(false);
       return;
@@ -43,23 +43,23 @@ export default function ChatWindow({
         setLoading(true);
         const token = localStorage.getItem("token");
 
-        console.log("📥 Fetching messages for conversation:", conversationId);
+        console.log("Fetching messages for conversation:", conversationId);
 
         const res = await axios.get(
           `http://localhost:5000/api/messages/${conversationId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log("✅ Fetched", res.data.length, "messages");
+        console.log(`Fetched ${res.data.length} messages`);
         setMessages(res.data);
 
-        //  Mark as read when opening chat
+        // Mark as read when opening chat
         if (socket && res.data.length > 0) {
-          console.log("👁️ Marking as read (on open)");
+          console.log("Marking as read (on open)");
           socket.emit("markAsRead", { conversationId });
         }
       } catch (err) {
-        console.error("❌ Error fetching messages:", err);
+        console.error("Error fetching messages:", err);
       } finally {
         setLoading(false);
       }
@@ -76,19 +76,29 @@ export default function ChatWindow({
   useEffect(() => {
     if (!socket) return;
 
-    //  Receive new message
+    // Receive new message
     const handleReceiveMessage = (msg) => {
-      console.log("📨 New message received:", msg);
+      console.log(" New message received:", {
+        id: msg._id,
+        status: msg.status,
+        conversationId: msg.conversationId
+      });
 
       if (msg.conversationId === conversationIdRef.current) {
         setMessages((prev) => [...prev, msg]);
 
-        //  Sidebar instantly reflects last message
+        //  Proper data pass karein
         if (onUpdateLastMessageStatus) {
-          onUpdateLastMessageStatus(msg.status || "sent");
+          onUpdateLastMessageStatus({
+            status: msg.status || "sent",
+            messageId: msg._id,
+            conversationId: msg.conversationId,
+            text: msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : ""),
+            senderId: msg.sender?._id || msg.sender
+          });
         }
 
-        //  Auto mark as read (delay for render)
+        // Auto mark as read
         if (socket && msg.sender._id !== currentUserId) {
           setTimeout(() => {
             socket.emit("markAsRead", { conversationId: msg.conversationId });
@@ -97,89 +107,86 @@ export default function ChatWindow({
       }
     };
 
-    //  Handle single message status update (✅ FIXED)
+    // Handle single message status WITHOUT queueMicrotask
     const handleStatusUpdate = (data) => {
-      console.log("📊 Status update received:", data);
+      console.log(" Status update received:", data);
 
       const msgId = data.messageId || data._id;
       const status = data.status;
+      const conversationId = data.conversationId;
 
       if (!msgId || !status) {
-        console.warn("⚠️ Invalid status update:", data);
+        console.warn("Invalid status update data");
         return;
       }
 
-      // ✅ Update messages state
-      queueMicrotask(() => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === msgId
-              ? { ...msg, status: status }
-              : msg
-          )
-        );
-      });
+      // IMMEDIATE UPDATE in ChatWindow
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === msgId
+            ? { ...msg, status: status }
+            : msg
+        )
+      );
 
-      // ✅ FIXED: Update sidebar without setMessages
+      //  Update sidebar if this is the last message
       if (onUpdateLastMessageStatus) {
-        queueMicrotask(() => {
-          const currentMessages = messagesRef.current;
-          const lastMsg = currentMessages[currentMessages.length - 1];
-          if (lastMsg?._id === msgId) {
-            onUpdateLastMessageStatus(status);
-          }
-        });
-      }
-    };
-
-    //  Handle bulk read (all messages read)
-    const handleMessagesRead = (data) => {
-      console.log("👁️ Messages marked as read:", data);
-
-      if (data.conversationId === conversationIdRef.current) {
-        queueMicrotask(() => {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.sender._id === currentUserId && msg.status !== "read"
-                ? { ...msg, status: "read", readAt: new Date() }
-                : msg
-            )
-          );
-        });
-
-        if (onUpdateLastMessageStatus) {
-          queueMicrotask(() => {
-            onUpdateLastMessageStatus("read");
+        const currentMessages = messagesRef.current;
+        const lastMsg = currentMessages[currentMessages.length - 1];
+        
+        if (lastMsg?._id === msgId) {
+          onUpdateLastMessageStatus({
+            status: status,
+            messageId: msgId,
+            conversationId: conversationId
           });
         }
       }
     };
 
-    // 🆕 Handle message deleted (for me)
-    const handleMessageDeleted = (data) => {
-      console.log("🗑️ Message deleted:", data);
-      
-      if (data.messageId) {
-        queueMicrotask(() => {
-          setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
-        });
+    // Handle bulk read (all messages read)
+    const handleMessagesRead = (data) => {
+      console.log("Messages marked as read:", data);
+
+      if (data.conversationId === conversationIdRef.current) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.sender._id === currentUserId && msg.status !== "read"
+              ? { ...msg, status: "read", readAt: new Date() }
+              : msg
+          )
+        );
+
+        if (onUpdateLastMessageStatus) {
+          onUpdateLastMessageStatus({
+            status: "read",
+            conversationId: data.conversationId
+          });
+        }
       }
     };
 
-    // 🆕 Handle message deleted for everyone
+    // Handle message deleted (for me)
+    const handleMessageDeleted = (data) => {
+      console.log("Message deleted:", data);
+      
+      if (data.messageId) {
+        setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
+      }
+    };
+
+    // Handle message deleted for everyone
     const handleMessageDeletedForEveryone = (data) => {
-      console.log("🗑️ Message deleted for everyone:", data);
+      console.log("Message deleted for everyone:", data);
       
       if (data.messageId && data.conversationId === conversationIdRef.current) {
-        queueMicrotask(() => {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg._id === data.messageId
-                ? { ...msg, deletedForEveryone: true, text: "", attachments: [] }
-                : msg
-            )
-          );
-        });
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === data.messageId
+              ? { ...msg, deletedForEveryone: true, text: "", attachments: [] }
+              : msg
+          )
+        );
       }
     };
 
@@ -198,12 +205,12 @@ export default function ChatWindow({
     };
   }, [socket, currentUserId, onUpdateLastMessageStatus]);
 
-  //  Auto scroll to bottom when messages change
+  // Auto scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 🆕 Selection Mode Functions
+  // Selection Mode Functions
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode);
     setSelectedMessages(new Set());
@@ -261,21 +268,21 @@ export default function ChatWindow({
       setIsSelectionMode(false);
       setSelectedMessages(new Set());
 
-      console.log("✅ Bulk delete successful");
+      console.log("Bulk delete successful");
     } catch (err) {
-      console.error("❌ Bulk delete error:", err);
+      console.error("Bulk delete error:", err);
       alert("Failed to delete messages");
     }
   };
 
-  //  Filter messages by search
+  // Filter messages by search
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
         msg.text?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : messages;
 
-  //  Loading state
+  // Loading state
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -287,7 +294,7 @@ export default function ChatWindow({
     );
   }
 
-  //  No messages found
+  // No messages found
   if (filteredMessages.length === 0 && searchQuery) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -313,7 +320,7 @@ export default function ChatWindow({
     );
   }
 
-  //  No messages yet
+  // No messages yet
   if (filteredMessages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -340,7 +347,7 @@ export default function ChatWindow({
     );
   }
 
-  //  Group by date
+  // Group by date
   const groupedMessages = filteredMessages.reduce((groups, msg) => {
     const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
       weekday: "long",
@@ -354,10 +361,10 @@ export default function ChatWindow({
     return groups;
   }, {});
 
-  //  Render UI
+  // Render UI
   return (
     <div className="flex-1 flex flex-col bg-gray-900 bg-opacity-30 min-h-0">
-      {/* 🆕 Selection Mode Header */}
+      {/* Selection Mode Header */}
       {isSelectionMode && (
         <div className="bg-gray-800 bg-opacity-90 border-b border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
@@ -405,9 +412,9 @@ export default function ChatWindow({
         </div>
       )}
 
-      {/* Messages Container - ✅ FIXED LAYOUT */}
+      {/* Messages Container */}
       <div className="flex-1 overflow-y-auto px-6 py-4" style={{ minHeight: 0 }}>
-        {/* 🆕 Selection Mode Toggle Button (Floating) */}
+        {/* Selection Mode Toggle Button (Floating) */}
         {!isSelectionMode && messages.length > 0 && (
           <div className="flex justify-center mb-4 sticky top-0 z-10">
             <button
@@ -424,14 +431,14 @@ export default function ChatWindow({
 
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
-            {/*  Date divider */}
+            {/* Date divider */}
             <div className="flex items-center justify-center my-4">
               <div className="bg-gray-800 bg-opacity-70 px-4 py-1 rounded-full shadow-md">
                 <p className="text-xs text-gray-400 font-medium">{date}</p>
               </div>
             </div>
 
-            {/*  Messages */}
+            {/* Messages */}
             {msgs.map((msg) => (
               <Message
                 key={msg._id}
