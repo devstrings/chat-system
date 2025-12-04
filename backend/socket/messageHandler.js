@@ -2,12 +2,12 @@ import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
 
 export function handleMessage(io, socket) {
-  console.log(`✅ User connected: ${socket.user.id}`);
+  console.log(` User connected: ${socket.user.id}`);
 
   //  Send message
   socket.on("sendMessage", async ({ conversationId, text, attachments = [] }) => {
     try {
-      console.log("📤 Sending message:", { conversationId, text, senderId: socket.user.id });
+      console.log(" Sending message:", { conversationId, text, senderId: socket.user.id });
 
       //  Extract attachment IDs
       let attachmentIds = [];
@@ -23,7 +23,7 @@ export function handleMessage(io, socket) {
       );
 
       if (!conversation) {
-        console.warn("⚠️ Conversation not found:", conversationId);
+        console.warn(" Warning: Conversation not found:", conversationId);
         return;
       }
 
@@ -41,7 +41,7 @@ export function handleMessage(io, socket) {
         status: "sent",
       });
 
-      console.log("💾 Message created:", msg._id);
+      console.log(" Message created:", msg._id);
 
       //  Populate sender AND attachments
       await msg.populate("sender", "username email");
@@ -62,7 +62,7 @@ export function handleMessage(io, socket) {
       const transformedAttachments = msg.attachments && msg.attachments.length > 0
         ? msg.attachments.map(att => {
             if (!att || !att.serverFileName) {
-              console.warn("⚠️ Invalid attachment:", att);
+              console.warn(" Warning: Invalid attachment:", att);
               return null;
             }
             return {
@@ -75,7 +75,7 @@ export function handleMessage(io, socket) {
           }).filter(Boolean)
         : [];
 
-      //  Prepare message data
+      //   Prepare message data WITH receiver field
       const messageData = {
         _id: msg._id,
         conversationId: msg.conversationId,
@@ -84,13 +84,14 @@ export function handleMessage(io, socket) {
           username: msg.sender.username,
           email: msg.sender.email,
         },
+        receiver: receiverId, //  Add receiver field
         text: msg.text,
         attachments: transformedAttachments,
         status: msg.status,
         createdAt: msg.createdAt,
       };
 
-      console.log("📡 Broadcasting message to both users");
+      console.log(" Broadcasting message to both users");
 
       //  Emit to BOTH sender and receiver explicitly
       socket.emit("receiveMessage", messageData);
@@ -102,7 +103,7 @@ export function handleMessage(io, socket) {
         );
 
         if (receiverSocket) {
-          console.log(`✅ Receiver ONLINE, sending message`);
+          console.log(` Receiver ONLINE, sending message`);
           receiverSocket.emit("receiveMessage", messageData);
 
           // Mark as delivered after 500ms
@@ -113,27 +114,28 @@ export function handleMessage(io, socket) {
                 deliveredAt: new Date(),
               });
 
-              console.log("✅ Message delivered:", msg._id);
+              console.log(" Message delivered:", msg._id);
 
+              //  Status update with conversationId
               const statusUpdate = {
                 messageId: msg._id,
                 _id: msg._id,
-                conversationId,
+                conversationId: msg.conversationId, //  Use msg.conversationId
                 status: "delivered",
               };
 
               socket.emit("messageStatusUpdate", statusUpdate);
               receiverSocket.emit("messageStatusUpdate", statusUpdate);
             } catch (err) {
-              console.error("❌ Delivery error:", err);
+              console.error(" Delivery error:", err);
             }
           }, 500);
         } else {
-          console.log(`⚠️ Receiver OFFLINE, message stays 'sent'`);
+          console.log(` Receiver OFFLINE, message stays 'sent'`);
         }
       }
     } catch (err) {
-      console.error("❌ sendMessage error:", err);
+      console.error(" sendMessage error:", err);
       console.error("Stack:", err.stack);
       socket.emit("errorMessage", { message: "Message send failed" });
     }
@@ -142,7 +144,7 @@ export function handleMessage(io, socket) {
   //  Handle user coming online (deliver pending messages)
   socket.on("userOnline", async () => {
     try {
-      console.log(`🟢 User ${socket.user.id} came online`);
+      console.log(` User ${socket.user.id} came online`);
 
       const conversations = await Conversation.find({
         participants: socket.user.id,
@@ -155,7 +157,7 @@ export function handleMessage(io, socket) {
         }).populate("sender", "username");
 
         if (pendingMessages.length > 0) {
-          console.log(`📬 Delivering ${pendingMessages.length} pending messages`);
+          console.log(` Delivering ${pendingMessages.length} pending messages`);
 
           await Message.updateMany(
             {
@@ -188,20 +190,20 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error("❌ userOnline error:", err);
+      console.error(" userOnline error:", err);
     }
   });
 
   //  Mark messages as read
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
-      console.log(`👁️ Marking read in conversation: ${conversationId}`);
+      console.log(` Marking read in conversation: ${conversationId}`);
 
       // Get conversation to find participants
       const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
       
       if (!conversation) {
-        console.warn("⚠️ Conversation not found");
+        console.warn(" Conversation not found");
         return;
       }
 
@@ -218,7 +220,7 @@ export function handleMessage(io, socket) {
       );
 
       if (result.modifiedCount > 0) {
-        console.log(`✅ Marked ${result.modifiedCount} messages as read`);
+        console.log(` Marked ${result.modifiedCount} messages as read`);
 
         const readMessages = await Message.find({
           conversationId,
@@ -259,18 +261,18 @@ export function handleMessage(io, socket) {
         }
       }
     } catch (err) {
-      console.error("❌ markAsRead error:", err);
+      console.error(" markAsRead error:", err);
     }
   });
 
-  // 🆕 DELETE MESSAGE FOR ME (✅ FIXED)
+  //  DELETE MESSAGE For me
   socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
     try {
-      console.log("🗑️ Delete for me request:", messageId);
+      console.log(" Delete for me request:", messageId);
 
       const message = await Message.findById(messageId).populate('conversationId');
       if (!message) {
-        console.warn("⚠️ Message not found");
+        console.warn(" Message not found");
         return;
       }
 
@@ -303,7 +305,7 @@ export function handleMessage(io, socket) {
 
       await message.save();
 
-      // ✅ Emit ONLY to the user who deleted
+      //  Emit ONLY to the user who deleted
       socket.emit("messageDeleted", {
         messageId,
         conversationId,
@@ -311,20 +313,20 @@ export function handleMessage(io, socket) {
         isDeleted: message.isDeleted
       });
 
-      console.log("✅ Message deleted for user");
+      console.log("Message deleted for user");
     } catch (err) {
-      console.error("❌ Delete for me error:", err);
+      console.error(" Delete for me error:", err);
     }
   });
 
-  // 🆕 DELETE MESSAGE FOR EVERYONE (✅ FIXED)
+  //  DELETE MESSAGE FOR EVERYONE
   socket.on("deleteMessageForEveryone", async ({ messageId, conversationId }) => {
     try {
-      console.log("🗑️ Delete for everyone request:", messageId);
+      console.log(" Delete for everyone request:", messageId);
 
       const message = await Message.findById(messageId).populate('conversationId');
       if (!message) {
-        console.warn("⚠️ Message not found");
+        console.warn(" Message not found");
         return;
       }
 
@@ -356,7 +358,7 @@ export function handleMessage(io, socket) {
 
       await message.save();
 
-      // ✅ Emit to ALL participants in the conversation
+      //  Emit to ALL participants in the conversation
       const deleteData = {
         messageId,
         conversationId,
@@ -374,13 +376,13 @@ export function handleMessage(io, socket) {
         }
       }
 
-      console.log("✅ Message deleted for everyone");
+      console.log(" Message deleted for everyone");
     } catch (err) {
-      console.error("❌ Delete for everyone error:", err);
+      console.error(" Delete for everyone error:", err);
     }
   });
 
   socket.on("disconnect", () => {
-    console.log(`🔴 User disconnected: ${socket.user.id}`);
+    console.log(` User disconnected: ${socket.user.id}`);
   });
 }

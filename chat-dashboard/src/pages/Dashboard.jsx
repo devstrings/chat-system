@@ -29,7 +29,7 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  // ✅ NEW: Helper function to format attachment text
+  // Helper function to format attachment text
   const formatAttachmentText = (attachments) => {
     if (!attachments || attachments.length === 0) return "";
     
@@ -37,7 +37,6 @@ export default function Dashboard() {
     const fileName = file.filename || file.fileName || "File";
     const fileType = file.fileType || file.type || "";
     
-    // Get appropriate icon
     let icon = "📎";
     if (fileType.startsWith("image/")) icon = "🖼️";
     else if (fileType.startsWith("video/")) icon = "🎥";
@@ -48,7 +47,7 @@ export default function Dashboard() {
     return `${icon} ${fileName}`;
   };
 
-  //  Initial data fetch
+  // Initial data fetch
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUsername = localStorage.getItem("username");
@@ -62,7 +61,7 @@ export default function Dashboard() {
 
     const fetchUsers = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/users", {
+        const res = await axios.get("http://localhost:5000/api/friends/list", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsers(res.data);
@@ -83,7 +82,7 @@ export default function Dashboard() {
     fetchUsers();
   }, [navigate]);
 
-  //  Load last messages for all users on mount
+  // Load last messages for all users on mount
   useEffect(() => {
     if (!currentUserId || users.length === 0) return;
 
@@ -109,7 +108,6 @@ export default function Dashboard() {
           if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1];
             
-            // ✅ FIXED: Use formatted attachment text
             const messageText = lastMsg.text || 
               (lastMsg.attachments?.length > 0 
                 ? formatAttachmentText(lastMsg.attachments) 
@@ -123,9 +121,13 @@ export default function Dashboard() {
                 sender: lastMsg.sender._id || lastMsg.sender,
                 status: lastMsg.status || "sent",
                 lastMessageId: lastMsg._id,
-                attachments: lastMsg.attachments // Store attachments for Sidebar
+                conversationId: conversationId,
+                attachments: lastMsg.attachments,
+                _updated: Date.now()
               },
             }));
+
+            console.log(` [INIT] Stored conversation ${conversationId} for user ${user._id}`);
 
             const unreadCount = messages.filter(
               (msg) => msg.sender._id !== currentUserId && msg.status !== "read"
@@ -147,7 +149,7 @@ export default function Dashboard() {
     loadLastMessages();
   }, [currentUserId, users]);
 
-  //  Online status management
+  // Online status management
   useEffect(() => {
     if (!socket) return;
 
@@ -184,7 +186,7 @@ export default function Dashboard() {
     };
   }, [socket]);
 
-  //  Listen for incoming messages
+  // Listen for incoming messages and status updates
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
@@ -192,18 +194,21 @@ export default function Dashboard() {
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
       
-      // ✅ FIXED: Use formatted attachment text
       const messageText = msg.text || 
         (msg.attachments?.length > 0 
           ? formatAttachmentText(msg.attachments) 
           : "");
 
-      console.log(" Received message:", msg);
+      console.log("[DASHBOARD] Received message:", {
+        id: msg._id,
+        conversationId: msg.conversationId,
+        status: msg.status
+      });
 
       const associatedUserId =
         senderId === currentUserId ? receiverId : senderId;
 
-      //  Update last message
+      // Update last message
       setLastMessages((prev) => ({
         ...prev,
         [associatedUserId]: {
@@ -213,11 +218,12 @@ export default function Dashboard() {
           status: msg.status || "sent",
           conversationId: msg.conversationId,
           lastMessageId: msg._id,
-          attachments: msg.attachments // Store attachments
+          attachments: msg.attachments,
+          _updated: Date.now()
         },
       }));
 
-      console.log(" Updated lastMessages for user:", associatedUserId);
+      console.log(`[MSG] Updated lastMessage for user ${associatedUserId}`);
 
       // Update unread count
       if (
@@ -231,42 +237,61 @@ export default function Dashboard() {
       }
     };
 
-    
-   //  Handle status updates 
-const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
-  const msgId = messageId || _id;
-  console.log("📊 Status update received:", {
-    msgId,
-    status,
-    conversationId,
-  });
+    // Handle status updates properly
+    const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
+      const msgId = messageId || _id;
+      
+      console.log(" [DASHBOARD] Status update received:", {
+        msgId,
+        status,
+        conversationId,
+      });
 
-  if (!msgId || !status) {
-    console.warn("⚠️ Invalid status update data");
-    return;
-  }
-
-  // Update lastMessages in a microtask to ensure state consistency
-  queueMicrotask(() => {
-    setLastMessages((prev) => {
-      const updated = { ...prev };
-
-      for (const [userId, msgData] of Object.entries(prev)) {
-        if (msgData?.lastMessageId === msgId) {
-          updated[userId] = {
-            ...msgData,
-            status,
-          };
-          console.log(
-            ` Updated sidebar status to ${status} for user ${userId}`
-          );
-        }
+      if (!status || !conversationId) {
+        console.warn(" Invalid status update");
+        return;
       }
 
-      return updated;
-    });
-  });
-};
+      //  Create completely new object to ensure React detects the change
+      setLastMessages((prev) => {
+        let targetUserId = null;
+        
+        // Find user by conversationId
+        for (const [userId, msgData] of Object.entries(prev)) {
+          if (msgData?.conversationId === conversationId) {
+            targetUserId = userId;
+            break;
+          }
+        }
+
+        if (!targetUserId) {
+          console.error(" [DASHBOARD] Conversation not found:", conversationId);
+          console.log(" Available conversations:", 
+            Object.entries(prev).map(([uid, data]) => ({
+              userId: uid,
+              conversationId: data?.conversationId
+            }))
+          );
+          return prev;
+        }
+
+        console.log(` [DASHBOARD] Updating ${status} for user ${targetUserId}`);
+
+        //  Create new nested object with new timestamp
+        const newState = {
+          ...prev,
+          [targetUserId]: {
+            ...prev[targetUserId],
+            status: status,
+            _updated: Date.now() // Force re-render
+          }
+        };
+
+        console.log(` [DASHBOARD] New state created with _updated: ${newState[targetUserId]._updated}`);
+        
+        return newState;
+      });
+    };
 
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
@@ -277,7 +302,7 @@ const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
     };
   }, [socket, currentUserId]);
 
-  //  Get conversation
+  // Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
       setConversationId(null);
@@ -454,7 +479,7 @@ const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
                           <button
                             onClick={() => {
                               alert(
-                                `👤 ${selectedUser.username}\n📧 ${
+                                ` ${selectedUser.username}\n📧 ${
                                   selectedUser.email
                                 }\n${
                                   onlineUsers.has(selectedUser._id)
@@ -563,19 +588,43 @@ const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
               )}
             </div>
 
+            {/*  ChatWindow callback */}
             <ChatWindow
               conversationId={conversationId}
               currentUserId={currentUserId}
               searchQuery={searchInChat}
-              onUpdateLastMessageStatus={(status) => {
-                if (selectedUser) {
-                  setLastMessages((prev) => ({
-                    ...prev,
-                    [selectedUser._id]: {
-                      ...(prev[selectedUser._id] || {}),
-                      status,
-                    },
-                  }));
+              onUpdateLastMessageStatus={(updateData) => {
+                if (updateData && updateData.status && updateData.conversationId) {
+                  console.log(" [DASHBOARD] ChatWindow status update:", updateData);
+                  
+                  // Use the same logic as socket handler
+                  setLastMessages((prev) => {
+                    let targetUserId = null;
+                    
+                    for (const [userId, msgData] of Object.entries(prev)) {
+                      if (msgData?.conversationId === updateData.conversationId) {
+                        targetUserId = userId;
+                        break;
+                      }
+                    }
+
+                    if (!targetUserId) {
+                      console.warn(" [DASHBOARD] User not found for conversation:", updateData.conversationId);
+                      return prev;
+                    }
+
+                    console.log(` [DASHBOARD] Updating sidebar for user ${targetUserId} to ${updateData.status}`);
+                    
+                    //  Create new object with new timestamp
+                    return {
+                      ...prev,
+                      [targetUserId]: {
+                        ...prev[targetUserId],
+                        status: updateData.status,
+                        _updated: Date.now() // Force re-render
+                      }
+                    };
+                  });
                 }
               }}
             />

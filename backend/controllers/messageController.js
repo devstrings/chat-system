@@ -1,6 +1,7 @@
 import Message from "../models/messageModel.js";
 import Conversation from "../models/conversationModel.js";
-import Attachment from "../models/Attachment.js"; 
+import Attachment from "../models/Attachment.js";
+import Friendship from "../models/Friendship.js"; 
 
 // Get or create conversation between two users
 export const getOrCreateConversation = async (req, res) => {
@@ -10,6 +11,18 @@ export const getOrCreateConversation = async (req, res) => {
 
     if (!otherUserId) {
       return res.status(400).json({ message: "Other user ID required" });
+    }
+
+    //  NEW: Check if they are friends
+    const friendship = await Friendship.findOne({
+      $or: [
+        { user1: currentUserId, user2: otherUserId },
+        { user1: otherUserId, user2: currentUserId }
+      ]
+    });
+
+    if (!friendship) {
+      return res.status(403).json({ message: "You must be friends to chat" });
     }
 
     // Find existing conversation
@@ -38,6 +51,33 @@ export const getMessages = async (req, res) => {
     const currentUserId = req.user.id;
     const limit = parseInt(req.query.limit) || 50;
     const skip = parseInt(req.query.skip) || 0;
+
+    //  NEW: Verify conversation exists and user is participant
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.participants.includes(currentUserId)) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    //  NEW: Check if users are still friends
+    const otherUserId = conversation.participants.find(
+      p => p.toString() !== currentUserId
+    );
+
+    const friendship = await Friendship.findOne({
+      $or: [
+        { user1: currentUserId, user2: otherUserId },
+        { user1: otherUserId, user2: currentUserId }
+      ]
+    });
+
+    if (!friendship) {
+      return res.status(403).json({ message: "You must be friends to view messages" });
+    }
 
     const messages = await Message.find({ 
       conversationId,
@@ -146,15 +186,15 @@ export const clearChat = async (req, res) => {
   }
 };
 
-// 🆕 DELETE MESSAGE FOR ME (FIXED)
+//  DELETE MESSAGE FOR ME (FIXED)
 export const deleteMessageForMe = async (req, res) => {
   try {
     const { messageId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log("🗑️ Delete for me - Message:", messageId, "User:", currentUserId);
+    console.log(" Delete for me - Message:", messageId, "User:", currentUserId);
 
-    // ✅ Populate conversation to get participants
+    //  Populate conversation to get participants
     const message = await Message.findById(messageId).populate('conversationId');
 
     if (!message) {
@@ -165,7 +205,7 @@ export const deleteMessageForMe = async (req, res) => {
       return res.status(404).json({ message: "Conversation not found" });
     }
 
-    // ✅ Verify user is part of conversation
+    //  Verify user is part of conversation
     const isParticipant = message.conversationId.participants.some(
       p => p.toString() === currentUserId
     );
@@ -179,7 +219,7 @@ export const deleteMessageForMe = async (req, res) => {
       message.deletedFor.push(currentUserId);
     }
 
-    // ✅ If ALL participants deleted, mark as fully deleted
+    //  If ALL participants deleted, mark as fully deleted
     const allDeleted = message.conversationId.participants.every(
       p => message.deletedFor.includes(p.toString())
     );
@@ -191,7 +231,7 @@ export const deleteMessageForMe = async (req, res) => {
 
     await message.save();
 
-    console.log("✅ Message deleted for user");
+    console.log(" Message deleted for user");
 
     res.json({ 
       message: "Message deleted for you",
@@ -199,18 +239,18 @@ export const deleteMessageForMe = async (req, res) => {
       isDeleted: message.isDeleted
     });
   } catch (err) {
-    console.error("❌ Delete for me error:", err);
+    console.error(" Delete for me error:", err);
     res.status(500).json({ message: "Failed to delete message", error: err.message });
   }
 };
 
-// 🆕 DELETE MESSAGE FOR EVERYONE (FIXED)
+//  DELETE MESSAGE FOR EVERYONE (FIXED)
 export const deleteMessageForEveryone = async (req, res) => {
   try {
     const { messageId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log("🗑️ Delete for everyone - Message:", messageId, "User:", currentUserId);
+    console.log(" Delete for everyone - Message:", messageId, "User:", currentUserId);
 
     const message = await Message.findById(messageId);
 
@@ -242,31 +282,31 @@ export const deleteMessageForEveryone = async (req, res) => {
 
     await message.save();
 
-    console.log("✅ Message deleted for everyone");
+    console.log(" Message deleted for everyone");
 
     res.json({ 
       message: "Message deleted for everyone",
       deletedForEveryone: true
     });
   } catch (err) {
-    console.error("❌ Delete for everyone error:", err);
+    console.error(" Delete for everyone error:", err);
     res.status(500).json({ message: "Failed to delete message", error: err.message });
   }
 };
 
-// 🆕 BULK DELETE MESSAGES (FIXED)
+//  BULK DELETE MESSAGES (FIXED)
 export const bulkDeleteMessages = async (req, res) => {
   try {
     const { messageIds } = req.body;
     const currentUserId = req.user.id;
 
-    console.log("🗑️ Bulk delete - Messages:", messageIds.length, "User:", currentUserId);
+    console.log(" Bulk delete - Messages:", messageIds.length, "User:", currentUserId);
 
     if (!messageIds || messageIds.length === 0) {
       return res.status(400).json({ message: "No messages to delete" });
     }
 
-    // ✅ Populate conversation for each message
+    // Populate conversation for each message
     const messages = await Message.find({ _id: { $in: messageIds } })
       .populate('conversationId');
 
@@ -277,7 +317,7 @@ export const bulkDeleteMessages = async (req, res) => {
         continue; // Skip if conversation not found
       }
 
-      // ✅ Verify user is participant
+      //  Verify user is participant
       const isParticipant = message.conversationId.participants.some(
         p => p.toString() === currentUserId
       );
@@ -287,7 +327,7 @@ export const bulkDeleteMessages = async (req, res) => {
           message.deletedFor.push(currentUserId);
         }
 
-        // ✅ If all participants deleted, mark as fully deleted
+        //  If all participants deleted, mark as fully deleted
         const allDeleted = message.conversationId.participants.every(
           p => message.deletedFor.includes(p.toString())
         );
@@ -302,14 +342,14 @@ export const bulkDeleteMessages = async (req, res) => {
       }
     }
 
-    console.log("✅ Bulk delete completed:", deletedCount, "messages");
+    console.log(" Bulk delete completed:", deletedCount, "messages");
 
     res.json({ 
       message: `${deletedCount} messages deleted`,
       deletedCount
     });
   } catch (err) {
-    console.error("❌ Bulk delete error:", err);
+    console.error(" Bulk delete error:", err);
     res.status(500).json({ message: "Failed to delete messages", error: err.message });
   }
 };
