@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSocket } from "../context/SocketContext";
 import Message from "./Message";
 import axios from "axios";
+import ConfirmationDialog from './ConfirmationDialog';
 
 export default function ChatWindow({
   conversationId,
@@ -16,11 +17,14 @@ export default function ChatWindow({
   const conversationIdRef = useRef(null);
   const messagesRef = useRef(messages);
 
-  // Selection Mode States
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
 
-  // Keep messages ref updated
+  const [deleteDialog, setDeleteDialog] = useState({
+    isOpen: false,
+    count: 0
+  });
+
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -29,10 +33,8 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  // Fetch messages when chat changes
   useEffect(() => {
     if (!conversationId) {
-      console.log("No conversation ID, skipping message fetch");
       setMessages([]);
       setLoading(false);
       return;
@@ -43,19 +45,14 @@ export default function ChatWindow({
         setLoading(true);
         const token = localStorage.getItem("token");
 
-        console.log("Fetching messages for conversation:", conversationId);
-
         const res = await axios.get(
           `http://localhost:5000/api/messages/${conversationId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        console.log(`Fetched ${res.data.length} messages`);
         setMessages(res.data);
 
-        // Mark as read when opening chat
         if (socket && res.data.length > 0) {
-          console.log("Marking as read (on open)");
           socket.emit("markAsRead", { conversationId });
         }
       } catch (err) {
@@ -67,27 +64,17 @@ export default function ChatWindow({
 
     fetchMessages();
 
-    // Reset selection mode when changing conversation
     setIsSelectionMode(false);
     setSelectedMessages(new Set());
   }, [conversationId, socket]);
 
-  // Socket listeners
   useEffect(() => {
     if (!socket) return;
 
-    // Receive new message
     const handleReceiveMessage = (msg) => {
-      console.log(" New message received:", {
-        id: msg._id,
-        status: msg.status,
-        conversationId: msg.conversationId
-      });
-
       if (msg.conversationId === conversationIdRef.current) {
         setMessages((prev) => [...prev, msg]);
 
-        //  Proper data pass karein
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus({
             status: msg.status || "sent",
@@ -98,7 +85,6 @@ export default function ChatWindow({
           });
         }
 
-        // Auto mark as read
         if (socket && msg.sender._id !== currentUserId) {
           setTimeout(() => {
             socket.emit("markAsRead", { conversationId: msg.conversationId });
@@ -107,20 +93,15 @@ export default function ChatWindow({
       }
     };
 
-    // Handle single message status WITHOUT queueMicrotask
     const handleStatusUpdate = (data) => {
-      console.log(" Status update received:", data);
-
       const msgId = data.messageId || data._id;
       const status = data.status;
       const conversationId = data.conversationId;
 
       if (!msgId || !status) {
-        console.warn("Invalid status update data");
         return;
       }
 
-      // IMMEDIATE UPDATE in ChatWindow
       setMessages((prev) =>
         prev.map((msg) =>
           msg._id === msgId
@@ -129,7 +110,6 @@ export default function ChatWindow({
         )
       );
 
-      //  Update sidebar if this is the last message
       if (onUpdateLastMessageStatus) {
         const currentMessages = messagesRef.current;
         const lastMsg = currentMessages[currentMessages.length - 1];
@@ -144,10 +124,7 @@ export default function ChatWindow({
       }
     };
 
-    // Handle bulk read (all messages read)
     const handleMessagesRead = (data) => {
-      console.log("Messages marked as read:", data);
-
       if (data.conversationId === conversationIdRef.current) {
         setMessages((prev) =>
           prev.map((msg) =>
@@ -166,19 +143,13 @@ export default function ChatWindow({
       }
     };
 
-    // Handle message deleted (for me)
     const handleMessageDeleted = (data) => {
-      console.log("Message deleted:", data);
-      
       if (data.messageId) {
         setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
       }
     };
 
-    // Handle message deleted for everyone
     const handleMessageDeletedForEveryone = (data) => {
-      console.log("Message deleted for everyone:", data);
-      
       if (data.messageId && data.conversationId === conversationIdRef.current) {
         setMessages((prev) =>
           prev.map((msg) =>
@@ -205,12 +176,10 @@ export default function ChatWindow({
     };
   }, [socket, currentUserId, onUpdateLastMessageStatus]);
 
-  // Auto scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Selection Mode Functions
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode);
     setSelectedMessages(new Set());
@@ -237,18 +206,18 @@ export default function ChatWindow({
     setSelectedMessages(new Set());
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedMessages.size === 0) {
-      alert("Please select messages to delete");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete ${selectedMessages.size} message(s) for you?`
-    );
+    setDeleteDialog({
+      isOpen: true,
+      count: selectedMessages.size
+    });
+  };
 
-    if (!confirmed) return;
-
+  const confirmBulkDelete = async () => {
     try {
       const token = localStorage.getItem("token");
       const messageIds = Array.from(selectedMessages);
@@ -259,30 +228,24 @@ export default function ChatWindow({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Remove deleted messages from UI
       setMessages((prev) =>
         prev.filter((msg) => !selectedMessages.has(msg._id))
       );
 
-      // Reset selection mode
       setIsSelectionMode(false);
       setSelectedMessages(new Set());
-
-      console.log("Bulk delete successful");
     } catch (err) {
       console.error("Bulk delete error:", err);
       alert("Failed to delete messages");
     }
   };
 
-  // Filter messages by search
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
         msg.text?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : messages;
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
@@ -294,13 +257,12 @@ export default function ChatWindow({
     );
   }
 
-  // No messages found
   if (filteredMessages.length === 0 && searchQuery) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
+      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30 p-4">
         <div className="text-center">
           <svg
-            className="w-16 h-16 text-gray-600 mx-auto mb-3"
+            className="w-12 h-12 md:w-16 md:h-16 text-gray-600 mx-auto mb-3"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -312,7 +274,7 @@ export default function ChatWindow({
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <p className="text-gray-400">
+          <p className="text-gray-400 text-sm md:text-base">
             No messages found for "{searchQuery}"
           </p>
         </div>
@@ -320,14 +282,13 @@ export default function ChatWindow({
     );
   }
 
-  // No messages yet
   if (filteredMessages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
+      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30 p-4">
         <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-800 bg-opacity-50 flex items-center justify-center">
+          <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 rounded-full bg-gray-800 bg-opacity-50 flex items-center justify-center">
             <svg
-              className="w-10 h-10 text-gray-600"
+              className="w-8 h-8 md:w-10 md:h-10 text-gray-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -340,14 +301,13 @@ export default function ChatWindow({
               />
             </svg>
           </div>
-          <p className="text-gray-400 text-lg mb-1">No messages yet</p>
-          <p className="text-gray-500 text-sm">Start the conversation!</p>
+          <p className="text-gray-400 text-base md:text-lg mb-1">No messages yet</p>
+          <p className="text-gray-500 text-xs md:text-sm">Start the conversation!</p>
         </div>
       </div>
     );
   }
 
-  // Group by date
   const groupedMessages = filteredMessages.reduce((groups, msg) => {
     const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
       weekday: "long",
@@ -361,101 +321,109 @@ export default function ChatWindow({
     return groups;
   }, {});
 
-  // Render UI
   return (
-    <div className="flex-1 flex flex-col bg-gray-900 bg-opacity-30 min-h-0">
-      {/* Selection Mode Header */}
-      {isSelectionMode && (
-        <div className="bg-gray-800 bg-opacity-90 border-b border-gray-700 px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={toggleSelectionMode}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <span className="text-white font-medium">
-              {selectedMessages.size} selected
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {selectedMessages.size < filteredMessages.length ? (
+    <>
+      <div className="flex-1 flex flex-col bg-gray-900 bg-opacity-30 min-h-0">
+        {isSelectionMode && (
+          <div className="bg-gray-800 bg-opacity-90 border-b border-gray-700 px-3 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3 md:gap-4">
               <button
-                onClick={selectAllMessages}
-                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                onClick={toggleSelectionMode}
+                className="text-gray-400 hover:text-white transition-colors"
               >
-                Select All
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-            ) : (
+              <span className="text-white font-medium text-sm md:text-base">
+                {selectedMessages.size} selected
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedMessages.size < filteredMessages.length ? (
+                <button
+                  onClick={selectAllMessages}
+                  className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  All
+                </button>
+              ) : (
+                <button
+                  onClick={deselectAllMessages}
+                  className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  None
+                </button>
+              )}
+
               <button
-                onClick={deselectAllMessages}
-                className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                onClick={handleBulkDelete}
+                disabled={selectedMessages.size === 0}
+                className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-xs md:text-sm"
               >
-                Deselect All
+                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">Delete</span>
               </button>
-            )}
-
-            <button
-              onClick={handleBulkDelete}
-              disabled={selectedMessages.size === 0}
-              className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-4" style={{ minHeight: 0 }}>
-        {/* Selection Mode Toggle Button (Floating) */}
-        {!isSelectionMode && messages.length > 0 && (
-          <div className="flex justify-center mb-4 sticky top-0 z-10">
-            <button
-              onClick={toggleSelectionMode}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Select Messages
-            </button>
+            </div>
           </div>
         )}
 
-        {Object.entries(groupedMessages).map(([date, msgs]) => (
-          <div key={date}>
-            {/* Date divider */}
-            <div className="flex items-center justify-center my-4">
-              <div className="bg-gray-800 bg-opacity-70 px-4 py-1 rounded-full shadow-md">
-                <p className="text-xs text-gray-400 font-medium">{date}</p>
-              </div>
+        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4" style={{ minHeight: 0 }}>
+          {!isSelectionMode && messages.length > 0 && (
+            <div className="flex justify-center mb-4 sticky top-0 z-10">
+              <button
+                onClick={toggleSelectionMode}
+                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-xs md:text-sm"
+              >
+                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Select Messages
+              </button>
             </div>
+          )}
 
-            {/* Messages */}
-            {msgs.map((msg) => (
-              <Message
-                key={msg._id}
-                message={msg}
-                isOwn={
-                  msg.sender._id === currentUserId ||
-                  msg.sender === currentUserId
-                }
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedMessages.has(msg._id)}
-                onToggleSelect={toggleMessageSelection}
-              />
-            ))}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+          {Object.entries(groupedMessages).map(([date, msgs]) => (
+            <div key={date}>
+              <div className="flex items-center justify-center my-4">
+                <div className="bg-gray-800 bg-opacity-70 px-3 md:px-4 py-1 rounded-full shadow-md">
+                  <p className="text-xs text-gray-400 font-medium">{date}</p>
+                </div>
+              </div>
+
+              {msgs.map((msg) => (
+                <Message
+                  key={msg._id}
+                  message={msg}
+                  isOwn={
+                    msg.sender._id === currentUserId ||
+                    msg.sender === currentUserId
+                  }
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedMessages.has(msg._id)}
+                  onToggleSelect={toggleMessageSelection}
+                />
+              ))}
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
-    </div>
+
+      <ConfirmationDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false })}
+        onConfirm={confirmBulkDelete}
+        title="Delete Messages?"
+        message={`Delete ${deleteDialog.count} message(s) for you? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        icon="delete"
+        type="danger"
+      />
+    </>
   );
 }
