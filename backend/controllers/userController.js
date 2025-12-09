@@ -21,7 +21,7 @@ export const getUsers = async (req, res) => {
         : block.blocker.toString()  // Users who blocked me
     );
 
-    console.log(` User ${currentUserId} has ${blockedUserIds.length} blocked relationships`);
+    console.log(`User ${currentUserId} has ${blockedUserIds.length} blocked relationships`);
 
     //  Exclude current user AND all blocked users
     const users = await User.find({ 
@@ -66,15 +66,18 @@ export const searchUsers = async (req, res) => {
     );
 
     console.log(` Searching for: "${searchQuery}"`);
-    console.log(` Excluding ${blockedUserIds.length} blocked users`);
+    console.log(`Excluding ${blockedUserIds.length} blocked users`);
 
-    //  Search with blocked users excluded
+    //  Search with blocked users excluded (username OR email)
     const users = await User.find({
       _id: { 
         $ne: currentUserId,
         $nin: blockedUserIds  // Exclude blocked users
       },
-      username: { $regex: searchQuery, $options: "i" }
+      $or: [
+        { username: { $regex: searchQuery, $options: "i" } },  // Search by username
+        { email: { $regex: searchQuery, $options: "i" } }      // Search by email
+      ]
     })
       .select("username email _id")
       .limit(20);
@@ -94,7 +97,7 @@ export const getUserById = async (req, res) => {
     const { id } = req.params;
     const currentUserId = req.user.id;
 
-    //  Check if user is blocked
+    // Check if user is blocked
     const isBlocked = await BlockedUser.findOne({
       $or: [
         { blocker: currentUserId, blocked: id },  // I blocked them
