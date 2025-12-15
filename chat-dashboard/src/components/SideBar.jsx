@@ -1,21 +1,25 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import UserItem from "./UserItem";
 import axios from "axios";
-import { AlertDialog } from './ConfirmationDialog';
+import { AlertDialog } from "./ConfirmationDialog";
+import { useAuthImage } from "../hooks/useAuthImage";
+import { useSocket } from "../context/SocketContext";
 
-export default function Sidebar({ 
-  users = [], 
-  selectedUserId, 
-  onSelectUser, 
-  onlineUsers = new Set(),
+export default function Sidebar({
+  users = [],
+  selectedUserId,
+  onSelectUser,
   currentUsername = "",
-  currentUserId = "", 
+  currentUserId = "",
   onLogout,
   unreadCounts = {},
   lastMessages = {},
-  isMobileSidebarOpen = false,        
-  onCloseMobileSidebar = () => {}     
+  isMobileSidebarOpen = false,
+  onCloseMobileSidebar = () => {},
+  currentUser = null,
+  onOpenProfileSettings = () => {},
 }) {
+  const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [searchUsers, setSearchUsers] = useState("");
@@ -25,57 +29,108 @@ export default function Sidebar({
   const [showRequests, setShowRequests] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [showBlocked, setShowBlocked] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
+  const { imageSrc: profilePreview, loading: imageLoading } =
+    useAuthImage(profileImageUrl);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
     message: "",
-    type: "success"
+    type: "success",
   });
 
-  const memoizedUsers = useMemo(() => {
-    const filteredUsers = users.filter(user => 
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/users/auth/me",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (response.data.profileImage) {
+          setProfileImageUrl(response.data.profileImage);
+        } else {
+          setProfileImageUrl(null);
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    };
+    loadUserProfile();
+  }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setShowProfileMenu(false);
+      }
+    };
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showProfileMenu]);
+
+  const memoizedUsers = useMemo(() => {
+    const filteredUsers = users.filter(
+      (user) =>
+        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
     return [...filteredUsers].sort((a, b) => {
-      const timeA = lastMessages[a._id]?.time ? new Date(lastMessages[a._id].time).getTime() : 0;
-      const timeB = lastMessages[b._id]?.time ? new Date(lastMessages[b._id].time).getTime() : 0;
+      const timeA = lastMessages[a._id]?.time
+        ? new Date(lastMessages[a._id].time).getTime()
+        : 0;
+      const timeB = lastMessages[b._id]?.time
+        ? new Date(lastMessages[b._id].time).getTime()
+        : 0;
       return timeB - timeA;
     });
   }, [users, searchQuery, lastMessages]);
 
-  const onlineCount = memoizedUsers.filter(user => onlineUsers.has(user._id)).length;
-  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  const onlineCount = memoizedUsers.filter((user) =>
+    onlineUsers.has(user._id)
+  ).length;
+  const totalUnread = Object.values(unreadCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
 
   const formatLastMessageText = (message) => {
     if (!message) return "";
-    
     if (message.attachments && message.attachments.length > 0) {
       const attachment = message.attachments[0];
       const fileName = attachment.fileName || attachment.filename || "File";
       const fileType = attachment.fileType || attachment.type || "";
       let icon = "📄";
-      
       if (fileType.startsWith("image/")) icon = "🖼️";
       else if (fileType.startsWith("video/")) icon = "🎥";
       else if (fileType === "application/pdf") icon = "📕";
-      
       return `${icon} ${fileName}`;
     }
-    
     return message.text || message.content || "";
   };
 
   const handleSearchUsers = async () => {
     if (!searchUsers.trim()) return;
-    
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/users/search?q=${searchUsers}`,
+        `http://localhost:5000/api/users/search?q=${encodeURIComponent(
+          searchUsers
+        )}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setAllUsers(res.data);
@@ -85,7 +140,7 @@ export default function Sidebar({
         isOpen: true,
         title: "Search Failed",
         message: "Failed to search users. Please try again.",
-        type: "error"
+        type: "error",
       });
     } finally {
       setLoading(false);
@@ -104,15 +159,18 @@ export default function Sidebar({
         isOpen: true,
         title: "Friend Request Sent!",
         message: "Your friend request has been sent successfully.",
-        type: "success"
+        type: "success",
       });
-      setAllUsers(allUsers.filter(u => u._id !== userId));
+      setAllUsers(allUsers.filter((u) => u._id !== userId));
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.response?.data?.message || "Failed to send request",
-        type: "error"
+        type: "error",
       });
     }
   };
@@ -122,7 +180,9 @@ export default function Sidebar({
       const token = localStorage.getItem("token");
       const res = await axios.get(
         "http://localhost:5000/api/friends/requests/pending",
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
       setPendingRequests(res.data);
       setShowRequests(true);
@@ -143,16 +203,18 @@ export default function Sidebar({
         isOpen: true,
         title: "Friend Request Accepted!",
         message: "You are now friends with this user.",
-        type: "success"
+        type: "success",
       });
-      setPendingRequests(pendingRequests.filter(r => r._id !== requestId));
-      window.location.reload();
+      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.response?.data?.message || "Failed to accept request",
-        type: "error"
+        type: "error",
       });
     }
   };
@@ -162,21 +224,23 @@ export default function Sidebar({
       const token = localStorage.getItem("token");
       await axios.delete(
         `http://localhost:5000/api/friends/request/${requestId}/reject`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
       setAlertDialog({
         isOpen: true,
         title: "Request Rejected",
         message: "Friend request has been rejected.",
-        type: "info"
+        type: "info",
       });
-      setPendingRequests(pendingRequests.filter(r => r._id !== requestId));
+      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.response?.data?.message || "Failed to reject request",
-        type: "error"
+        type: "error",
       });
     }
   };
@@ -184,10 +248,9 @@ export default function Sidebar({
   const loadBlockedUsers = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(
-        "http://localhost:5000/api/friends/blocked",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await axios.get("http://localhost:5000/api/friends/blocked", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setBlockedUsers(res.data);
       setShowBlocked(true);
     } catch (err) {
@@ -196,7 +259,7 @@ export default function Sidebar({
         isOpen: true,
         title: "Error",
         message: "Failed to load blocked users",
-        type: "error"
+        type: "error",
       });
     }
   };
@@ -206,73 +269,245 @@ export default function Sidebar({
       const token = localStorage.getItem("token");
       await axios.delete(
         `http://localhost:5000/api/friends/unblock/${userId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
       setAlertDialog({
         isOpen: true,
         title: "User Unblocked!",
         message: "User has been unblocked successfully.",
-        type: "success"
+        type: "success",
       });
-      setBlockedUsers(blockedUsers.filter(b => b.blocked._id !== userId));
+      setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.response?.data?.message || "Failed to unblock user",
-        type: "error"
+        type: "error",
       });
+    }
+  };
+
+  const handleProfileClick = () => {
+    setShowProfileMenu(!showProfileMenu);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current.click();
+    setShowProfileMenu(false);
+  };
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("image", file);
+      const uploadRes = await axios.post(
+        "http://localhost:5000/api/users/profile/upload",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      const imageUrl = uploadRes.data.imageUrl;
+      const updateRes = await axios.put(
+        "http://localhost:5000/api/users/profile/update-image",
+        { profileImage: imageUrl },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+    
+      setProfileImageUrl(imageUrl); 
+
+      setAlertDialog({
+        isOpen: true,
+        title: "Success!",
+        message: "Profile picture uploaded successfully",
+        type: "success",
+      });
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setAlertDialog({
+        isOpen: true,
+        title: "Upload Failed",
+        message:
+          err.response?.data?.message || "Failed to upload profile picture",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleRemoveImage = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        "http://localhost:5000/api/users/profile/remove-image",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setProfileImageUrl(null); 
+      setShowProfileMenu(false);
+      setAlertDialog({
+        isOpen: true,
+        title: "Removed",
+        message: "Profile picture removed successfully",
+        type: "success",
+      });
+    } catch (err) {
+      console.error("Remove failed:", err);
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to remove profile picture",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
-      {/* RESPONSIVE SIDEBAR CONTAINER */}
-      <div className={`
-        fixed md:relative inset-y-0 left-0 z-50
-        w-80 sm:w-96 bg-gray-800 border-r border-gray-700 flex flex-col
-        transform transition-transform duration-300 ease-in-out
-        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
-        
-        {/* MOBILE CLOSE BUTTON */}
+      <div
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 bg-gray-800 border-r border-gray-700 flex flex-col transform transition-transform duration-300 ease-in-out ${
+          isMobileSidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         <button
           onClick={onCloseMobileSidebar}
           className="md:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-white z-10 bg-gray-900 rounded-lg shadow-lg"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
-        {/* Sidebar Header */}
         <div className="bg-gray-900 border-b border-gray-700 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg relative">
-                {currentUsername.charAt(0).toUpperCase()}
-                {totalUnread > 0 && (
-                  <div className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-gray-900">
-                    <span className="text-white text-xs font-bold">
-                      {totalUnread > 99 ? "99+" : totalUnread}
-                    </span>
+              <div className="relative" ref={profileMenuRef}>
+                
+                <div
+                  className="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-700"
+                  onClick={handleProfileClick}
+                >
+                  {imageLoading ? (
+                    <div className="w-full h-full bg-gray-700 animate-pulse" />
+                  ) : profilePreview ? (
+                    <img
+                      src={profilePreview}
+                      alt="profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-semibold">
+                      {currentUsername?.charAt(0)?.toUpperCase() || "U"}
+                    </div>
+                  )}
+
+                
+                </div>
+
+                {showProfileMenu && (
+                  <div className="absolute left-0 top-14 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={handleUploadClick}
+                      className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      {profilePreview ? "Change Photo" : "Upload Photo"}
+                    </button>
+
+                    {profilePreview && (
+                      <button
+                        onClick={handleRemoveImage}
+                        className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm border-t border-gray-700"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                        Remove Photo
+                      </button>
+                    )}
                   </div>
                 )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </div>
               <div>
                 <h2 className="text-white font-semibold text-lg">Chats</h2>
                 <p className="text-xs text-gray-400">{currentUsername}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button
                 onClick={loadBlockedUsers}
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
                 title="Blocked Users"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
                 </svg>
                 {blockedUsers.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-600 rounded-full text-white text-xs flex items-center justify-center">
@@ -286,8 +521,18 @@ export default function Sidebar({
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-yellow-400 hover:text-yellow-300 relative"
                 title="Friend Requests"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
                 </svg>
                 {pendingRequests.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
@@ -301,8 +546,18 @@ export default function Sidebar({
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-blue-400 hover:text-blue-300"
                 title="Add Friend"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                  />
                 </svg>
               </button>
 
@@ -311,14 +566,23 @@ export default function Sidebar({
                 className="p-2 hover:bg-red-500 hover:bg-opacity-20 rounded-lg transition-colors text-red-400 hover:text-red-300"
                 title="Logout"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
                 </svg>
               </button>
             </div>
           </div>
 
-          {/* Search Bar */}
           <div className="relative">
             <input
               type="text"
@@ -327,24 +591,42 @@ export default function Sidebar({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-10 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            <svg className="w-5 h-5 text-gray-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              className="w-5 h-5 text-gray-500 absolute left-3 top-2.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
-            
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
                 className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-200 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
           </div>
         </div>
 
-        {/* Blocked Users Modal */}
         {showBlocked && (
           <div className="p-4 bg-gray-900 border-b border-gray-700 max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
@@ -353,26 +635,51 @@ export default function Sidebar({
                 onClick={() => setShowBlocked(false)}
                 className="text-gray-400 hover:text-white"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
-
             {blockedUsers.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">No blocked users</p>
+              <p className="text-gray-400 text-sm text-center py-4">
+                No blocked users
+              </p>
             ) : (
               <div className="space-y-2">
                 {blockedUsers.map((block) => (
                   <div key={block._id} className="bg-gray-800 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
-                          {block.blocked.username.charAt(0).toUpperCase()}
+                        <div className="w-8 h-8 rounded-full overflow-hidden">
+                          {block.blocked.profileImage ? (
+                            <img
+                              src={block.blocked.profileImage}
+                              alt={block.blocked.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
+                              {block.blocked.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">{block.blocked.username}</p>
-                          <p className="text-xs text-gray-400">{block.blocked.email}</p>
+                          <p className="text-sm font-medium text-white">
+                            {block.blocked.username}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {block.blocked.email}
+                          </p>
                         </div>
                       </div>
                       <button
@@ -389,7 +696,6 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* Friend Requests Modal */}
         {showRequests && (
           <div className="p-4 bg-gray-900 border-b border-gray-700 max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
@@ -398,26 +704,51 @@ export default function Sidebar({
                 onClick={() => setShowRequests(false)}
                 className="text-gray-400 hover:text-white"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
-
             {pendingRequests.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">No pending requests</p>
+              <p className="text-gray-400 text-sm text-center py-4">
+                No pending requests
+              </p>
             ) : (
               <div className="space-y-2">
                 {pendingRequests.map((request) => (
                   <div key={request._id} className="bg-gray-800 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                          {request.sender.username.charAt(0).toUpperCase()}
+                        <div className="w-8 h-8 rounded-full overflow-hidden">
+                          {request.sender.profileImage ? (
+                            <img
+                              src={request.sender.profileImage}
+                              alt={request.sender.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                              {request.sender.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">{request.sender.username}</p>
-                          <p className="text-xs text-gray-400">{request.sender.email}</p>
+                          <p className="text-sm font-medium text-white">
+                            {request.sender.username}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {request.sender.email}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -455,8 +786,18 @@ export default function Sidebar({
                 }}
                 className="text-gray-400 hover:text-white"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -467,7 +808,7 @@ export default function Sidebar({
                 placeholder="Search users by username..."
                 value={searchUsers}
                 onChange={(e) => setSearchUsers(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearchUsers()}
+                onKeyPress={(e) => e.key === "Enter" && handleSearchUsers()}
                 className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
@@ -485,24 +826,36 @@ export default function Sidebar({
                   No users found
                 </p>
               )}
-              
+
               {allUsers.length === 0 && !loading && !searchUsers && (
                 <p className="text-gray-500 text-sm text-center py-4">
                   Search for users to add as friends
                 </p>
               )}
-              
+
               {allUsers.map((user) => (
                 <div
                   key={user._id}
                   className="flex items-center justify-between p-2 bg-gray-800 rounded-lg hover:bg-gray-750"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                      {user.username.charAt(0).toUpperCase()}
+                    <div className="w-8 h-8 rounded-full overflow-hidden">
+                      {user.profileImage ? (
+                        <img
+                          src={user.profileImage}
+                          alt={user.username}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">{user.username}</p>
+                      <p className="text-sm font-medium text-white">
+                        {user.username}
+                      </p>
                       <p className="text-xs text-gray-400">{user.email}</p>
                     </div>
                   </div>
@@ -521,12 +874,11 @@ export default function Sidebar({
         {/* Users Count & Stats */}
         <div className="px-4 py-2 bg-gray-900 bg-opacity-30">
           <p className="text-xs text-gray-400 font-medium">
-            {memoizedUsers.length} {memoizedUsers.length === 1 ? "contact" : "contacts"}
+            {memoizedUsers.length}{" "}
+            {memoizedUsers.length === 1 ? "contact" : "contacts"}
             {searchQuery && ` found`} • {onlineCount} online
             {totalUnread > 0 && (
-              <span className="text-red-400 ml-2">
-                • {totalUnread} unread
-              </span>
+              <span className="text-red-400 ml-2">• {totalUnread} unread</span>
             )}
           </p>
         </div>
@@ -537,20 +889,44 @@ export default function Sidebar({
             <div className="text-center py-12 px-4">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
                 {searchQuery ? (
-                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg
+                    className="w-8 h-8 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <svg
+                    className="w-8 h-8 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
                   </svg>
                 )}
               </div>
               <p className="text-gray-400 text-sm">
-                {searchQuery ? `No results for "${searchQuery}"` : "No contacts yet"}
+                {searchQuery
+                  ? `No results for "${searchQuery}"`
+                  : "No contacts yet"}
               </p>
               {!searchQuery && (
-                <p className="text-gray-500 text-xs mt-1">Start by adding some friends!</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Start by adding some friends!
+                </p>
               )}
             </div>
           ) : (
@@ -558,7 +934,7 @@ export default function Sidebar({
               {memoizedUsers.map((user) => {
                 const lastMsg = lastMessages[user._id];
                 const formattedText = formatLastMessageText(lastMsg);
-                
+
                 return (
                   <UserItem
                     key={user._id}
@@ -570,7 +946,7 @@ export default function Sidebar({
                     lastMessage={formattedText}
                     lastMessageTime={lastMsg?.time || null}
                     lastMessageSender={lastMsg?.sender || null}
-                    lastMessageStatus={lastMsg?.status || "sent"} 
+                    lastMessageStatus={lastMsg?.status || "sent"}
                     currentUserId={currentUserId}
                     onRelationshipChange={() => window.location.reload()}
                   />

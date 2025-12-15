@@ -2,15 +2,16 @@ import { useEffect, useState, useRef } from "react";
 import { useSocket } from "../context/SocketContext";
 import Message from "./Message";
 import axios from "axios";
-import ConfirmationDialog from './ConfirmationDialog';
+import ConfirmationDialog from "./ConfirmationDialog";
 
 export default function ChatWindow({
   conversationId,
   currentUserId,
   searchQuery = "",
   onUpdateLastMessageStatus,
+  selectedUser = null, 
 }) {
-  const { socket } = useSocket();
+  const { socket, onlineUsers } = useSocket();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
@@ -22,7 +23,7 @@ export default function ChatWindow({
 
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
-    count: 0
+    count: 0,
   });
 
   useEffect(() => {
@@ -80,8 +81,9 @@ export default function ChatWindow({
             status: msg.status || "sent",
             messageId: msg._id,
             conversationId: msg.conversationId,
-            text: msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : ""),
-            senderId: msg.sender?._id || msg.sender
+            text:
+              msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : ""),
+            senderId: msg.sender?._id || msg.sender,
           });
         }
 
@@ -104,21 +106,19 @@ export default function ChatWindow({
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === msgId
-            ? { ...msg, status: status }
-            : msg
+          msg._id === msgId ? { ...msg, status: status } : msg
         )
       );
 
       if (onUpdateLastMessageStatus) {
         const currentMessages = messagesRef.current;
         const lastMsg = currentMessages[currentMessages.length - 1];
-        
+
         if (lastMsg?._id === msgId) {
           onUpdateLastMessageStatus({
             status: status,
             messageId: msgId,
-            conversationId: conversationId
+            conversationId: conversationId,
           });
         }
       }
@@ -137,7 +137,7 @@ export default function ChatWindow({
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus({
             status: "read",
-            conversationId: data.conversationId
+            conversationId: data.conversationId,
           });
         }
       }
@@ -213,7 +213,7 @@ export default function ChatWindow({
 
     setDeleteDialog({
       isOpen: true,
-      count: selectedMessages.size
+      count: selectedMessages.size,
     });
   };
 
@@ -301,8 +301,12 @@ export default function ChatWindow({
               />
             </svg>
           </div>
-          <p className="text-gray-400 text-base md:text-lg mb-1">No messages yet</p>
-          <p className="text-gray-500 text-xs md:text-sm">Start the conversation!</p>
+          <p className="text-gray-400 text-base md:text-lg mb-1">
+            No messages yet
+          </p>
+          <p className="text-gray-500 text-xs md:text-sm">
+            Start the conversation!
+          </p>
         </div>
       </div>
     );
@@ -324,6 +328,8 @@ export default function ChatWindow({
   return (
     <>
       <div className="flex-1 flex flex-col bg-gray-900 bg-opacity-30 min-h-0">
+      
+
         {isSelectionMode && (
           <div className="bg-gray-800 bg-opacity-90 border-b border-gray-700 px-3 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
@@ -331,8 +337,18 @@ export default function ChatWindow({
                 onClick={toggleSelectionMode}
                 className="text-gray-400 hover:text-white transition-colors"
               >
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5 md:w-6 md:h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
               <span className="text-white font-medium text-sm md:text-base">
@@ -362,8 +378,18 @@ export default function ChatWindow({
                 disabled={selectedMessages.size === 0}
                 className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-xs md:text-sm"
               >
-                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <svg
+                  className="w-3.5 h-3.5 md:w-4 md:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
                 </svg>
                 <span className="hidden sm:inline">Delete</span>
               </button>
@@ -371,15 +397,28 @@ export default function ChatWindow({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-3 md:px-6 py-4" style={{ minHeight: 0 }}>
+        <div
+          className="flex-1 overflow-y-auto px-3 md:px-6 py-4"
+          style={{ minHeight: 0 }}
+        >
           {!isSelectionMode && messages.length > 0 && (
             <div className="flex justify-center mb-4 sticky top-0 z-10">
               <button
                 onClick={toggleSelectionMode}
                 className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-xs md:text-sm"
               >
-                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <svg
+                  className="w-3.5 h-3.5 md:w-4 md:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
                 </svg>
                 Select Messages
               </button>

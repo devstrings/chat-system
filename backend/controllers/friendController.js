@@ -1,7 +1,18 @@
 import FriendRequest from "../models/FriendRequest.js";
 import Friendship from "../models/Friendship.js";
 import BlockedUser from "../models/BlockedUser.js";
-import mongoose from "mongoose"; 
+import mongoose from "mongoose";
+
+//  HELPER FUNCTION: Format user with full image URL
+const formatUserWithFullImageUrl = (user) => {
+  const userObj = user.toObject ? user.toObject() : user;
+  return {
+    ...userObj,
+    profileImage: userObj.profileImage 
+      ? `http://localhost:5000${userObj.profileImage}` 
+      : null
+  };
+};
 
 // SEND FRIEND REQUEST
 export const sendFriendRequest = async (req, res) => {
@@ -133,7 +144,7 @@ export const rejectFriendRequest = async (req, res) => {
   }
 };
 
-// GET PENDING FRIEND REQUESTS (RECEIVED)
+//  GET PENDING FRIEND REQUESTS (RECEIVED) - WITH PROFILE IMAGES
 export const getPendingRequests = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -142,17 +153,23 @@ export const getPendingRequests = async (req, res) => {
       receiver: currentUserId,
       status: "pending"
     })
-      .populate("sender", "username email")
+      .populate("sender", "username email profileImage")
       .sort({ createdAt: -1 });
 
-    res.json(requests);
+    //  Format sender with full image URL
+    const formattedRequests = requests.map(request => ({
+      ...request.toObject(),
+      sender: formatUserWithFullImageUrl(request.sender)
+    }));
+
+    res.json(formattedRequests);
   } catch (err) {
     console.error("Get pending requests error:", err);
     res.status(500).json({ message: "Failed to fetch requests", error: err.message });
   }
 };
 
-// GET SENT FRIEND REQUESTS
+//  GET SENT FRIEND REQUESTS - WITH PROFILE IMAGES
 export const getSentRequests = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -161,10 +178,16 @@ export const getSentRequests = async (req, res) => {
       sender: currentUserId,
       status: "pending"
     })
-      .populate("receiver", "username email")
+      .populate("receiver", "username email profileImage")
       .sort({ createdAt: -1 });
 
-    res.json(requests);
+    //  Format receiver with full image URL
+    const formattedRequests = requests.map(request => ({
+      ...request.toObject(),
+      receiver: formatUserWithFullImageUrl(request.receiver)
+    }));
+
+    res.json(formattedRequests);
   } catch (err) {
     console.error("Get sent requests error:", err);
     res.status(500).json({ message: "Failed to fetch requests", error: err.message });
@@ -270,16 +293,22 @@ export const unblockUser = async (req, res) => {
   }
 };
 
-//  GET BLOCKED USERS
+//  GET BLOCKED USERS - WITH PROFILE IMAGES
 export const getBlockedUsers = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
     const blocked = await BlockedUser.find({ blocker: currentUserId })
-      .populate("blocked", "username email")
+      .populate("blocked", "username email profileImage")
       .sort({ createdAt: -1 });
 
-    res.json(blocked);
+    //  Format blocked user with full image URL
+    const formattedBlocked = blocked.map(block => ({
+      ...block.toObject(),
+      blocked: formatUserWithFullImageUrl(block.blocked)
+    }));
+
+    res.json(formattedBlocked);
   } catch (err) {
     console.error("Get blocked users error:", err);
     res.status(500).json({ message: "Failed to fetch blocked users", error: err.message });
@@ -351,7 +380,7 @@ export const getRelationshipStatus = async (req, res) => {
   }
 };
 
-// GET ALL FRIENDS (NEW FUNCTION - ADD THIS AT THE END)
+//  GET ALL FRIENDS - WITH PROFILE IMAGES
 export const getFriends = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -370,7 +399,6 @@ export const getFriends = async (req, res) => {
 
     // Extract friend user IDs
     const friendIds = friendships.map(friendship => {
-      // If user1 is current user, return user2, else return user1
       return friendship.user1.toString() === currentUserId 
         ? friendship.user2 
         : friendship.user1;
@@ -380,11 +408,14 @@ export const getFriends = async (req, res) => {
     const User = mongoose.model("User");
     const friends = await User.find({ 
       _id: { $in: friendIds } 
-    }).select("username email");
+    }).select("username email profileImage");
 
-    console.log(` Returning ${friends.length} friends`);
+    //  Format all friends with full image URLs
+    const formattedFriends = friends.map(friend => formatUserWithFullImageUrl(friend));
 
-    res.json(friends);
+    console.log(` Returning ${formattedFriends.length} friends`);
+
+    res.json(formattedFriends);
   } catch (err) {
     console.error(" Get friends error:", err);
     res.status(500).json({ 

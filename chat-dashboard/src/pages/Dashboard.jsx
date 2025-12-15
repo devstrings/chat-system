@@ -5,17 +5,20 @@ import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import axios from "axios";
-import ConfirmationDialog, { AlertDialog } from '../components/ConfirmationDialog';
+import ConfirmationDialog, {
+  AlertDialog,
+} from "../components/ConfirmationDialog";
+import { useAuthImage } from "../hooks/useAuthImage";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { socket } = useSocket();
+  const { socket, onlineUsers } = useSocket();
   const [username, setUsername] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  // const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [searchInChat, setSearchInChat] = useState("");
@@ -28,39 +31,77 @@ export default function Dashboard() {
 
   //  MOBILE SIDEBAR STATE
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  // Profile Picture States
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [profileImage, setProfileImage] = useState(
+    localStorage.getItem("profileImage") || ""
+  );
+  const [imageInput, setImageInput] = useState("");
 
   // Dialog states
   const [clearChatDialog, setClearChatDialog] = useState({
     isOpen: false,
-    username: ""
+    username: "",
   });
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
     message: "",
-    type: "info"
+    type: "info",
   });
 
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
+  const { imageSrc: selectedUserImage } = useAuthImage(
+    selectedUser?.profileImage
+  );
+  const handleRemoveProfileImage = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        "http://localhost:5000/api/users/profile/remove-image",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      localStorage.removeItem("profileImage");
+      setProfileImage("");
+      setShowProfileSettings(false);
+
+      setAlertDialog({
+        isOpen: true,
+        title: "Success!",
+        message: "Profile picture removed successfully",
+        type: "success",
+      });
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message:
+          err.response?.data?.message || "Failed to remove profile picture",
+        type: "error",
+      });
+    }
+  };
+
   // Helper function to format attachment text
   const formatAttachmentText = (attachments) => {
     if (!attachments || attachments.length === 0) return "";
-    
+
     const file = attachments[0];
     const fileName = file.filename || file.fileName || "File";
     const fileType = file.fileType || file.type || "";
-    
+
     let icon = "📎";
     if (fileType.startsWith("image/")) icon = "🖼️";
     else if (fileType.startsWith("video/")) icon = "🎥";
     else if (fileType === "application/pdf") icon = "📕";
     else if (fileType.includes("word")) icon = "📄";
     else if (fileType === "text/plain") icon = "📝";
-    
+
     return `${icon} ${fileName}`;
   };
 
@@ -81,6 +122,10 @@ export default function Dashboard() {
         const res = await axios.get("http://localhost:5000/api/friends/list", {
           headers: { Authorization: `Bearer ${token}` },
         });
+        //......
+        console.log(" Fetched users from backend:", res.data);
+        console.log(" First user:", res.data[0]);
+        console.log(" First user profile image:", res.data[0]?.profileImage);
         setUsers(res.data);
 
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -124,10 +169,11 @@ export default function Dashboard() {
           const messages = msgRes.data;
           if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1];
-            
-            const messageText = lastMsg.text || 
-              (lastMsg.attachments?.length > 0 
-                ? formatAttachmentText(lastMsg.attachments) 
+
+            const messageText =
+              lastMsg.text ||
+              (lastMsg.attachments?.length > 0
+                ? formatAttachmentText(lastMsg.attachments)
                 : "");
 
             setLastMessages((prev) => ({
@@ -140,7 +186,7 @@ export default function Dashboard() {
                 lastMessageId: lastMsg._id,
                 conversationId: conversationId,
                 attachments: lastMsg.attachments,
-                _updated: Date.now()
+                _updated: Date.now(),
               },
             }));
 
@@ -164,42 +210,42 @@ export default function Dashboard() {
     loadLastMessages();
   }, [currentUserId, users]);
 
-  // Online status management
-  useEffect(() => {
-    if (!socket) return;
+  
+  // useEffect(() => {
+  //   if (!socket) return;
 
-    socket.emit("userOnline");
+  //   socket.emit("userOnline");
 
-    socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
-      setOnlineUsers(new Set(onlineList));
-    });
+  //   socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
+  //     setOnlineUsers(new Set(onlineList));
+  //   });
 
-    socket.on("userOnline", ({ userId, onlineUsers: onlineList }) => {
-      if (onlineList) {
-        setOnlineUsers(new Set(onlineList));
-      } else {
-        setOnlineUsers((prev) => new Set(prev).add(userId));
-      }
-    });
+  //   socket.on("userOnline", ({ userId, onlineUsers: onlineList }) => {
+  //     if (onlineList) {
+  //       setOnlineUsers(new Set(onlineList));
+  //     } else {
+  //       setOnlineUsers((prev) => new Set(prev).add(userId));
+  //     }
+  //   });
 
-    socket.on("userOffline", ({ userId, onlineUsers: onlineList }) => {
-      if (onlineList) {
-        setOnlineUsers(new Set(onlineList));
-      } else {
-        setOnlineUsers((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(userId);
-          return newSet;
-        });
-      }
-    });
+  //   socket.on("userOffline", ({ userId, onlineUsers: onlineList }) => {
+  //     if (onlineList) {
+  //       setOnlineUsers(new Set(onlineList));
+  //     } else {
+  //       setOnlineUsers((prev) => {
+  //         const newSet = new Set(prev);
+  //         newSet.delete(userId);
+  //         return newSet;
+  //       });
+  //     }
+  //   });
 
-    return () => {
-      socket.off("onlineUsersList");
-      socket.off("userOnline");
-      socket.off("userOffline");
-    };
-  }, [socket]);
+  //   return () => {
+  //     socket.off("onlineUsersList");
+  //     socket.off("userOnline");
+  //     socket.off("userOffline");
+  //   };
+  // }, [socket]);
 
   // Listen for incoming messages and status updates
   useEffect(() => {
@@ -208,10 +254,11 @@ export default function Dashboard() {
     const handleNewMessage = (msg) => {
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
-      
-      const messageText = msg.text || 
-        (msg.attachments?.length > 0 
-          ? formatAttachmentText(msg.attachments) 
+
+      const messageText =
+        msg.text ||
+        (msg.attachments?.length > 0
+          ? formatAttachmentText(msg.attachments)
           : "");
 
       const associatedUserId =
@@ -227,7 +274,7 @@ export default function Dashboard() {
           conversationId: msg.conversationId,
           lastMessageId: msg._id,
           attachments: msg.attachments,
-          _updated: Date.now()
+          _updated: Date.now(),
         },
       }));
 
@@ -244,7 +291,7 @@ export default function Dashboard() {
 
     const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
       const msgId = messageId || _id;
-      
+
       if (!status || !conversationId) {
         console.warn(" Invalid status update");
         return;
@@ -252,7 +299,7 @@ export default function Dashboard() {
 
       setLastMessages((prev) => {
         let targetUserId = null;
-        
+
         for (const [userId, msgData] of Object.entries(prev)) {
           if (msgData?.conversationId === conversationId) {
             targetUserId = userId;
@@ -269,10 +316,10 @@ export default function Dashboard() {
           [targetUserId]: {
             ...prev[targetUserId],
             status: status,
-            _updated: Date.now()
-          }
+            _updated: Date.now(),
+          },
         };
-        
+
         return newState;
       });
     };
@@ -340,7 +387,7 @@ export default function Dashboard() {
         isOpen: true,
         title: "Chat Cleared!",
         message: "All messages have been deleted successfully.",
-        type: "success"
+        type: "success",
       });
 
       setLastMessages((prev) => {
@@ -357,7 +404,7 @@ export default function Dashboard() {
         isOpen: true,
         title: "Error",
         message: "Could not clear chat. Please try again.",
-        type: "error"
+        type: "error",
       });
     }
   };
@@ -389,8 +436,11 @@ export default function Dashboard() {
           users={users}
           selectedUserId={selectedUser?._id}
           onSelectUser={(user) => {
+            //...
+            console.log(" Selected user object:", user);
+            console.log(" Selected user profile image:", user.profileImage);
             setSelectedUser(user);
-            setIsMobileSidebarOpen(false); // Close on mobile
+            setIsMobileSidebarOpen(false);
           }}
           onlineUsers={onlineUsers}
           currentUsername={username}
@@ -414,14 +464,34 @@ export default function Dashboard() {
                       onClick={() => setIsMobileSidebarOpen(true)}
                       className="md:hidden p-2 text-gray-400 hover:text-white transition-colors flex-shrink-0"
                     >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6h16M4 12h16M4 18h16"
+                        />
                       </svg>
                     </button>
 
                     <div className="relative flex-shrink-0">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base md:text-lg shadow-lg">
-                        {selectedUser.username.charAt(0).toUpperCase()}
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden shadow-lg">
+                        {selectedUserImage ? (
+                          <img
+                            src={selectedUserImage}
+                            alt={selectedUser.username}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base md:text-lg">
+                            {selectedUser.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
                       {onlineUsers.has(selectedUser._id) && (
                         <div className="absolute bottom-0 right-0 w-3 h-3 md:w-3.5 md:h-3.5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse"></div>
@@ -454,8 +524,18 @@ export default function Dashboard() {
                       className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
                       title="Search in chat"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     </button>
 
@@ -465,29 +545,58 @@ export default function Dashboard() {
                         className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
                         title="Chat options"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                          />
                         </svg>
                       </button>
 
                       {showChatMenu && (
                         <>
-                          <div className="fixed inset-0 z-10" onClick={() => setShowChatMenu(false)}></div>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowChatMenu(false)}
+                          ></div>
                           <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
                             <button
                               onClick={() => {
                                 setAlertDialog({
                                   isOpen: true,
                                   title: "User Info",
-                                  message: `👤 ${selectedUser.username}\n📧 ${selectedUser.email}\n${onlineUsers.has(selectedUser._id) ? "🟢 Online" : "⚫ Offline"}`,
-                                  type: "info"
+                                  message: `👤 ${selectedUser.username}\n📧 ${
+                                    selectedUser.email
+                                  }\n${
+                                    onlineUsers.has(selectedUser._id)
+                                      ? "🟢 Online"
+                                      : "⚫ Offline"
+                                  }`,
+                                  type: "info",
                                 });
                                 setShowChatMenu(false);
                               }}
                               className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
                               </svg>
                               View Profile
                             </button>
@@ -496,14 +605,24 @@ export default function Dashboard() {
                               onClick={() => {
                                 setClearChatDialog({
                                   isOpen: true,
-                                  username: selectedUser.username
+                                  username: selectedUser.username,
                                 });
                                 setShowChatMenu(false);
                               }}
                               className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm border-t border-gray-700"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                               Clear Chat
                             </button>
@@ -523,16 +642,36 @@ export default function Dashboard() {
                       onChange={(e) => setSearchInChat(e.target.value)}
                       className="w-full pl-10 pr-10 py-2 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
-                    <svg className="w-4 h-4 text-gray-500 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <svg
+                      className="w-4 h-4 text-gray-500 absolute left-3 top-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
                     </svg>
                     {searchInChat && (
                       <button
                         onClick={() => setSearchInChat("")}
                         className="absolute right-3 top-3 text-gray-400 hover:text-gray-200 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     )}
@@ -544,13 +683,20 @@ export default function Dashboard() {
                 conversationId={conversationId}
                 currentUserId={currentUserId}
                 searchQuery={searchInChat}
+                selectedUser={selectedUser}
                 onUpdateLastMessageStatus={(updateData) => {
-                  if (updateData && updateData.status && updateData.conversationId) {
+                  if (
+                    updateData &&
+                    updateData.status &&
+                    updateData.conversationId
+                  ) {
                     setLastMessages((prev) => {
                       let targetUserId = null;
-                      
+
                       for (const [userId, msgData] of Object.entries(prev)) {
-                        if (msgData?.conversationId === updateData.conversationId) {
+                        if (
+                          msgData?.conversationId === updateData.conversationId
+                        ) {
                           targetUserId = userId;
                           break;
                         }
@@ -563,8 +709,8 @@ export default function Dashboard() {
                         [targetUserId]: {
                           ...prev[targetUserId],
                           status: updateData.status,
-                          _updated: Date.now()
-                        }
+                          _updated: Date.now(),
+                        },
                       };
                     });
                   }
@@ -585,8 +731,18 @@ export default function Dashboard() {
                 </button>
 
                 <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-4 md:mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 bg-opacity-20 flex items-center justify-center">
-                  <svg className="w-12 h-12 md:w-16 md:h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg
+                    className="w-12 h-12 md:w-16 md:h-16 text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
                 </div>
                 <h3 className="text-xl md:text-2xl font-semibold text-white mb-2">
@@ -604,7 +760,9 @@ export default function Dashboard() {
       {/* DIALOGS */}
       <ConfirmationDialog
         isOpen={clearChatDialog.isOpen}
-        onClose={() => setClearChatDialog({ ...clearChatDialog, isOpen: false })}
+        onClose={() =>
+          setClearChatDialog({ ...clearChatDialog, isOpen: false })
+        }
         onConfirm={handleClearChat}
         title="Clear Chat?"
         message={`Clear all messages with ${clearChatDialog.username}? This action cannot be undone.`}

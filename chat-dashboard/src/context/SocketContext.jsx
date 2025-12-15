@@ -6,19 +6,18 @@ const SocketContext = createContext();
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    //  Token na ho to skip
     if (!token) {
-      console.log(" No token found, skipping socket connection.");
+      console.log("No token found, skipping socket connection.");
       return;
     }
 
     console.log(" Connecting socket with token");
 
-    //  Socket connection
     const newSocket = io("http://localhost:5000", {
       auth: { token },
       transports: ["websocket"],
@@ -29,42 +28,58 @@ export function SocketProvider({ children }) {
 
     setSocket(newSocket);
 
-    //  Connected
     newSocket.on("connect", () => {
       console.log(" Socket connected:", newSocket.id);
       setConnected(true);
     });
 
-    //  Disconnected
     newSocket.on("disconnect", (reason) => {
       console.warn(" Socket disconnected:", reason);
       setConnected(false);
     });
 
-    //  Connection Error
-    newSocket.on("connct_error", (err) => {
+    newSocket.on("connect_error", (err) => {
       console.error(" Socket connection error:", err.message);
       setConnected(false);
     });
 
-    //  Online/Offline events (optional logging)
+    //  ONLINE USERS EVENTS
+    newSocket.on("onlineUsersList", (data) => {
+      console.log(" Initial online users list:", data.onlineUsers);
+      if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
+        const userIds = data.onlineUsers.map(u => u._id);
+        setOnlineUsers(new Set(userIds));
+        console.log(" Set online users:", userIds);
+      }
+    });
+
     newSocket.on("userOnline", (data) => {
-      console.log(" User came online:", data);
+      console.log(" User came online:", data.user?.username, data.userId);
+      setOnlineUsers(prev => {
+        const updated = new Set(prev);
+        updated.add(data.userId);
+        console.log(" Online count:", updated.size);
+        return updated;
+      });
     });
 
     newSocket.on("userOffline", (data) => {
-      console.log(" User went offline:", data);
+      console.log(" User went offline:", data.userId);
+      setOnlineUsers(prev => {
+        const updated = new Set(prev);
+        updated.delete(data.userId);
+        console.log(" Online count:", updated.size);
+        return updated;
+      });
     });
 
-    //  DELETE MESSAGE EVENTS
+    // DELETE MESSAGE EVENTS
     newSocket.on("messageDeleted", (data) => {
       console.log(" Message deleted:", data);
-      // This will be handled in ChatWindow component
     });
 
     newSocket.on("messageDeletedForEveryone", (data) => {
-      console.log("Message deleted for everyone:", data);
-      // This will be handled in ChatWindow component
+      console.log(" Message deleted for everyone:", data);
     });
 
     newSocket.on("errorMessage", (data) => {
@@ -72,20 +87,18 @@ export function SocketProvider({ children }) {
       alert(data.message);
     });
 
-    //  Cleanup on unmount
     return () => {
       console.log(" Cleaning up socket...");
       newSocket.removeAllListeners();
       newSocket.disconnect();
     };
-  }, []); //  Empty dependency - runs once on mount
+  }, []);
 
   return (
-    <SocketContext.Provider value={{ socket, connected }}>
+    <SocketContext.Provider value={{ socket, connected, onlineUsers }}>
       {children}
     </SocketContext.Provider>
   );
 }
 
-//  Custom hook
 export const useSocket = () => useContext(SocketContext);

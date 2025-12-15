@@ -1,24 +1,25 @@
 import React, { useState, useEffect, memo } from "react";
-import ConfirmationDialog, { AlertDialog } from './ConfirmationDialog';
+import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axios from "axios";
-
-const UserItem = memo(function UserItem({ 
-  user, 
-  selected, 
-  onClick, 
-  isOnline = false, 
+import { useAuthImage } from "../hooks/useAuthImage";
+const UserItem = memo(function UserItem({
+  user,
+  selected,
+  onClick,
+  isOnline = false,
   unreadCount = 0,
   lastMessage = "",
   lastMessageTime = null,
-  lastMessageSender = null, 
+  lastMessageSender = null,
   currentUserId = null,
   lastMessageStatus = "sent",
-  onRelationshipChange
+  onRelationshipChange,
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [relationshipStatus, setRelationshipStatus] = useState("loading");
   const [requestId, setRequestId] = useState(null);
   const [conversationId, setConversationId] = useState(null);
+  const { imageSrc: userImage } = useAuthImage(user.profileImage);
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = useState({
@@ -28,17 +29,16 @@ const UserItem = memo(function UserItem({
     confirmText: "",
     onConfirm: null,
     icon: "warning",
-    type: "danger"
+    type: "danger",
   });
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
     message: "",
-    type: "success"
+    type: "success",
   });
 
-  //  Profile Dialog State
   const [showProfileDialog, setShowProfileDialog] = useState(false);
 
   // Fetch relationship status
@@ -65,7 +65,6 @@ const UserItem = memo(function UserItem({
     }
   }, [user._id]);
 
-  //  Get conversation ID for clear chat
   useEffect(() => {
     const getConversationId = async () => {
       try {
@@ -100,7 +99,10 @@ const UserItem = memo(function UserItem({
     if (hours < 24) return `${hours}h`;
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days}d`;
-    return msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return msgDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
   };
 
   const truncateMessage = (msg, length = 30) => {
@@ -110,27 +112,40 @@ const UserItem = memo(function UserItem({
   };
 
   const displayMessage = truncateMessage(lastMessage);
-  const isOwnMessage = lastMessageSender && currentUserId && lastMessageSender === currentUserId;
+  const isOwnMessage =
+    lastMessageSender && currentUserId && lastMessageSender === currentUserId;
 
   const getMessageStatusIcon = () => {
     if (!isOwnMessage || !lastMessage) return null;
-    
-    if (lastMessageStatus === 'read') {
+
+    if (lastMessageStatus === "read") {
       return (
-        <svg className="w-3 h-3 text-blue-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+        <svg
+          className="w-3 h-3 text-blue-400 flex-shrink-0 mr-1"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z" />
         </svg>
       );
-    } else if (lastMessageStatus === 'delivered') {
+    } else if (lastMessageStatus === "delivered") {
       return (
-        <svg className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z"/>
+        <svg
+          className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path d="M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z" />
         </svg>
       );
     } else {
       return (
-        <svg className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/>
+        <svg
+          className="w-3 h-3 text-gray-400 flex-shrink-0 mr-1"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
         </svg>
       );
     }
@@ -145,33 +160,33 @@ const UserItem = memo(function UserItem({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ receiverId: user._id })
+          body: JSON.stringify({ receiverId: user._id }),
         }
       );
-      
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message);
       }
-      
+
       setRelationshipStatus("request_sent");
-      
+
       setAlertDialog({
         isOpen: true,
         title: "Friend Request Sent!",
         message: `Friend request sent to ${user.username}`,
-        type: "success"
+        type: "success",
       });
-      
+
       if (onRelationshipChange) onRelationshipChange();
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.message || "Failed to send request",
-        type: "error"
+        type: "error",
       });
     }
     setShowMenu(false);
@@ -186,32 +201,32 @@ const UserItem = memo(function UserItem({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
-      
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message);
       }
-      
+
       setRelationshipStatus("friends");
-      
+
       setAlertDialog({
         isOpen: true,
         title: "Friend Request Accepted!",
         message: `You are now friends with ${user.username}`,
-        type: "success"
+        type: "success",
       });
-      
+
       if (onRelationshipChange) onRelationshipChange();
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.message || "Failed to accept request",
-        type: "error"
+        type: "error",
       });
     }
     setShowMenu(false);
@@ -224,31 +239,31 @@ const UserItem = memo(function UserItem({
         `http://localhost:5000/api/friends/request/${requestId}/reject`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-      
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message);
       }
-      
+
       setRelationshipStatus("none");
-      
+
       setAlertDialog({
         isOpen: true,
         title: "Request Rejected",
         message: "Friend request rejected",
-        type: "info"
+        type: "info",
       });
-      
+
       if (onRelationshipChange) onRelationshipChange();
     } catch (err) {
       setAlertDialog({
         isOpen: true,
         title: "Error",
         message: err.message || "Failed to reject request",
-        type: "error"
+        type: "error",
       });
     }
     setShowMenu(false);
@@ -270,34 +285,34 @@ const UserItem = memo(function UserItem({
             `http://localhost:5000/api/friends/unfriend/${user._id}`,
             {
               method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
             }
           );
-          
+
           if (!res.ok) {
             const error = await res.json();
             throw new Error(error.message);
           }
-          
+
           setRelationshipStatus("none");
-          
+
           setAlertDialog({
             isOpen: true,
             title: "Unfriended",
             message: `You are no longer friends with ${user.username}`,
-            type: "info"
+            type: "info",
           });
-          
+
           if (onRelationshipChange) onRelationshipChange();
         } catch (err) {
           setAlertDialog({
             isOpen: true,
             title: "Error",
             message: err.message || "Failed to unfriend",
-            type: "error"
+            type: "error",
           });
         }
-      }
+      },
     });
     setShowMenu(false);
   };
@@ -315,42 +330,39 @@ const UserItem = memo(function UserItem({
       onConfirm: async () => {
         try {
           const token = localStorage.getItem("token");
-          const res = await fetch(
-            "http://localhost:5000/api/friends/block",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ userId: user._id })
-            }
-          );
-          
+          const res = await fetch("http://localhost:5000/api/friends/block", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ userId: user._id }),
+          });
+
           if (!res.ok) {
             const error = await res.json();
             throw new Error(error.message);
           }
-          
+
           setRelationshipStatus("blocked");
-          
+
           setAlertDialog({
             isOpen: true,
             title: "User Blocked",
             message: `${user.username} has been blocked successfully`,
-            type: "success"
+            type: "success",
           });
-          
+
           if (onRelationshipChange) onRelationshipChange();
         } catch (err) {
           setAlertDialog({
             isOpen: true,
             title: "Error",
             message: err.message || "Failed to block user",
-            type: "error"
+            type: "error",
           });
         }
-      }
+      },
     });
     setShowMenu(false);
   };
@@ -372,39 +384,38 @@ const UserItem = memo(function UserItem({
             `http://localhost:5000/api/friends/unblock/${user._id}`,
             {
               method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
             }
           );
-          
+
           if (!res.ok) {
             const error = await res.json();
             throw new Error(error.message);
           }
-          
+
           setRelationshipStatus("none");
-          
+
           setAlertDialog({
             isOpen: true,
             title: "User Unblocked",
             message: `${user.username} has been unblocked`,
-            type: "success"
+            type: "success",
           });
-          
+
           if (onRelationshipChange) onRelationshipChange();
         } catch (err) {
           setAlertDialog({
             isOpen: true,
             title: "Error",
             message: err.message || "Failed to unblock user",
-            type: "error"
+            type: "error",
           });
         }
-      }
+      },
     });
     setShowMenu(false);
   };
 
-  //  Clear Chat Handler
   const handleClearChat = () => {
     setConfirmDialog({
       isOpen: true,
@@ -427,7 +438,7 @@ const UserItem = memo(function UserItem({
             isOpen: true,
             title: "Chat Cleared!",
             message: "All messages have been deleted successfully.",
-            type: "success"
+            type: "success",
           });
 
           setTimeout(() => {
@@ -438,15 +449,14 @@ const UserItem = memo(function UserItem({
             isOpen: true,
             title: "Error",
             message: "Could not clear chat. Please try again.",
-            type: "error"
+            type: "error",
           });
         }
-      }
+      },
     });
     setShowMenu(false);
   };
 
-  //  Show Profile Handler
   const handleShowProfile = () => {
     setShowProfileDialog(true);
   };
@@ -471,8 +481,8 @@ const UserItem = memo(function UserItem({
     <>
       <div
         className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${
-          selected 
-            ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg" 
+          selected
+            ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg"
             : "hover:bg-gray-700 hover:bg-opacity-50 active:scale-95"
         }`}
         onClick={(e) => {
@@ -484,16 +494,20 @@ const UserItem = memo(function UserItem({
               isOpen: true,
               title: "Cannot Chat",
               message: "You must be friends to chat!",
-              type: "info"
+              type: "info",
             });
           }
         }}
       >
-        {/*  AVATAR WITH CLICK HANDLER */}
-        <div className="relative flex-shrink-0">
-          <div 
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${
-              selected ? "bg-white bg-opacity-20" : "bg-gradient-to-br from-purple-500 to-pink-500"
+        
+
+        {/* AVATAR WITH PROFILE PICTURE */}
+        <div className="relative">
+          {" "}
+          
+          <div
+            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${
+              selected ? "ring-2 ring-white ring-opacity-40" : ""
             }`}
             onClick={(e) => {
               e.stopPropagation();
@@ -501,15 +515,25 @@ const UserItem = memo(function UserItem({
             }}
             title="View Profile"
           >
-            {user.username.charAt(0).toUpperCase()}
+            {userImage ? (
+              <img
+                src={userImage}
+                alt={user.username}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white font-semibold">
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
-
+          {/*  GREEN DOT FOR ONLINE STATUS */}
           {isOnline && (
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse"></div>
+            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-gray-800 rounded-full"></div>
           )}
-
-          {unreadCount > 0 && !selected && (
-            <div className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-gray-900">
+          {/*  UNREAD BADGE */}
+          {unreadCount > 0 && (
+            <div className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-gray-800">
               <span className="text-white text-xs font-bold">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
@@ -520,15 +544,27 @@ const UserItem = memo(function UserItem({
         {/* User info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className={`font-semibold truncate ${
-              selected ? "text-white" : unreadCount > 0 ? "text-white" : "text-gray-200"
-            }`}>
+            <h3
+              className={`font-semibold truncate ${
+                selected
+                  ? "text-white"
+                  : unreadCount > 0
+                  ? "text-white"
+                  : "text-gray-200"
+              }`}
+            >
               {user.username}
             </h3>
             {lastMessageTime && relationshipStatus === "friends" && (
-              <span className={`text-xs flex-shrink-0 ml-2 ${
-                selected ? "text-white text-opacity-70" : unreadCount > 0 ? "text-blue-400 font-semibold" : "text-gray-500"
-              }`}>
+              <span
+                className={`text-xs flex-shrink-0 ml-2 ${
+                  selected
+                    ? "text-white text-opacity-70"
+                    : unreadCount > 0
+                    ? "text-blue-400 font-semibold"
+                    : "text-gray-500"
+                }`}
+              >
                 {formatTime(lastMessageTime)}
               </span>
             )}
@@ -537,9 +573,15 @@ const UserItem = memo(function UserItem({
           {relationshipStatus === "friends" && displayMessage ? (
             <div className="flex items-center">
               {getMessageStatusIcon()}
-              <p className={`text-xs truncate ${
-                selected ? "text-white text-opacity-70" : unreadCount > 0 ? "text-gray-200 font-medium" : "text-gray-400"
-              }`}>
+              <p
+                className={`text-xs truncate ${
+                  selected
+                    ? "text-white text-opacity-70"
+                    : unreadCount > 0
+                    ? "text-gray-200 font-medium"
+                    : "text-gray-400"
+                }`}
+              >
                 {displayMessage}
               </p>
             </div>
@@ -557,8 +599,12 @@ const UserItem = memo(function UserItem({
             }}
             className="p-2 hover:bg-gray-600 hover:bg-opacity-50 rounded-lg transition-colors"
           >
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            <svg
+              className="w-5 h-5 text-gray-400"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
             </svg>
           </button>
 
@@ -569,15 +615,24 @@ const UserItem = memo(function UserItem({
                 className="fixed inset-0 z-10"
                 onClick={() => setShowMenu(false)}
               ></div>
-              
+
               <div className="absolute right-0 mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                {/*  VIEW PROFILE (Always show) */}
                 <button
                   onClick={handleShowProfile}
                   className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
                   </svg>
                   View Profile
                 </button>
@@ -587,8 +642,18 @@ const UserItem = memo(function UserItem({
                     onClick={handleSendRequest}
                     className="w-full px-4 py-2.5 text-left text-blue-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                      />
                     </svg>
                     Send Friend Request
                   </button>
@@ -600,8 +665,18 @@ const UserItem = memo(function UserItem({
                       onClick={handleAcceptRequest}
                       className="w-full px-4 py-2.5 text-left text-green-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       Accept Request
                     </button>
@@ -609,8 +684,18 @@ const UserItem = memo(function UserItem({
                       onClick={handleRejectRequest}
                       className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                       Reject Request
                     </button>
@@ -619,13 +704,22 @@ const UserItem = memo(function UserItem({
 
                 {relationshipStatus === "friends" && (
                   <>
-                    {/*  CLEAR CHAT OPTION */}
                     <button
                       onClick={handleClearChat}
                       className="w-full px-4 py-2.5 text-left text-orange-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                       Clear Chat
                     </button>
@@ -634,33 +728,64 @@ const UserItem = memo(function UserItem({
                       onClick={handleUnfriend}
                       className="w-full px-4 py-2.5 text-left text-yellow-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"
+                        />
                       </svg>
                       Unfriend
                     </button>
                   </>
                 )}
 
-                {relationshipStatus !== "blocked" && relationshipStatus !== "blocked_by" && (
-                  <button
-                    onClick={handleBlock}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                    </svg>
-                    Block User
-                  </button>
-                )}
+                {relationshipStatus !== "blocked" &&
+                  relationshipStatus !== "blocked_by" && (
+                    <button
+                      onClick={handleBlock}
+                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                        />
+                      </svg>
+                      Block User
+                    </button>
+                  )}
 
                 {relationshipStatus === "blocked" && (
                   <button
                     onClick={handleUnblock}
                     className="w-full px-4 py-2.5 text-left text-green-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                      />
                     </svg>
                     Unblock User
                   </button>
@@ -671,8 +796,18 @@ const UserItem = memo(function UserItem({
         </div>
 
         {selected && relationshipStatus === "friends" && (
-          <svg className="w-5 h-5 text-white text-opacity-70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          <svg
+            className="w-5 h-5 text-white text-opacity-70 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
           </svg>
         )}
       </div>
@@ -684,7 +819,7 @@ const UserItem = memo(function UserItem({
             className="fixed inset-0 bg-black bg-opacity-50 z-50"
             onClick={() => setShowProfileDialog(false)}
           ></div>
-          
+
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
               <div className="flex justify-end mb-4">
@@ -692,61 +827,90 @@ const UserItem = memo(function UserItem({
                   onClick={() => setShowProfileDialog(false)}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
 
-              <div className="text-center">
-                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
+              {/* Profile Picture */}
+              <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
+                {userImage ? (
+                  <img
+                    src={userImage}
+                    alt={user.username}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white text-4xl font-bold">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
 
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  {user.username}
-                </h3>
+              {/* Username */}
+              <h2 className="text-2xl font-bold text-center text-white mb-2">
+                {user.username}
+              </h2>
 
-                <p className="text-gray-400 mb-4 flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  {user.email}
-                </p>
-
-                <div className="flex items-center justify-center gap-2 mb-6">
-                  {isOnline ? (
-                    <>
-                      <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                      <span className="text-green-400 text-sm font-medium">Online</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-3 h-3 bg-gray-500 rounded-full"></span>
-                      <span className="text-gray-400 text-sm">Offline</span>
-                    </>
-                  )}
-                </div>
-
-                <div className="bg-gray-700 rounded-lg p-4 mb-4">
-                  <p className="text-xs text-gray-400 mb-2">Status</p>
-                  <p className="text-white font-medium">
-                    {getStatusBadge() || <span className="text-green-400">Friends ✓</span>}
+              {/* Status Badge */}
+              <div className="text-center mb-4">
+                {user.status && (
+                  <p className="text-sm text-gray-400 italic">
+                    "{user.status}"
                   </p>
-                </div>
+                )}
+              </div>
 
-                <button
-                  onClick={() => setShowProfileDialog(false)}
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  Close
-                </button>
+              {/* Online Status */}
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    isOnline ? "bg-green-500" : "bg-gray-500"
+                  }`}
+                ></div>
+                <span className="text-sm text-gray-400">
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+              </div>
+
+              {/* Relationship Status Badge */}
+              <div className="text-center mb-4">
+                {relationshipStatus === "friends" && (
+                  <span className="px-4 py-2 bg-blue-600 text-white text-sm rounded-full">
+                    Friends
+                  </span>
+                )}
+                {relationshipStatus === "request_sent" && (
+                  <span className="px-4 py-2 bg-yellow-600 text-white text-sm rounded-full">
+                    Request Sent
+                  </span>
+                )}
+                {relationshipStatus === "request_received" && (
+                  <span className="px-4 py-2 bg-green-600 text-white text-sm rounded-full">
+                    Pending Request
+                  </span>
+                )}
+                {relationshipStatus === "blocked" && (
+                  <span className="px-4 py-2 bg-red-600 text-white text-sm rounded-full">
+                    Blocked
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </>
       )}
-
       {/* DIALOGS */}
       <ConfirmationDialog
         isOpen={confirmDialog.isOpen}
