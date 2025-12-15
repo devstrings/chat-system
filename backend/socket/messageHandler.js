@@ -13,7 +13,7 @@ export function handleMessage(io, socket) {
       let attachmentIds = [];
       if (attachments && attachments.length > 0) {
         attachmentIds = attachments.map(att => att.attachmentId).filter(Boolean);
-        console.log("📎 Attachment IDs:", attachmentIds);
+        console.log(" Attachment IDs:", attachmentIds);
       }
 
       //  Get conversation to find receiver

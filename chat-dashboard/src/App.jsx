@@ -20,27 +20,28 @@ function ProtectedRoute({ children }) {
 }
 
 //  Main App Component
-export default function App() {
+
+ export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Default Route */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-
-        {/* Protected Route with SocketProvider */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-             <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+      
+      <SocketProvider>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </SocketProvider>
     </BrowserRouter>
   );
 }
+

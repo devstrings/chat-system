@@ -14,10 +14,11 @@ export const verifyToken = (req, res, next) => {
 
     console.log("Decoded token:", decoded);
 
-    // Normalize: always use userId in req.user
+    // Set BOTH id and userId
     req.user = {
-      ...decoded,
-      userId: decoded.userId || decoded.id
+      id: decoded.userId || decoded.id,      
+      userId: decoded.userId || decoded.id,
+      username: decoded.username
     };
     
     next();

@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import upload from "../middleware/upload.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { downloadFile, uploadFile } from "../controllers/fileController.js";
+import { serveProfileImage } from "../controllers/userController.js"; 
 
 const router = express.Router();
 
@@ -22,5 +23,6 @@ const downloadLimiter = rateLimit({
 // Routes
 router.get("/get/:filename", verifyToken, downloadLimiter, downloadFile);
 router.post("/upload", verifyToken, uploadLimiter, upload.single("file"), uploadFile);
+router.get("/profile/:filename", verifyToken, serveProfileImage);
 
 export default router;
