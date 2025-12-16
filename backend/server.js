@@ -7,29 +7,40 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
+import session from "express-session";
 
-// Configs
-import { config } from "./config/index.js";
-import connectDB from "./config/db.js";
-import { connectRedis } from "./config/redis.js"; 
+// GET CURRENT DIRECTORY
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Routes - function import
-import setupRoutes from "./routes/index.js"; 
+// EXPLICITLY LOAD .env FILE
+dotenv.config({ path: path.join(__dirname, '.env') });
 
-// Socket setup import
-import { setupSocket } from "./socket/index.js";
+// DEBUG - CHECK IF LOADED
+// console.log("=== ENV DEBUG ===");
+// console.log("ENV File Path:", path.join(__dirname, '.env'));
+// console.log("Google Client ID:", process.env.GOOGLE_CLIENT_ID);
+// console.log("Google Secret:", process.env.GOOGLE_CLIENT_SECRET);
+// console.log("Session Secret:", process.env.SESSION_SECRET);
+// console.log("================");
 
-dotenv.config();
+// DYNAMIC IMPORTS (after dotenv loaded)
+const { default: passport } = await import("./config/passport.js");
+const { config } = await import("./config/index.js");
+const { default: connectDB } = await import("./config/db.js");
+const { connectRedis } = await import("./config/redis.js");
+const { default: setupRoutes } = await import("./routes/index.js");
+const { setupSocket } = await import("./socket/index.js");
 
 const startServer = async () => {
   try {
-    //  Connect to MongoDB
+    // Connect to MongoDB
     await connectDB();
 
-    //  Connect to Redis
+    // Connect to Redis
     await connectRedis();
 
-    //  Setup Express + Socket.io
+    // Setup Express + Socket.io
     const app = express();
     const server = http.createServer(app);
     const io = new Server(server, {
@@ -38,15 +49,21 @@ const startServer = async () => {
       pingInterval: 25000,
     });
 
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-
     app.use(cors());
     app.use(express.json());
-    // Serve uploaded files if needed
-    // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-    // --- Swagger UI Setup ---
+    // ADD SESSION & PASSPORT
+    app.use(
+      session({
+        secret: process.env.SESSION_SECRET || "your-secret-key",
+        resave: false,
+        saveUninitialized: false,
+      })
+    );
+    app.use(passport.initialize());
+    app.use(passport.session());
+
+    // Swagger UI Setup
     const swaggerFilePath = path.join(__dirname, "openapi.json");
     if (fs.existsSync(swaggerFilePath)) {
       const swaggerDocument = JSON.parse(fs.readFileSync(swaggerFilePath, "utf-8"));
@@ -55,7 +72,6 @@ const startServer = async () => {
     } else {
       console.warn("OpenAPI file not found. Swagger UI not available.");
     }
-    // ----------------------
 
     // Setup routes
     setupRoutes(app);
@@ -68,7 +84,7 @@ const startServer = async () => {
 
     // Start server
     server.listen(config.port, () =>
-      console.log(`Server running on port ${config.port}`)
+      console.log(`Server running on port 5000`)
     );
   } catch (err) {
     console.error("Server startup failed:", err);

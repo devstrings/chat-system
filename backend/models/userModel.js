@@ -14,10 +14,27 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
-
   profileImage: { 
     type: String, 
     default: null 
+  },
+  
+  googleId: {
+    type: String,
+    default: null,
+     unique: true,      
+    sparse: true 
+  },
+  facebookId: {
+    type: String,
+    default: null,
+     unique: true,      
+    sparse: true 
+  },
+  provider: {
+    type: String,
+    enum: ["local", "google", "facebook"],
+    default: "local"
   }
 }, { 
   timestamps: true 
