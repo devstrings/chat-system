@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { FcGoogle } from "react-icons/fc";
+import { FaFacebook } from "react-icons/fa";
 
 export default function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   // Check if user is already logged in
   useEffect(() => {
@@ -18,7 +22,7 @@ export default function Login() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(""); // Clear error when user types
+    setError("");
   };
 
   const handleSubmit = async (e) => {
@@ -27,31 +31,18 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", formData);
+      const res = await axios.post(`${API_BASE}/api/auth/login`, formData);
 
-      // Debug: Check what backend is sending
-      console.log(" Backend Response:", res.data);
-
-      // Save to localStorage
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
-        console.log(" Token saved");
-      }
-
-      if (res.data.username) {
         localStorage.setItem("username", res.data.username);
-        console.log(" Username saved:", res.data.username);
+        
+        if (res.data.profileImage) {
+          localStorage.setItem("profileImage", res.data.profileImage);
+        }
+
+        navigate("/dashboard", { replace: true });
       }
-
-      // Final verification
-      console.log(" localStorage Check:", {
-        token: localStorage.getItem("token"),
-        username: localStorage.getItem("username")
-      });
-
-      // Then navigate
-      navigate("/dashboard", { replace: true });
-
     } catch (err) {
       setError(err.response?.data?.message || "Invalid credentials");
       console.error("Login error:", err);
@@ -60,56 +51,115 @@ export default function Login() {
     }
   };
 
+  //  GOOGLE LOGIN
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_BASE}/api/auth/google`;
+  };
+
+  //  FACEBOOK LOGIN
+  const handleFacebookLogin = () => {
+    window.location.href = `${API_BASE}/api/auth/facebook`;
+  };
+
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-      <div className="bg-gray-800 p-8 rounded-2xl w-96 shadow-lg">
-        <h1 className="text-3xl font-semibold mb-6 text-center text-blue-400">
-          Chat-System 
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white px-4">
+      <div className="bg-gray-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+        <h1 className="text-3xl font-bold mb-2 text-center bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          Chat-System
         </h1>
-        
+        <p className="text-center text-gray-400 mb-6 text-sm">
+          Welcome back! Please login to continue
+        </p>
+
         {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-md mb-4">
+          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4 text-sm">
             {error}
           </div>
         )}
 
+        {/* SOCIAL LOGIN BUTTONS */}
+        <div className="space-y-3 mb-6">
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-100 transition-all shadow-md hover:shadow-lg"
+          >
+            <FcGoogle className="text-2xl" />
+            Continue with Google
+          </button>
+
+          <button
+            onClick={handleFacebookLogin}
+            className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
+          >
+            <FaFacebook className="text-2xl" />
+            Continue with Facebook
+          </button>
+        </div>
+
+        {/*  DIVIDER */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-gray-700"></div>
+          <span className="text-gray-500 text-sm">OR</span>
+          <div className="flex-1 h-px bg-gray-700"></div>
+        </div>
+
+        {/*  EMAIL/PASSWORD LOGIN */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="email"
-            name="email"
-            placeholder="Enter your email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            autoComplete="email"
-            className="w-full p-3 rounded-md bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Enter your password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            autoComplete="current-password"
-            className="w-full p-3 rounded-md bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              autoComplete="email"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              autoComplete="current-password"
+              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-md font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white"></div>
+                Logging in...
+              </span>
+            ) : (
+              "Login with Email"
+            )}
           </button>
         </form>
 
-        <p className="text-center mt-4 text-gray-400">
-          New here?{" "}
+        <p className="text-center mt-6 text-gray-400 text-sm">
+          Don't have an account?{" "}
           <span
             onClick={() => navigate("/register")}
-            className="text-blue-400 cursor-pointer hover:underline"
+            className="text-blue-400 cursor-pointer hover:underline font-medium"
           >
-            Register
+            Create Account
           </span>
         </p>
       </div>
