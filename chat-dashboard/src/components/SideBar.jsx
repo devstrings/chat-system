@@ -110,22 +110,34 @@ export default function Sidebar({
     0
   );
 
-  const formatLastMessageText = (message) => {
+ //  - Add this around line 82
+const formatLastMessageText = (message) => {
   if (!message) return "";
   
   if (message.attachments && message.attachments.length > 0) {
     const attachment = message.attachments[0];
+    
+    //  Priority 1: Check isVoiceMessage flag
+    if (attachment.isVoiceMessage) {
+      const duration = attachment.duration || 0;
+      if (duration > 0) {
+        const mins = Math.floor(duration / 60);
+        const secs = Math.floor(duration % 60);
+        return `🎤 Voice (${mins}:${secs.toString().padStart(2, '0')})`;
+      }
+      return "🎤 Voice message";
+    }
+    
+    // Priority 2: Check fileType
     const fileType = attachment.fileType || attachment.type || "";
     
-    //  NO FILENAME
     if (fileType.startsWith("image/")) return "📷 Photo";
     if (fileType.startsWith("video/")) return "🎥 Video";
     if (fileType === "application/pdf") return "📕 PDF";
-    if (fileType.startsWith("audio/") || fileType.includes("webm") || fileType.includes("ogg")) return "🎤 Voice message";
+    if (fileType.startsWith("audio/")) return "🎵 Audio"; 
     if (fileType.includes("word")) return "📄 Document";
     if (fileType === "text/plain") return "📝 Text file";
     
-    // Default for other files
     return "📎 File";
   }
   

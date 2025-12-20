@@ -81,7 +81,7 @@ export default function Dashboard() {
 
   // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl) => {
-    console.log('📸 Profile image updated:', newImageUrl);
+    console.log('Profile image updated:', newImageUrl);
     setSharedProfileImage(newImageUrl);
     
     // update currentUser state
@@ -123,21 +123,34 @@ export default function Dashboard() {
   };
 
 
+// Add this around line 146
 const formatAttachmentText = (attachments) => {
   if (!attachments || attachments.length === 0) return "";
 
   const file = attachments[0];
+  
+  //  Check isVoiceMessage flag (most reliable)
+  if (file.isVoiceMessage) {
+    const duration = file.duration || 0;
+    if (duration > 0) {
+      const mins = Math.floor(duration / 60);
+      const secs = Math.floor(duration % 60);
+      return `🎤 Voice (${mins}:${secs.toString().padStart(2, '0')})`;
+    }
+    return "🎤 Voice message";
+  }
+  
+  // Priority 2: Check fileType
   const fileType = file.fileType || file.type || "";
-
-  // - NO FILENAME
+  
   if (fileType.startsWith("image/")) return "📷 Photo";
   if (fileType.startsWith("video/")) return "🎥 Video";
   if (fileType === "application/pdf") return "📕 PDF";
-  if (fileType.startsWith("audio/") || fileType.includes("webm") || fileType.includes("ogg")) return "🎤 Voice message";
+  if (fileType.startsWith("audio/")) return "🎵 Audio"; 
   if (fileType.includes("word")) return "📄 Document";
   if (fileType === "text/plain") return "📝 Text file";
   
-  // Default for other files
+  // Default fallback
   return "📎 File";
 };
 
