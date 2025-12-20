@@ -13,7 +13,7 @@ export const getOrCreateConversation = async (req, res) => {
       return res.status(400).json({ message: "Other user ID required" });
     }
 
-    //  NEW: Check if they are friends
+    // Check if they are friends
     const friendship = await Friendship.findOne({
       $or: [
         { user1: currentUserId, user2: otherUserId },
@@ -52,7 +52,7 @@ export const getMessages = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = parseInt(req.query.skip) || 0;
 
-    //  NEW: Verify conversation exists and user is participant
+    // Verify conversation exists and user is participant
     const conversation = await Conversation.findById(conversationId);
     
     if (!conversation) {
@@ -63,7 +63,7 @@ export const getMessages = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    //  NEW: Check if users are still friends
+    // Check if users are still friends
     const otherUserId = conversation.participants.find(
       p => p.toString() !== currentUserId
     );
@@ -90,7 +90,8 @@ export const getMessages = async (req, res) => {
       .populate("sender", "username email")
       .populate({
         path: "attachments",
-        select: "fileName fileType sizeInKilobytes serverFileName status"
+        // Added duration & isVoiceMessage
+        select: "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage"
       })
       .sort({ createdAt: 1 })
       .skip(skip)
@@ -105,12 +106,15 @@ export const getMessages = async (req, res) => {
       messageObj.isDeletedForEveryone = msg.deletedForEveryone;
       
       if (messageObj.attachments && messageObj.attachments.length > 0) {
+        // Added duration & isVoiceMessage to transformation
         messageObj.attachments = messageObj.attachments.map(att => ({
           url: `/api/file/get/${att.serverFileName}`,
           filename: att.fileName,
           fileType: att.fileType,
           fileSize: att.sizeInKilobytes * 1024,
-          attachmentId: att._id
+          attachmentId: att._id,
+          duration: att.duration || 0,              
+          isVoiceMessage: att.isVoiceMessage || false 
         }));
       }
       
@@ -186,7 +190,7 @@ export const clearChat = async (req, res) => {
   }
 };
 
-//  DELETE MESSAGE FOR ME (FIXED)
+// DELETE MESSAGE FOR ME
 export const deleteMessageForMe = async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -194,7 +198,7 @@ export const deleteMessageForMe = async (req, res) => {
 
     console.log(" Delete for me - Message:", messageId, "User:", currentUserId);
 
-    //  Populate conversation to get participants
+    // Populate conversation to get participants
     const message = await Message.findById(messageId).populate('conversationId');
 
     if (!message) {
@@ -205,7 +209,7 @@ export const deleteMessageForMe = async (req, res) => {
       return res.status(404).json({ message: "Conversation not found" });
     }
 
-    //  Verify user is part of conversation
+    // Verify user is part of conversation
     const isParticipant = message.conversationId.participants.some(
       p => p.toString() === currentUserId
     );
@@ -219,7 +223,7 @@ export const deleteMessageForMe = async (req, res) => {
       message.deletedFor.push(currentUserId);
     }
 
-    //  If ALL participants deleted, mark as fully deleted
+    // If ALL participants deleted, mark as fully deleted
     const allDeleted = message.conversationId.participants.every(
       p => message.deletedFor.includes(p.toString())
     );
@@ -239,12 +243,12 @@ export const deleteMessageForMe = async (req, res) => {
       isDeleted: message.isDeleted
     });
   } catch (err) {
-    console.error(" Delete for me error:", err);
+    console.error("Delete for me error:", err);
     res.status(500).json({ message: "Failed to delete message", error: err.message });
   }
 };
 
-//  DELETE MESSAGE FOR EVERYONE (FIXED)
+// DELETE MESSAGE FOR EVERYONE
 export const deleteMessageForEveryone = async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -294,7 +298,7 @@ export const deleteMessageForEveryone = async (req, res) => {
   }
 };
 
-//  BULK DELETE MESSAGES (FIXED)
+// BULK DELETE MESSAGES
 export const bulkDeleteMessages = async (req, res) => {
   try {
     const { messageIds } = req.body;
@@ -317,7 +321,7 @@ export const bulkDeleteMessages = async (req, res) => {
         continue; // Skip if conversation not found
       }
 
-      //  Verify user is participant
+      // Verify user is participant
       const isParticipant = message.conversationId.participants.some(
         p => p.toString() === currentUserId
       );
@@ -327,7 +331,7 @@ export const bulkDeleteMessages = async (req, res) => {
           message.deletedFor.push(currentUserId);
         }
 
-        //  If all participants deleted, mark as fully deleted
+        // If all participants deleted, mark as fully deleted
         const allDeleted = message.conversationId.participants.every(
           p => message.deletedFor.includes(p.toString())
         );
