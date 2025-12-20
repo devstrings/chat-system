@@ -14,9 +14,18 @@ export const useAuthImage = (imageUrl) => {
 
     const loadImage = async () => {
       try {
-        //  Extract filename and construct API URL
-        const filename = imageUrl.split('/').pop();
+        // ✅ FIX: Extract only the filename from the full path
+        let filename = imageUrl;
+        
+        // If full path is stored (e.g., "/uploads/profileImages/1234.jpg")
+        if (imageUrl.includes('/')) {
+          filename = imageUrl.split('/').pop();
+        }
+        
+        // ✅ CORRECT API URL matching your backend route
         const fullUrl = `http://localhost:5000/api/file/profile/${filename}`;
+        
+        console.log('🔍 Loading image:', fullUrl);
         
         const token = localStorage.getItem('token');
         const response = await axios.get(fullUrl, {
@@ -27,8 +36,9 @@ export const useAuthImage = (imageUrl) => {
         const blob = response.data;
         const objectUrl = URL.createObjectURL(blob);
         setImageSrc(objectUrl);
+        console.log('✅ Image loaded successfully');
       } catch (err) {
-        console.error('Failed to load image:', err);
+        console.error('❌ Failed to load image:', err.response?.status, err.message);
         setImageSrc(null);
       } finally {
         setLoading(false);
@@ -37,6 +47,7 @@ export const useAuthImage = (imageUrl) => {
 
     loadImage();
 
+    // Cleanup blob URL when component unmounts
     return () => {
       if (imageSrc && imageSrc.startsWith('blob:')) {
         URL.revokeObjectURL(imageSrc);
