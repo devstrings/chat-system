@@ -58,7 +58,7 @@ const messageSchema = new mongoose.Schema({
     type: Date
   },
   
-  // Edit functionality
+  
   isEdited: {
     type: Boolean,
     default: false

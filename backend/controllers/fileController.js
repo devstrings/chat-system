@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { getAudioDurationInSeconds } from "get-audio-duration"; //  Audio duration extraction
 import Attachment from "../models/Attachment.js";
 import Conversation from "../models/conversationModel.js";
 
@@ -95,7 +96,7 @@ export const downloadFile = async (req, res) => {
 // Upload file controller (authenticated & authorized)
 export const uploadFile = async (req, res) => {
   try {
-    console.log(" Upload started");
+    console.log("Upload started");
     console.log("File:", req.file);
     console.log("Body:", req.body);
     console.log("User ID:", req.user?.userId);
@@ -142,6 +143,27 @@ export const uploadFile = async (req, res) => {
       return res.status(400).json({ message: "File too large" });
     }
 
+    //  Calculate audio duration for audio files
+    let audioDuration = null;
+    let isVoiceMessage = false;
+
+    if (req.file.mimetype.startsWith('audio/')) {
+      try {
+        console.log(" Calculating audio duration...");
+        audioDuration = await getAudioDurationInSeconds(req.file.path);
+        audioDuration = Math.floor(audioDuration); // Round to seconds
+        
+        // Check if it's a voice message based on filename or body flag
+        isVoiceMessage = req.file.originalname.includes('voice_') || 
+                        req.body.isVoiceMessage === 'true';
+        
+        console.log(` Audio duration: ${audioDuration}s, Voice message: ${isVoiceMessage}`);
+      } catch (err) {
+        console.error(" Duration calculation failed:", err);
+        // Continue with null duration - not a critical error
+      }
+    }
+
     // Calculate hash
     console.log(" Calculating file hash...");
     const fileHash = await calculateFileHash(req.file.path);
@@ -155,20 +177,24 @@ export const uploadFile = async (req, res) => {
     });
 
     if (existingAttachment) {
-      console.log(" Duplicate file found, reusing existing");
+      console.log("Duplicate file found, reusing existing");
       fs.unlinkSync(req.file.path);
+      
+      //  Return duration even for duplicates
       return res.json({
         url: `/api/file/get/${existingAttachment.serverFileName}`,
         filename: req.file.originalname,
         fileType: existingAttachment.fileType,
         fileSize: req.file.size,
+        duration: existingAttachment.duration || 0,              
+        isVoiceMessage: existingAttachment.isVoiceMessage || false, 
         attachmentId: existingAttachment._id,
         isDuplicate: true,
         message: "File already exists, reused existing file"
       });
     }
 
-    // Save new attachment
+    //  Save new attachment with duration and voice flag
     console.log(" Saving new attachment to database...");
     const attachment = await Attachment.create({
       conversationId,
@@ -177,23 +203,28 @@ export const uploadFile = async (req, res) => {
       sizeInKilobytes: Math.round(req.file.size / 1024),
       fileType: req.file.mimetype,
       serverFileName: req.file.filename,
-      uploadedBy: userId,  
+      uploadedBy: userId,
+      duration: audioDuration,        
+      isVoiceMessage: isVoiceMessage, 
       status: "completed"
     });
 
     console.log(" Upload successful:", attachment._id);
 
+    //  Include duration and voice flag in response
     res.json({
       url: `/api/file/get/${req.file.filename}`,
       filename: req.file.originalname,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
+      duration: audioDuration || 0,              
+      isVoiceMessage: isVoiceMessage || false,   
       attachmentId: attachment._id,
       isDuplicate: false
     });
 
   } catch (error) {
-    console.error(" Upload error:", error);
+    console.error("Upload error:", error);
     console.error("Error details:", error.message);
     console.error("Error code:", error.code);
     
@@ -205,7 +236,7 @@ export const uploadFile = async (req, res) => {
     
     // Handle duplicate key error (concurrent uploads)
     if (error.code === 11000) {
-      console.log("Duplicate key error - file already exists");
+      console.log(" Duplicate key error - file already exists");
       return res.status(200).json({
         message: "File already exists in this conversation",
         isDuplicate: true
