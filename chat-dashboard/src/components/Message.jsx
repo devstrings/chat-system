@@ -579,3 +579,4 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
     </div>
   );
 }
+

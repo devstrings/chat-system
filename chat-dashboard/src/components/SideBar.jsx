@@ -15,9 +15,12 @@ export default function Sidebar({
   unreadCounts = {},
   lastMessages = {},
   isMobileSidebarOpen = false,
+    profileImageUrl, 
+  
   onCloseMobileSidebar = () => {},
   currentUser = null,
   onOpenProfileSettings = () => {},
+  
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,10 +32,10 @@ export default function Sidebar({
   const [showRequests, setShowRequests] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [showBlocked, setShowBlocked] = useState(false);
-  const [profileImageUrl, setProfileImageUrl] = useState(null);
+  
   const { imageSrc: profilePreview, loading: imageLoading } =
     useAuthImage(profileImageUrl);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  // const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -43,44 +46,44 @@ export default function Sidebar({
     type: "success",
   });
 
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
-          "http://localhost:5000/api/users/auth/me",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        if (response.data.profileImage) {
-          setProfileImageUrl(response.data.profileImage);
-        } else {
-          setProfileImageUrl(null);
-        }
-      } catch (err) {
-        console.error("Failed to load profile:", err);
-      }
-    };
-    loadUserProfile();
-  }, []);
+  // useEffect(() => {
+  //   const loadUserProfile = async () => {
+  //     try {
+  //       const token = localStorage.getItem("token");
+  //       const response = await axios.get(
+  //         "http://localhost:5000/api/users/auth/me",
+  //         {
+  //           headers: { Authorization: `Bearer ${token}` },
+  //         }
+  //       );
+  //       if (response.data.profileImage) {
+  //         setProfileImageUrl(response.data.profileImage);
+  //       } else {
+  //         setProfileImageUrl(null);
+  //       }
+  //     } catch (err) {
+  //       console.error("Failed to load profile:", err);
+  //     }
+  //   };
+  //   loadUserProfile();
+  // }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        profileMenuRef.current &&
-        !profileMenuRef.current.contains(event.target)
-      ) {
-        setShowProfileMenu(false);
-      }
-    };
-    if (showProfileMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showProfileMenu]);
+  // useEffect(() => {
+  //   const handleClickOutside = (event) => {
+  //     if (
+  //       profileMenuRef.current &&
+  //       !profileMenuRef.current.contains(event.target)
+  //     ) {
+  //       setShowProfileMenu(false);
+  //     }
+  //   };
+  //   if (showProfileMenu) {
+  //     document.addEventListener("mousedown", handleClickOutside);
+  //   }
+  //   return () => {
+  //     document.removeEventListener("mousedown", handleClickOutside);
+  //   };
+  // }, [showProfileMenu]);
 
   const memoizedUsers = useMemo(() => {
     const filteredUsers = users.filter(
@@ -289,92 +292,96 @@ export default function Sidebar({
       });
     }
   };
+  // ✅ ADD THIS:
+const handleProfileClick = () => {
+  onOpenProfileSettings(); // This prop will come from Dashboard
+};
 
-  const handleProfileClick = () => {
-    setShowProfileMenu(!showProfileMenu);
-  };
+  // const handleProfileClick = () => {
+  //   setShowProfileMenu(!showProfileMenu);
+  // };
 
-  const handleUploadClick = () => {
-    fileInputRef.current.click();
-    setShowProfileMenu(false);
-  };
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const formData = new FormData();
-      formData.append("image", file);
-      const uploadRes = await axios.post(
-        "http://localhost:5000/api/users/profile/upload",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      const imageUrl = uploadRes.data.imageUrl;
-      const updateRes = await axios.put(
-        "http://localhost:5000/api/users/profile/update-image",
-        { profileImage: imageUrl },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  // const handleUploadClick = () => {
+  //   fileInputRef.current.click();
+  //   setShowProfileMenu(false);
+  // };
+  // const handleFileChange = async (e) => {
+  //   const file = e.target.files[0];
+  //   if (!file) return;
+  //   setLoading(true);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     const formData = new FormData();
+  //     formData.append("image", file);
+  //     const uploadRes = await axios.post(
+  //       "http://localhost:5000/api/users/profile/upload",
+  //       formData,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //           "Content-Type": "multipart/form-data",
+  //         },
+  //       }
+  //     );
+  //     const imageUrl = uploadRes.data.imageUrl;
+  //     const updateRes = await axios.put(
+  //       "http://localhost:5000/api/users/profile/update-image",
+  //       { profileImage: imageUrl },
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
 
     
-      setProfileImageUrl(imageUrl); 
+  //     setProfileImageUrl(imageUrl); 
 
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Profile picture uploaded successfully",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Upload failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Upload Failed",
-        message:
-          err.response?.data?.message || "Failed to upload profile picture",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleRemoveImage = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      await axios.delete(
-        "http://localhost:5000/api/users/profile/remove-image",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setProfileImageUrl(null); 
-      setShowProfileMenu(false);
-      setAlertDialog({
-        isOpen: true,
-        title: "Removed",
-        message: "Profile picture removed successfully",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Remove failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to remove profile picture",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     setAlertDialog({
+  //       isOpen: true,
+  //       title: "Success!",
+  //       message: "Profile picture uploaded successfully",
+  //       type: "success",
+  //     });
+  //   } catch (err) {
+  //     console.error("Upload failed:", err);
+  //     setAlertDialog({
+  //       isOpen: true,
+  //       title: "Upload Failed",
+  //       message:
+  //         err.response?.data?.message || "Failed to upload profile picture",
+  //       type: "error",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+  // const handleRemoveImage = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     await axios.delete(
+  //       "http://localhost:5000/api/users/profile/remove-image",
+  //       {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //       }
+  //     );
+  //     setProfileImageUrl(null); 
+  //     setShowProfileMenu(false);
+  //     setAlertDialog({
+  //       isOpen: true,
+  //       title: "Removed",
+  //       message: "Profile picture removed successfully",
+  //       type: "success",
+  //     });
+  //   } catch (err) {
+  //     console.error("Remove failed:", err);
+  //     setAlertDialog({
+  //       isOpen: true,
+  //       title: "Error",
+  //       message: "Failed to remove profile picture",
+  //       type: "error",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <>
@@ -407,7 +414,7 @@ export default function Sidebar({
         <div className="bg-gray-900 border-b border-gray-700 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="relative" ref={profileMenuRef}>
+              <div className="relative" >
                 
                 <div
                   className="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-700"
@@ -429,7 +436,7 @@ export default function Sidebar({
 
                 
                 </div>
-
+{/* 
                 {showProfileMenu && (
                   <div className="absolute left-0 top-14 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
                     <button
@@ -474,15 +481,15 @@ export default function Sidebar({
                       </button>
                     )}
                   </div>
-                )}
+                )} */}
 
-                <input
+                {/* <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
                   onChange={handleFileChange}
-                />
+                /> */}
               </div>
               <div>
                 <h2 className="text-white font-semibold text-lg">Chats</h2>

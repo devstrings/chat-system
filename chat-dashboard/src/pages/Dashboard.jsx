@@ -1,3 +1,5 @@
+// Dashboard.jsx - KEY CHANGES HIGHLIGHTED
+
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
@@ -5,10 +7,9 @@ import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import axios from "axios";
-import ConfirmationDialog, {
-  AlertDialog,
-} from "../components/ConfirmationDialog";
+import ConfirmationDialog, { AlertDialog } from "../components/ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
+import ProfileSetting from "../components/ProfileSetting";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -18,27 +19,21 @@ export default function Dashboard() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
-  // const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [searchInChat, setSearchInChat] = useState("");
   const [showSearchBox, setShowSearchBox] = useState(false);
-
   const [unreadCounts, setUnreadCounts] = useState({});
   const [lastMessages, setLastMessages] = useState({});
-
   const selectedUserRef = useRef(null);
-
-  //  MOBILE SIDEBAR STATE
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  // Profile Picture States
-  const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [profileImage, setProfileImage] = useState(
-    localStorage.getItem("profileImage") || ""
-  );
-  const [imageInput, setImageInput] = useState("");
 
-  // Dialog states
+  // ✅ ADD: Shared profile image state
+  const [sharedProfileImage, setSharedProfileImage] = useState(null);
+
+  // ✅ ADD: Clear chat dialog state
   const [clearChatDialog, setClearChatDialog] = useState({
     isOpen: false,
     username: "",
@@ -55,9 +50,48 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
+  // ✅ MODIFIED: Load current user and set shared state
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/users/auth/me",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setCurrentUser(response.data);
+        
+        // ✅ SET SHARED PROFILE IMAGE
+        if (response.data.profileImage) {
+          setSharedProfileImage(response.data.profileImage);
+        }
+      } catch (err) {
+        console.error("Failed to load current user:", err);
+      }
+    };
+
+    loadCurrentUser();
+  }, []);
+
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage
   );
+
+  // ✅ ADD: Handler to update profile image from ProfileSettings
+  const handleProfileImageUpdate = (newImageUrl) => {
+    console.log('📸 Profile image updated:', newImageUrl);
+    setSharedProfileImage(newImageUrl);
+    
+    // Also update currentUser state
+    setCurrentUser(prev => ({
+      ...prev,
+      profileImage: newImageUrl
+    }));
+  };
+
+  // ✅ FIXED: Complete handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -66,8 +100,9 @@ export default function Dashboard() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      localStorage.removeItem("profileImage");
-      setProfileImage("");
+      // ✅ UPDATE SHARED STATE
+      setSharedProfileImage(null);
+      setCurrentUser(prev => ({ ...prev, profileImage: null }));
       setShowProfileSettings(false);
 
       setAlertDialog({
@@ -87,7 +122,7 @@ export default function Dashboard() {
     }
   };
 
-  // Helper function to format attachment text
+  // ✅ ADD: Helper function to format attachment text
   const formatAttachmentText = (attachments) => {
     if (!attachments || attachments.length === 0) return "";
 
@@ -210,44 +245,6 @@ export default function Dashboard() {
     loadLastMessages();
   }, [currentUserId, users]);
 
-  
-  // useEffect(() => {
-  //   if (!socket) return;
-
-  //   socket.emit("userOnline");
-
-  //   socket.on("onlineUsersList", ({ onlineUsers: onlineList }) => {
-  //     setOnlineUsers(new Set(onlineList));
-  //   });
-
-  //   socket.on("userOnline", ({ userId, onlineUsers: onlineList }) => {
-  //     if (onlineList) {
-  //       setOnlineUsers(new Set(onlineList));
-  //     } else {
-  //       setOnlineUsers((prev) => new Set(prev).add(userId));
-  //     }
-  //   });
-
-  //   socket.on("userOffline", ({ userId, onlineUsers: onlineList }) => {
-  //     if (onlineList) {
-  //       setOnlineUsers(new Set(onlineList));
-  //     } else {
-  //       setOnlineUsers((prev) => {
-  //         const newSet = new Set(prev);
-  //         newSet.delete(userId);
-  //         return newSet;
-  //       });
-  //     }
-  //   });
-
-  //   return () => {
-  //     socket.off("onlineUsersList");
-  //     socket.off("userOnline");
-  //     socket.off("userOffline");
-  //   };
-  // }, [socket]);
-
-  // Listen for incoming messages and status updates
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
@@ -432,26 +429,34 @@ export default function Dashboard() {
         )}
 
         {/*  RESPONSIVE SIDEBAR */}
-        <Sidebar
-          users={users}
-          selectedUserId={selectedUser?._id}
-          onSelectUser={(user) => {
-            //...
-            console.log(" Selected user object:", user);
-            console.log(" Selected user profile image:", user.profileImage);
-            setSelectedUser(user);
-            setIsMobileSidebarOpen(false);
-          }}
-          onlineUsers={onlineUsers}
-          currentUsername={username}
-          currentUserId={currentUserId}
-          onLogout={handleLogout}
-          unreadCounts={unreadCounts}
-          lastMessages={lastMessages}
-          isMobileSidebarOpen={isMobileSidebarOpen}
-          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-        />
+    <Sidebar
+  users={users}
+  selectedUserId={selectedUser?._id}
+  onSelectUser={(user) => {
+    console.log(" Selected user object:", user);
+    console.log(" Selected user profile image:", user.profileImage);
+    setSelectedUser(user);
+    setIsMobileSidebarOpen(false);
+  }}
+  onlineUsers={onlineUsers}
+  currentUsername={username}
+  currentUserId={currentUserId}
+  onLogout={handleLogout}
+  unreadCounts={unreadCounts}
+  lastMessages={lastMessages}
+  isMobileSidebarOpen={isMobileSidebarOpen}
+  onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+  onOpenProfileSettings={() => setShowProfileSettings(true)}
+  profileImageUrl={sharedProfileImage}
+/>
 
+{showProfileSettings && (
+  <ProfileSetting
+    currentUser={currentUser}
+    onClose={() => setShowProfileSettings(false)}
+       onProfileImageUpdate={handleProfileImageUpdate} 
+  />
+)}
         <div className="flex-1 flex flex-col min-w-0">
           {selectedUser ? (
             <>
