@@ -376,64 +376,77 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
               {message.attachments.map((file, index) => {
                 const fileName = getFileName(file);
                 const fileIcon = getFileIcon(file.fileType);
-                
-                if (isVoiceMessage(file)) {
-                  const duration = file.duration || audioDuration[index] || 0;
-                  const progress = audioProgress[index] || 0;
-                  const isPlaying = playingAudio === index;
-                  
-                  return (
-                    <div 
-                      key={index} 
-                      className={`flex items-center gap-2 p-2 md:p-3 rounded-lg ${
-                        isOwn 
-                          ? "bg-white bg-opacity-20" 
-                          : "bg-gray-700"
-                      }`}
-                    >
-                      <button
-                        onClick={() => toggleAudio(index, file.url)}
-                        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${
-                          isOwn
-                            ? "bg-white bg-opacity-30 hover:bg-opacity-40"
-                            : "bg-blue-500 hover:bg-blue-600"
-                        }`}
-                      >
-                        {isPlaying ? (
-                          <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4 md:w-5 md:h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
-                        )}
-                      </button>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex gap-0.5 items-center h-5 md:h-6 mb-1">
-                          {[...Array(20)].map((_, i) => (
-                            <div
-                              key={i}
-                              className={`w-0.5 rounded-full transition-all ${
-                                isOwn ? "bg-white" : "bg-blue-400"
-                              }`}
-                              style={{
-                                height: `${Math.random() * 80 + 20}%`,
-                                opacity: progress > (i / 20) * 100 ? 1 : 0.3
-                              }}
-                            />
-                          ))}
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-xs opacity-70">
-                          <span>🎤 Voice message</span>
-                          <span>{formatAudioTime(duration)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
+
+            if (isVoiceMessage(file)) {
+  const duration = file.duration ?? audioDuration[index] ?? 0;
+  const progress = audioProgress[index] || 0;
+  const isPlaying = playingAudio === index;
+  
+  return (
+    <div 
+      key={index} 
+      className={`flex items-center gap-2 p-2 md:p-3 rounded-lg ${
+        isOwn 
+          ? "bg-white bg-opacity-20" 
+          : "bg-gray-700"
+      }`}
+    >
+      <button
+        onClick={() => toggleAudio(index, file.url)}
+        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${
+          isOwn
+            ? "bg-white bg-opacity-30 hover:bg-opacity-40"
+            : "bg-blue-500 hover:bg-blue-600"
+        }`}
+      >
+        {isPlaying ? (
+          <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+          </svg>
+        ) : (
+          <svg className="w-4 h-4 md:w-5 md:h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
+      </button>
+      
+      <div className="flex-1 min-w-0">
+        <div className="flex gap-0.5 items-center h-5 md:h-6 mb-1">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className={`w-0.5 rounded-full transition-all ${
+                isOwn ? "bg-white" : "bg-blue-400"
+              }`}
+              style={{
+                height: `${Math.random() * 80 + 20}%`,
+                opacity: progress > (i / 20) * 100 ? 1 : 0.3
+              }}
+            />
+          ))}
+        </div>
+        
+  
+        <div className="flex items-center justify-between text-xs opacity-70">
+          <span className="flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+            Voice message
+          </span>
+          {/* Show current/total when playing, else just total */}
+          <span className="font-mono">
+            {isPlaying && audioDuration[index] 
+              ? `${formatAudioTime((progress / 100) * audioDuration[index])} / ${formatAudioTime(duration)}`
+           : formatAudioTime(duration || 0) 
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
                 
                 if (file.fileType?.startsWith("image/")) {
                   return (

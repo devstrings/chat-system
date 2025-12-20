@@ -74,11 +74,19 @@ export default function ChatWindow({
 
     const handleReceiveMessage = (msg) => {
       if (msg.conversationId === conversationIdRef.current) {
-        setMessages((prev) => [...prev, msg]);
+        const processedMsg = {
+      ...msg,
+      attachments: msg.attachments?.map(att => ({
+        ...att,
+        duration: att.duration ?? 0,
+        isVoiceMessage: att.isVoiceMessage ?? false
+      })) || []
+    };
+        setMessages((prev) => [...prev, processedMsg]);
 
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus({
-            status: msg.status || "sent",
+            status: processedMsg.status || "sent",
             messageId: msg._id,
             conversationId: msg.conversationId,
             text:

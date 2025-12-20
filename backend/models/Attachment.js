@@ -36,12 +36,23 @@ const attachmentSchema = new mongoose.Schema({
     type: String,
     enum: ['uploading', 'completed', 'failed', 'deleted'],
     default: 'uploading'
+  },
+  
+  duration: {
+    type: Number,
+    default: 0,
+    required: false
+  },
+
+  isVoiceMessage: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
 });
 
-//  ADD THIS - Per-conversation deduplication
+// Per-conversation deduplication
 attachmentSchema.index({ conversationId: 1, fileHash: 1 }, { unique: true });
 
 // Existing indexes

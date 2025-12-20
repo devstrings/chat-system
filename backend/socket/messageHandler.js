@@ -4,19 +4,19 @@ import Conversation from "../models/conversationModel.js";
 export function handleMessage(io, socket) {
   console.log(` User connected: ${socket.user.id}`);
 
-  //  Send message
+ 
   socket.on("sendMessage", async ({ conversationId, text, attachments = [] }) => {
     try {
       console.log(" Sending message:", { conversationId, text, senderId: socket.user.id });
 
-      //  Extract attachment IDs
+      // Extract attachment IDs
       let attachmentIds = [];
       if (attachments && attachments.length > 0) {
         attachmentIds = attachments.map(att => att.attachmentId).filter(Boolean);
         console.log(" Attachment IDs:", attachmentIds);
       }
 
-      //  Get conversation to find receiver
+      // Get conversation to find receiver
       const conversation = await Conversation.findById(conversationId).populate(
         "participants",
         "_id username email"
@@ -27,12 +27,12 @@ export function handleMessage(io, socket) {
         return;
       }
 
-      //  Find receiver ID
+      // Find receiver ID
       const receiverId = conversation.participants.find(
         (p) => p._id.toString() !== socket.user.id
       )?._id;
 
-      //  Create message with 'sent' status
+      // Create message with 'sent' status
       const msg = await Message.create({
         conversationId,
         sender: socket.user.id,
@@ -43,14 +43,14 @@ export function handleMessage(io, socket) {
 
       console.log(" Message created:", msg._id);
 
-      //  Populate sender AND attachments
+      //  Populate sender AND attachments with ALL required fields
       await msg.populate("sender", "username email");
       await msg.populate({
         path: "attachments",
-        select: "fileName fileType sizeInKilobytes serverFileName"
+        select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage" 
       });
 
-      //  Update conversation with last message
+      // Update conversation with last message
       const lastMessageText = text || (attachmentIds.length > 0 ? "📎 Attachment" : "");
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: lastMessageText,
@@ -58,7 +58,7 @@ export function handleMessage(io, socket) {
         lastMessageSender: socket.user.id,
       });
 
-      //  Transform attachments for frontend
+      // Transform attachments with complete data including duration
       const transformedAttachments = msg.attachments && msg.attachments.length > 0
         ? msg.attachments.map(att => {
             if (!att || !att.serverFileName) {
@@ -68,14 +68,17 @@ export function handleMessage(io, socket) {
             return {
               url: `/api/file/get/${att.serverFileName}`,
               filename: att.fileName,
+              fileName: att.fileName, // Both formats for compatibility
               fileType: att.fileType,
               fileSize: att.sizeInKilobytes * 1024,
-              attachmentId: att._id
+              attachmentId: att._id,
+              duration: att.duration || 0,              
+              isVoiceMessage: att.isVoiceMessage || false 
             };
           }).filter(Boolean)
         : [];
 
-      //   Prepare message data WITH receiver field
+      // Prepare message data WITH receiver field
       const messageData = {
         _id: msg._id,
         conversationId: msg.conversationId,
@@ -84,16 +87,17 @@ export function handleMessage(io, socket) {
           username: msg.sender.username,
           email: msg.sender.email,
         },
-        receiver: receiverId, //  Add receiver field
+        receiver: receiverId,
         text: msg.text,
-        attachments: transformedAttachments,
+        attachments: transformedAttachments, 
         status: msg.status,
         createdAt: msg.createdAt,
       };
 
       console.log(" Broadcasting message to both users");
+      console.log("Attachments with duration:", transformedAttachments); 
 
-      //  Emit to BOTH sender and receiver explicitly
+      // Emit to BOTH sender and receiver explicitly
       socket.emit("receiveMessage", messageData);
 
       // Emit to receiver (if online)
@@ -103,7 +107,7 @@ export function handleMessage(io, socket) {
         );
 
         if (receiverSocket) {
-          console.log(` Receiver ONLINE, sending message`);
+          console.log(`Receiver ONLINE, sending message`);
           receiverSocket.emit("receiveMessage", messageData);
 
           // Mark as delivered after 500ms
@@ -116,11 +120,10 @@ export function handleMessage(io, socket) {
 
               console.log(" Message delivered:", msg._id);
 
-              //  Status update with conversationId
               const statusUpdate = {
                 messageId: msg._id,
                 _id: msg._id,
-                conversationId: msg.conversationId, //  Use msg.conversationId
+                conversationId: msg.conversationId,
                 status: "delivered",
               };
 
@@ -131,7 +134,7 @@ export function handleMessage(io, socket) {
             }
           }, 500);
         } else {
-          console.log(` Receiver OFFLINE, message stays 'sent'`);
+          console.log(`⏸ Receiver OFFLINE, message stays 'sent'`);
         }
       }
     } catch (err) {
@@ -141,7 +144,6 @@ export function handleMessage(io, socket) {
     }
   });
 
-  //  Handle user coming online (deliver pending messages)
   socket.on("userOnline", async () => {
     try {
       console.log(` User ${socket.user.id} came online`);
@@ -194,12 +196,11 @@ export function handleMessage(io, socket) {
     }
   });
 
-  //  Mark messages as read
+  
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
       console.log(` Marking read in conversation: ${conversationId}`);
 
-      // Get conversation to find participants
       const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
       
       if (!conversation) {
@@ -265,7 +266,7 @@ export function handleMessage(io, socket) {
     }
   });
 
-  //  DELETE MESSAGE For me
+ 
   socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
     try {
       console.log(" Delete for me request:", messageId);
@@ -278,7 +279,6 @@ export function handleMessage(io, socket) {
 
       const userId = socket.user.id;
 
-      // Verify user is participant
       const isParticipant = message.conversationId.participants.some(
         p => p.toString() === userId
       );
@@ -288,12 +288,10 @@ export function handleMessage(io, socket) {
         return;
       }
 
-      // Add to deletedFor array
       if (!message.deletedFor.includes(userId)) {
         message.deletedFor.push(userId);
       }
 
-      // If all participants deleted, mark as fully deleted
       const allDeleted = message.conversationId.participants.every(
         p => message.deletedFor.includes(p.toString())
       );
@@ -305,7 +303,6 @@ export function handleMessage(io, socket) {
 
       await message.save();
 
-      //  Emit ONLY to the user who deleted
       socket.emit("messageDeleted", {
         messageId,
         conversationId,
@@ -319,7 +316,7 @@ export function handleMessage(io, socket) {
     }
   });
 
-  //  DELETE MESSAGE FOR EVERYONE
+
   socket.on("deleteMessageForEveryone", async ({ messageId, conversationId }) => {
     try {
       console.log(" Delete for everyone request:", messageId);
@@ -332,13 +329,11 @@ export function handleMessage(io, socket) {
 
       const userId = socket.user.id;
 
-      // Only sender can delete for everyone
       if (message.sender.toString() !== userId) {
         socket.emit("errorMessage", { message: "Only sender can delete for everyone" });
         return;
       }
 
-      // Check time limit (5 minutes)
       const messageAge = Date.now() - new Date(message.createdAt).getTime();
       const fiveMinutes = 5 * 60 * 1000;
 
@@ -349,7 +344,6 @@ export function handleMessage(io, socket) {
         return;
       }
 
-      // Mark as deleted for everyone
       message.deletedForEveryone = true;
       message.isDeleted = true;
       message.deletedAt = new Date();
@@ -358,14 +352,12 @@ export function handleMessage(io, socket) {
 
       await message.save();
 
-      //  Emit to ALL participants in the conversation
       const deleteData = {
         messageId,
         conversationId,
         deletedForEveryone: true
       };
 
-      // Emit to all participants
       for (const participant of message.conversationId.participants) {
         const targetSocket = [...io.sockets.sockets.values()].find(
           (s) => s.user && s.user.id === participant.toString()

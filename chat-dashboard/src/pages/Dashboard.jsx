@@ -1,4 +1,4 @@
-// Dashboard.jsx - KEY CHANGES HIGHLIGHTED
+
 
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,10 +30,10 @@ export default function Dashboard() {
   const selectedUserRef = useRef(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // ✅ ADD: Shared profile image state
+  //  Shared profile image state
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
 
-  // ✅ ADD: Clear chat dialog state
+  // Clear chat dialog state
   const [clearChatDialog, setClearChatDialog] = useState({
     isOpen: false,
     username: "",
@@ -50,7 +50,7 @@ export default function Dashboard() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  // ✅ MODIFIED: Load current user and set shared state
+  //Load current user and set shared state
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
@@ -63,7 +63,7 @@ export default function Dashboard() {
         );
         setCurrentUser(response.data);
         
-        // ✅ SET SHARED PROFILE IMAGE
+        // SET SHARED PROFILE IMAGE
         if (response.data.profileImage) {
           setSharedProfileImage(response.data.profileImage);
         }
@@ -79,19 +79,19 @@ export default function Dashboard() {
     selectedUser?.profileImage
   );
 
-  // ✅ ADD: Handler to update profile image from ProfileSettings
+  // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl) => {
     console.log('📸 Profile image updated:', newImageUrl);
     setSharedProfileImage(newImageUrl);
     
-    // Also update currentUser state
+    // update currentUser state
     setCurrentUser(prev => ({
       ...prev,
       profileImage: newImageUrl
     }));
   };
 
-  // ✅ FIXED: Complete handleRemoveProfileImage function
+  //  Complete handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -100,7 +100,7 @@ export default function Dashboard() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // ✅ UPDATE SHARED STATE
+      // UPDATE SHARED STATE
       setSharedProfileImage(null);
       setCurrentUser(prev => ({ ...prev, profileImage: null }));
       setShowProfileSettings(false);
@@ -122,23 +122,24 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ ADD: Helper function to format attachment text
-  const formatAttachmentText = (attachments) => {
-    if (!attachments || attachments.length === 0) return "";
 
-    const file = attachments[0];
-    const fileName = file.filename || file.fileName || "File";
-    const fileType = file.fileType || file.type || "";
+const formatAttachmentText = (attachments) => {
+  if (!attachments || attachments.length === 0) return "";
 
-    let icon = "📎";
-    if (fileType.startsWith("image/")) icon = "🖼️";
-    else if (fileType.startsWith("video/")) icon = "🎥";
-    else if (fileType === "application/pdf") icon = "📕";
-    else if (fileType.includes("word")) icon = "📄";
-    else if (fileType === "text/plain") icon = "📝";
+  const file = attachments[0];
+  const fileType = file.fileType || file.type || "";
 
-    return `${icon} ${fileName}`;
-  };
+  // - NO FILENAME
+  if (fileType.startsWith("image/")) return "📷 Photo";
+  if (fileType.startsWith("video/")) return "🎥 Video";
+  if (fileType === "application/pdf") return "📕 PDF";
+  if (fileType.startsWith("audio/") || fileType.includes("webm") || fileType.includes("ogg")) return "🎤 Voice message";
+  if (fileType.includes("word")) return "📄 Document";
+  if (fileType === "text/plain") return "📝 Text file";
+  
+  // Default for other files
+  return "📎 File";
+};
 
   // Initial data fetch
   useEffect(() => {

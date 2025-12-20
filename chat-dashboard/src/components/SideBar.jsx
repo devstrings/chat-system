@@ -111,19 +111,26 @@ export default function Sidebar({
   );
 
   const formatLastMessageText = (message) => {
-    if (!message) return "";
-    if (message.attachments && message.attachments.length > 0) {
-      const attachment = message.attachments[0];
-      const fileName = attachment.fileName || attachment.filename || "File";
-      const fileType = attachment.fileType || attachment.type || "";
-      let icon = "📄";
-      if (fileType.startsWith("image/")) icon = "🖼️";
-      else if (fileType.startsWith("video/")) icon = "🎥";
-      else if (fileType === "application/pdf") icon = "📕";
-      return `${icon} ${fileName}`;
-    }
-    return message.text || message.content || "";
-  };
+  if (!message) return "";
+  
+  if (message.attachments && message.attachments.length > 0) {
+    const attachment = message.attachments[0];
+    const fileType = attachment.fileType || attachment.type || "";
+    
+    //  NO FILENAME
+    if (fileType.startsWith("image/")) return "📷 Photo";
+    if (fileType.startsWith("video/")) return "🎥 Video";
+    if (fileType === "application/pdf") return "📕 PDF";
+    if (fileType.startsWith("audio/") || fileType.includes("webm") || fileType.includes("ogg")) return "🎤 Voice message";
+    if (fileType.includes("word")) return "📄 Document";
+    if (fileType === "text/plain") return "📝 Text file";
+    
+    // Default for other files
+    return "📎 File";
+  }
+  
+  return message.text || message.content || "";
+};
 
   const handleSearchUsers = async () => {
     if (!searchUsers.trim()) return;
@@ -292,7 +299,7 @@ export default function Sidebar({
       });
     }
   };
-  // ✅ ADD THIS:
+  
 const handleProfileClick = () => {
   onOpenProfileSettings(); // This prop will come from Dashboard
 };
