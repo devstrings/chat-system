@@ -1,53 +1,59 @@
+// backend/routes/authRoutes.js
 import express from "express";
-import { register, login } from "../controllers/authController.js";
 import passport from "../config/passport.js";
-import jwt from "jsonwebtoken";
+import { 
+  register, 
+  login, 
+  googleCallback, 
+  facebookCallback 
+} from "../controllers/authController.js";
 
 const router = express.Router();
 
-// Existing routes
+//  LOCAL AUTH ROUTES
 router.post("/register", register);
 router.post("/login", login);
 
 //  GOOGLE OAUTH ROUTES
 router.get(
   "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
+  passport.authenticate("google", { 
+    scope: ["profile", "email"],
+    session: false 
+  })
 );
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false, failureRedirect: "/login" }),
-  (req, res) => {
-    const token = jwt.sign(
-      { id: req.user._id, username: req.user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    // Redirect to frontend with token
-    res.redirect(`http://localhost:5173/auth/callback?token=${token}&username=${req.user.username}&profileImage=${req.user.profileImage || ""}`);
-  }
+  passport.authenticate("google", { 
+    session: false, 
+    failureRedirect: "http://localhost:5173/login?error=google_auth_failed" 
+  }),
+  googleCallback  //  Controller function
 );
 
 //  FACEBOOK OAUTH ROUTES
 router.get(
   "/facebook",
-  passport.authenticate("facebook", { scope: ["email"] })
+  passport.authenticate("facebook", { 
+    scope: ["email"],
+    session: false 
+  })
 );
 
 router.get(
   "/facebook/callback",
-  passport.authenticate("facebook", { session: false, failureRedirect: "/login" }),
-  (req, res) => {
-    const token = jwt.sign(
-      { id: req.user._id, username: req.user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.redirect(`http://localhost:5173/auth/callback?token=${token}&username=${req.user.username}&profileImage=${req.user.profileImage || ""}`);
-  }
+  passport.authenticate("facebook", { 
+    session: false, 
+    failureRedirect: "http://localhost:5173/login?error=facebook_auth_failed" 
+  }),
+  facebookCallback  // Controller function
 );
+
+// ERROR HANDLER
+router.use((err, req, res, next) => {
+  console.error(" OAuth error:", err.message);
+  res.redirect(`http://localhost:5173/login?error=${encodeURIComponent(err.message)}`);
+});
 
 export default router;

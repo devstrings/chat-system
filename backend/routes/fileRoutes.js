@@ -1,3 +1,4 @@
+// backend/routes/fileRoutes.js
 import express from "express";
 import rateLimit from "express-rate-limit";
 import upload from "../middleware/upload.js";
@@ -19,10 +20,13 @@ const downloadLimiter = rateLimit({
   max: 50,
   message: "Too many file downloads, please try again after 15 minutes"
 });
+// Upload file (authenticated)
+router.post("/upload", uploadLimiter, upload.single("file"), verifyToken, uploadFile);
 
-// Routes
+// Get file (authenticated)
 router.get("/get/:filename", verifyToken, downloadLimiter, downloadFile);
-router.post("/upload", verifyToken, uploadLimiter, upload.single("file"), uploadFile);
+
+// Serve profile image (authenticated)
 router.get("/profile/:filename", verifyToken, serveProfileImage);
 
 export default router;

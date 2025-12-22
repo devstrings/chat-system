@@ -1,25 +1,26 @@
+// backend/controllers/fileController.js
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { getAudioDurationInSeconds } from "get-audio-duration"; //  Audio duration extraction
+import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "../models/Attachment.js";
 import Conversation from "../models/conversationModel.js";
 
 // Allowed MIME types and extensions
 const ALLOWED_TYPES = [
-  "image/jpeg", "image/png", "image/gif",
+  "image/jpeg", "image/jpg", "image/png", "image/gif",
   "application/pdf", "text/plain",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "video/mp4", "video/quicktime", "video/x-msvideo",
-  "audio/webm", "audio/mpeg", "audio/mp3", "audio/ogg"  // Audio support added
+  "audio/webm", "audio/mpeg", "audio/mp3", "audio/ogg", "audio/wav"
 ];
 
 const ALLOWED_EXTENSIONS = [
   ".jpg", ".jpeg", ".png", ".gif",
   ".pdf", ".txt", ".doc", ".docx",
   ".mp4", ".mov", ".avi",
-  ".webm", ".mp3", ".mpeg", ".ogg"  // Audio extensions added
+  ".webm", ".mp3", ".mpeg", ".ogg", ".wav"
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -38,7 +39,7 @@ const calculateFileHash = (filePath) =>
 export const downloadFile = async (req, res) => {
   try {
     const filename = req.params.filename;
-    const userId = req.user.userId; // from JWT token (verifyToken middleware)
+    const userId = req.user.userId || req.user.id; // Support both
 
     // Prevent path traversal
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
@@ -88,7 +89,7 @@ export const downloadFile = async (req, res) => {
     res.sendFile(filePath);
 
   } catch (error) {
-    console.error("File download error:", error);
+    console.error(" File download error:", error);
     res.status(500).json({ message: "File download failed" });
   }
 };
@@ -96,15 +97,20 @@ export const downloadFile = async (req, res) => {
 // Upload file controller (authenticated & authorized)
 export const uploadFile = async (req, res) => {
   try {
-    console.log("Upload started");
-    console.log("File:", req.file);
-    console.log("Body:", req.body);
-    console.log("User ID:", req.user?.userId);
+    console.log(" Upload started");
+    console.log(" File:", req.file);
+    console.log(" Body:", req.body);
+    console.log(" User:", req.user);
 
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+    //  Check if file exists
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
 
     const { conversationId } = req.body;
-    const userId = req.user.userId; // from JWT token
+    const userId = req.user.userId || req.user.id; 
+
+    console.log(" User ID extracted:", userId);
 
     if (!conversationId) {
       fs.unlinkSync(req.file.path);
@@ -140,7 +146,7 @@ export const uploadFile = async (req, res) => {
     // File size check
     if (req.file.size > MAX_FILE_SIZE) {
       fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: "File too large" });
+      return res.status(400).json({ message: "File too large (max 10MB)" });
     }
 
     //  Calculate audio duration for audio files
@@ -159,7 +165,7 @@ export const uploadFile = async (req, res) => {
         
         console.log(` Audio duration: ${audioDuration}s, Voice message: ${isVoiceMessage}`);
       } catch (err) {
-        console.error(" Duration calculation failed:", err);
+        console.error("Duration calculation failed:", err);
         // Continue with null duration - not a critical error
       }
     }
@@ -167,7 +173,7 @@ export const uploadFile = async (req, res) => {
     // Calculate hash
     console.log(" Calculating file hash...");
     const fileHash = await calculateFileHash(req.file.path);
-    console.log("Hash:", fileHash);
+    console.log(" Hash:", fileHash);
 
     // Check for duplicate in the same conversation
     const existingAttachment = await Attachment.findOne({
@@ -177,15 +183,14 @@ export const uploadFile = async (req, res) => {
     });
 
     if (existingAttachment) {
-      console.log("Duplicate file found, reusing existing");
+      console.log(" Duplicate file found, reusing existing");
       fs.unlinkSync(req.file.path);
       
-      //  Return duration even for duplicates
       return res.json({
         url: `/api/file/get/${existingAttachment.serverFileName}`,
         filename: req.file.originalname,
         fileType: existingAttachment.fileType,
-        fileSize: req.file.size,
+        fileSize: existingAttachment.sizeInKilobytes * 1024,
         duration: existingAttachment.duration || 0,              
         isVoiceMessage: existingAttachment.isVoiceMessage || false, 
         attachmentId: existingAttachment._id,
@@ -224,9 +229,9 @@ export const uploadFile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Upload error:", error);
-    console.error("Error details:", error.message);
-    console.error("Error code:", error.code);
+    console.error(" Upload error:", error);
+    console.error(" Error details:", error.message);
+    console.error(" Error stack:", error.stack);
     
     // Cleanup uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {

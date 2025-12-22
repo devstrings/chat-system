@@ -15,12 +15,11 @@ export default function Sidebar({
   unreadCounts = {},
   lastMessages = {},
   isMobileSidebarOpen = false,
-    profileImageUrl, 
-  
+  profileImageUrl,
+
   onCloseMobileSidebar = () => {},
   currentUser = null,
   onOpenProfileSettings = () => {},
-  
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,7 +31,7 @@ export default function Sidebar({
   const [showRequests, setShowRequests] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [showBlocked, setShowBlocked] = useState(false);
-  
+
   const { imageSrc: profilePreview, loading: imageLoading } =
     useAuthImage(profileImageUrl);
   // const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -45,45 +44,6 @@ export default function Sidebar({
     message: "",
     type: "success",
   });
-
-  // useEffect(() => {
-  //   const loadUserProfile = async () => {
-  //     try {
-  //       const token = localStorage.getItem("token");
-  //       const response = await axios.get(
-  //         "http://localhost:5000/api/users/auth/me",
-  //         {
-  //           headers: { Authorization: `Bearer ${token}` },
-  //         }
-  //       );
-  //       if (response.data.profileImage) {
-  //         setProfileImageUrl(response.data.profileImage);
-  //       } else {
-  //         setProfileImageUrl(null);
-  //       }
-  //     } catch (err) {
-  //       console.error("Failed to load profile:", err);
-  //     }
-  //   };
-  //   loadUserProfile();
-  // }, []);
-
-  // useEffect(() => {
-  //   const handleClickOutside = (event) => {
-  //     if (
-  //       profileMenuRef.current &&
-  //       !profileMenuRef.current.contains(event.target)
-  //     ) {
-  //       setShowProfileMenu(false);
-  //     }
-  //   };
-  //   if (showProfileMenu) {
-  //     document.addEventListener("mousedown", handleClickOutside);
-  //   }
-  //   return () => {
-  //     document.removeEventListener("mousedown", handleClickOutside);
-  //   };
-  // }, [showProfileMenu]);
 
   const memoizedUsers = useMemo(() => {
     const filteredUsers = users.filter(
@@ -110,39 +70,39 @@ export default function Sidebar({
     0
   );
 
- //  - Add this around line 82
-const formatLastMessageText = (message) => {
-  if (!message) return "";
-  
-  if (message.attachments && message.attachments.length > 0) {
-    const attachment = message.attachments[0];
-    
-    //  Priority 1: Check isVoiceMessage flag
-    if (attachment.isVoiceMessage) {
-      const duration = attachment.duration || 0;
-      if (duration > 0) {
-        const mins = Math.floor(duration / 60);
-        const secs = Math.floor(duration % 60);
-        return `🎤 Voice (${mins}:${secs.toString().padStart(2, '0')})`;
+  //  - Add this around line 82
+  const formatLastMessageText = (message) => {
+    if (!message) return "";
+
+    if (message.attachments && message.attachments.length > 0) {
+      const attachment = message.attachments[0];
+
+      //  Priority 1: Check isVoiceMessage flag
+      if (attachment.isVoiceMessage) {
+        const duration = attachment.duration || 0;
+        if (duration > 0) {
+          const mins = Math.floor(duration / 60);
+          const secs = Math.floor(duration % 60);
+          return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
+        }
+        return "🎤 Voice message";
       }
-      return "🎤 Voice message";
+
+      // Priority 2: Check fileType
+      const fileType = attachment.fileType || attachment.type || "";
+
+      if (fileType.startsWith("image/")) return "📷 Photo";
+      if (fileType.startsWith("video/")) return "🎥 Video";
+      if (fileType === "application/pdf") return "📕 PDF";
+      if (fileType.startsWith("audio/")) return "🎵 Audio";
+      if (fileType.includes("word")) return "📄 Document";
+      if (fileType === "text/plain") return "📝 Text file";
+
+      return "📎 File";
     }
-    
-    // Priority 2: Check fileType
-    const fileType = attachment.fileType || attachment.type || "";
-    
-    if (fileType.startsWith("image/")) return "📷 Photo";
-    if (fileType.startsWith("video/")) return "🎥 Video";
-    if (fileType === "application/pdf") return "📕 PDF";
-    if (fileType.startsWith("audio/")) return "🎵 Audio"; 
-    if (fileType.includes("word")) return "📄 Document";
-    if (fileType === "text/plain") return "📝 Text file";
-    
-    return "📎 File";
-  }
-  
-  return message.text || message.content || "";
-};
+
+    return message.text || message.content || "";
+  };
 
   const handleSearchUsers = async () => {
     if (!searchUsers.trim()) return;
@@ -172,26 +132,32 @@ const formatLastMessageText = (message) => {
   const handleSendRequest = async (userId) => {
     try {
       const token = localStorage.getItem("token");
+
       await axios.post(
         "http://localhost:5000/api/friends/request/send",
         { receiverId: userId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      //  Success alert
       setAlertDialog({
         isOpen: true,
         title: "Friend Request Sent!",
         message: "Your friend request has been sent successfully.",
         type: "success",
       });
+
+      //  Remove user from list
       setAllUsers(allUsers.filter((u) => u._id !== userId));
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
     } catch (err) {
+      //  Show proper error message
+      const errorMessage =
+        err.response?.data?.message || "Failed to send request";
+
       setAlertDialog({
         isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to send request",
+        title: "Cannot Send Request",
+        message: errorMessage, // Backend se "Request already exists" aayega
         type: "error",
       });
     }
@@ -311,96 +277,10 @@ const formatLastMessageText = (message) => {
       });
     }
   };
-  
-const handleProfileClick = () => {
-  onOpenProfileSettings(); // This prop will come from Dashboard
-};
 
-  // const handleProfileClick = () => {
-  //   setShowProfileMenu(!showProfileMenu);
-  // };
-
-  // const handleUploadClick = () => {
-  //   fileInputRef.current.click();
-  //   setShowProfileMenu(false);
-  // };
-  // const handleFileChange = async (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
-  //   setLoading(true);
-  //   try {
-  //     const token = localStorage.getItem("token");
-  //     const formData = new FormData();
-  //     formData.append("image", file);
-  //     const uploadRes = await axios.post(
-  //       "http://localhost:5000/api/users/profile/upload",
-  //       formData,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "multipart/form-data",
-  //         },
-  //       }
-  //     );
-  //     const imageUrl = uploadRes.data.imageUrl;
-  //     const updateRes = await axios.put(
-  //       "http://localhost:5000/api/users/profile/update-image",
-  //       { profileImage: imageUrl },
-  //       { headers: { Authorization: `Bearer ${token}` } }
-  //     );
-
-    
-  //     setProfileImageUrl(imageUrl); 
-
-  //     setAlertDialog({
-  //       isOpen: true,
-  //       title: "Success!",
-  //       message: "Profile picture uploaded successfully",
-  //       type: "success",
-  //     });
-  //   } catch (err) {
-  //     console.error("Upload failed:", err);
-  //     setAlertDialog({
-  //       isOpen: true,
-  //       title: "Upload Failed",
-  //       message:
-  //         err.response?.data?.message || "Failed to upload profile picture",
-  //       type: "error",
-  //     });
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  // const handleRemoveImage = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const token = localStorage.getItem("token");
-  //     await axios.delete(
-  //       "http://localhost:5000/api/users/profile/remove-image",
-  //       {
-  //         headers: { Authorization: `Bearer ${token}` },
-  //       }
-  //     );
-  //     setProfileImageUrl(null); 
-  //     setShowProfileMenu(false);
-  //     setAlertDialog({
-  //       isOpen: true,
-  //       title: "Removed",
-  //       message: "Profile picture removed successfully",
-  //       type: "success",
-  //     });
-  //   } catch (err) {
-  //     console.error("Remove failed:", err);
-  //     setAlertDialog({
-  //       isOpen: true,
-  //       title: "Error",
-  //       message: "Failed to remove profile picture",
-  //       type: "error",
-  //     });
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+  const handleProfileClick = () => {
+    onOpenProfileSettings(); // This prop will come from Dashboard
+  };
 
   return (
     <>
@@ -433,8 +313,7 @@ const handleProfileClick = () => {
         <div className="bg-gray-900 border-b border-gray-700 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="relative" >
-                
+              <div className="relative">
                 <div
                   className="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-700"
                   onClick={handleProfileClick}
@@ -452,63 +331,7 @@ const handleProfileClick = () => {
                       {currentUsername?.charAt(0)?.toUpperCase() || "U"}
                     </div>
                   )}
-
-                
                 </div>
-{/* 
-                {showProfileMenu && (
-                  <div className="absolute left-0 top-14 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={handleUploadClick}
-                      className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      {profilePreview ? "Change Photo" : "Upload Photo"}
-                    </button>
-
-                    {profilePreview && (
-                      <button
-                        onClick={handleRemoveImage}
-                        className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm border-t border-gray-700"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                        Remove Photo
-                      </button>
-                    )}
-                  </div>
-                )} */}
-
-                {/* <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                /> */}
               </div>
               <div>
                 <h2 className="text-white font-semibold text-lg">Chats</h2>
