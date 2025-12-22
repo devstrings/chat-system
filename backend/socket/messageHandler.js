@@ -267,112 +267,169 @@ export function handleMessage(io, socket) {
   });
 
  
-  socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
-    try {
-      console.log(" Delete for me request:", messageId);
+  //   DELETE FOR ME
+socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
+  try {
+    console.log("🗑️ Delete for me request:", messageId);
 
-      const message = await Message.findById(messageId).populate('conversationId');
-      if (!message) {
-        console.warn(" Message not found");
-        return;
-      }
-
-      const userId = socket.user.id;
-
-      const isParticipant = message.conversationId.participants.some(
-        p => p.toString() === userId
-      );
-
-      if (!isParticipant) {
-        socket.emit("errorMessage", { message: "Unauthorized" });
-        return;
-      }
-
-      if (!message.deletedFor.includes(userId)) {
-        message.deletedFor.push(userId);
-      }
-
-      const allDeleted = message.conversationId.participants.every(
-        p => message.deletedFor.includes(p.toString())
-      );
-
-      if (allDeleted) {
-        message.isDeleted = true;
-        message.deletedAt = new Date();
-      }
-
-      await message.save();
-
-      socket.emit("messageDeleted", {
-        messageId,
-        conversationId,
-        deletedFor: [userId],
-        isDeleted: message.isDeleted
-      });
-
-      console.log("Message deleted for user");
-    } catch (err) {
-      console.error(" Delete for me error:", err);
+    const message = await Message.findById(messageId).populate('conversationId');
+    if (!message) {
+      console.warn(" Message not found");
+      return;
     }
-  });
 
+    const userId = socket.user.id;
 
-  socket.on("deleteMessageForEveryone", async ({ messageId, conversationId }) => {
-    try {
-      console.log(" Delete for everyone request:", messageId);
+    const isParticipant = message.conversationId.participants.some(
+      p => p.toString() === userId
+    );
 
-      const message = await Message.findById(messageId).populate('conversationId');
-      if (!message) {
-        console.warn(" Message not found");
-        return;
-      }
+    if (!isParticipant) {
+      socket.emit("errorMessage", { message: "Unauthorized" });
+      return;
+    }
 
-      const userId = socket.user.id;
+    if (!message.deletedFor.includes(userId)) {
+      message.deletedFor.push(userId);
+    }
 
-      if (message.sender.toString() !== userId) {
-        socket.emit("errorMessage", { message: "Only sender can delete for everyone" });
-        return;
-      }
+    const allDeleted = message.conversationId.participants.every(
+      p => message.deletedFor.includes(p.toString())
+    );
 
-      const messageAge = Date.now() - new Date(message.createdAt).getTime();
-      const fiveMinutes = 5 * 60 * 1000;
-
-      if (messageAge > fiveMinutes) {
-        socket.emit("errorMessage", { 
-          message: "Cannot delete for everyone after 5 minutes" 
-        });
-        return;
-      }
-
-      message.deletedForEveryone = true;
+    if (allDeleted) {
       message.isDeleted = true;
       message.deletedAt = new Date();
-      message.text = "";
-      message.attachments = [];
-
       await message.save();
-
-      const deleteData = {
-        messageId,
-        conversationId,
-        deletedForEveryone: true
-      };
-
-      for (const participant of message.conversationId.participants) {
-        const targetSocket = [...io.sockets.sockets.values()].find(
-          (s) => s.user && s.user.id === participant.toString()
-        );
-
-        if (targetSocket) {
-          targetSocket.emit("messageDeletedForEveryone", deleteData);
-        }
-      }
-
-      console.log(" Message deleted for everyone");
-    } catch (err) {
-      console.error(" Delete for everyone error:", err);
+      
+      await Message.findByIdAndDelete(messageId);
+      console.log(" Message physically deleted from DB");
+    } else {
+      await message.save();
     }
-  });
+
+    //  Emit delete event
+    socket.emit("messageDeleted", {
+      messageId,
+      conversationId,
+      deletedFor: [userId],
+      isDeleted: allDeleted
+    });
+
+    //  conversation's lastMessage if needed
+    if (allDeleted) {
+      const remainingMessages = await Message.find({ 
+        conversationId: conversationId 
+      })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .populate('sender', 'username');
+
+      if (remainingMessages.length > 0) {
+        const lastMsg = remainingMessages[0];
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: lastMsg.text || "📎 Attachment",
+          lastMessageTime: lastMsg.createdAt,
+          lastMessageSender: lastMsg.sender._id
+        });
+      } else {
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: "",
+          lastMessageTime: Date.now(),
+          lastMessageSender: null
+        });
+      }
+    }
+
+    console.log(" Message deleted for user");
+  } catch (err) {
+    console.error(" Delete for me error:", err);
+  }
+});
+
+
+  // DELETE FOR EVERYONE
+  socket.on("deleteMessageForEveryone", async ({ messageId, conversationId }) => {
+  try {
+    console.log(" Delete for everyone request:", messageId);
+
+    const message = await Message.findById(messageId).populate('conversationId');
+    if (!message) {
+      console.warn(" Message not found");
+      return;
+    }
+
+    const userId = socket.user.id;
+
+    if (message.sender.toString() !== userId) {
+      socket.emit("errorMessage", { message: "Only sender can delete for everyone" });
+      return;
+    }
+
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (messageAge > fiveMinutes) {
+      socket.emit("errorMessage", { 
+        message: "Cannot delete for everyone after 5 minutes" 
+      });
+      return;
+    }
+
+    message.deletedForEveryone = true;
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.text = "";
+    message.attachments = [];
+
+    await message.save();
+
+    const deleteData = {
+      messageId,
+      conversationId,
+      deletedForEveryone: true
+    };
+
+    //  Emit to all participants
+    for (const participant of message.conversationId.participants) {
+      const targetSocket = [...io.sockets.sockets.values()].find(
+        (s) => s.user && s.user.id === participant.toString()
+      );
+
+      if (targetSocket) {
+        targetSocket.emit("messageDeletedForEveryone", deleteData);
+      }
+    }
+
+    //  conversation's lastMessage
+    const remainingMessages = await Message.find({ 
+      conversationId: conversationId,
+      deletedForEveryone: { $ne: true }
+    })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .populate('sender', 'username');
+
+    if (remainingMessages.length > 0) {
+      const lastMsg = remainingMessages[0];
+      await Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: lastMsg.text || "📎 Attachment",
+        lastMessageTime: lastMsg.createdAt,
+        lastMessageSender: lastMsg.sender._id
+      });
+    } else {
+      await Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: "",
+        lastMessageTime: Date.now(),
+        lastMessageSender: null
+      });
+    }
+
+    console.log(" Message deleted for everyone");
+  } catch (err) {
+    console.error(" Delete for everyone error:", err);
+  }
+});
 
   socket.on("disconnect", () => {
     console.log(` User disconnected: ${socket.user.id}`);

@@ -1,3 +1,4 @@
+// backend/controllers/authController.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
@@ -55,10 +56,9 @@ export const login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
 
-    //  INCLUDE PROFILE IMAGE IN RESPONSE
     res.json({
       message: "Login successful",
       token,
@@ -67,5 +67,53 @@ export const login = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Login failed", error: err.message });
+  }
+};
+
+//  GOOGLE OAUTH CALLBACK HANDLER
+export const googleCallback = (req, res) => {
+  try {
+    const token = jwt.sign(
+      { id: req.user._id, username: req.user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    const profileImage = req.user.profileImage || "";
+    const redirectUrl = `http://localhost:5173/auth/callback?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+    
+    console.log(" Google OAuth success:", { 
+      username: req.user.username, 
+      email: req.user.email 
+    });
+    
+    res.redirect(redirectUrl);
+  } catch (err) {
+    console.error(" Google callback error:", err);
+    res.redirect("http://localhost:5173/login?error=token_generation_failed");
+  }
+};
+
+//  FACEBOOK OAUTH CALLBACK HANDLER
+export const facebookCallback = (req, res) => {
+  try {
+    const token = jwt.sign(
+      { id: req.user._id, username: req.user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    const profileImage = req.user.profileImage || "";
+    const redirectUrl = `http://localhost:5173/auth/callback?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+    
+    console.log(" Facebook OAuth success:", { 
+      username: req.user.username, 
+      email: req.user.email 
+    });
+    
+    res.redirect(redirectUrl);
+  } catch (err) {
+    console.error(" Facebook callback error:", err);
+    res.redirect("http://localhost:5173/login?error=token_generation_failed");
   }
 };

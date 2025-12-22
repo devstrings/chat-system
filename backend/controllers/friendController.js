@@ -52,16 +52,38 @@ export const sendFriendRequest = async (req, res) => {
       return res.status(400).json({ message: "Already friends" });
     }
 
-    // Check if request already exists
+    //  CHECK: Opposite request exists? (User B already sent request to User A)
+    const oppositeRequest = await FriendRequest.findOne({
+      sender: receiverId,
+      receiver: senderId,
+      status: "pending"
+    });
+
+    if (oppositeRequest) {
+      //  AUTO-ACCEPT: Both users want to be friends
+      oppositeRequest.status = "accepted";
+      await oppositeRequest.save();
+
+      //  Create friendship
+      await Friendship.create({
+        user1: senderId,
+        user2: receiverId
+      });
+
+      return res.json({ 
+        message: "You are now friends!", 
+        autoAccepted: true 
+      });
+    }
+
+    //  CHECK: Same direction request already sent?
     const existingRequest = await FriendRequest.findOne({
-      $or: [
-        { sender: senderId, receiver: receiverId },
-        { sender: receiverId, receiver: senderId }
-      ]
+      sender: senderId,
+      receiver: receiverId
     });
 
     if (existingRequest) {
-      return res.status(400).json({ message: "Request already exists" });
+      return res.status(400).json({ message: "Request already sent" });
     }
 
     // Create new request

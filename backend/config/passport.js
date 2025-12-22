@@ -24,7 +24,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
+      callbackURL: "http://localhost:5000/api/auth/google/callback", 
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -49,7 +49,7 @@ passport.use(
           email: profile.emails[0].value,
           profileImage: profile.photos[0]?.value,
           provider: "google",
-          password: "OAUTH_USER_NO_PASSWORD", // Dummy password
+          password: "OAUTH_USER_NO_PASSWORD",
         });
 
         done(null, user);
@@ -60,13 +60,14 @@ passport.use(
   )
 );
 
+
 //  FACEBOOK STRATEGY
 passport.use(
   new FacebookStrategy(
     {
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
-      callbackURL: "/api/auth/facebook/callback",
+      callbackURL: "http://localhost:5000/api/auth/facebook/callback", 
       profileFields: ["id", "displayName", "photos", "email"],
     },
     async (accessToken, refreshToken, profile, done) => {

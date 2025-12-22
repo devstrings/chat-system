@@ -1,9 +1,11 @@
+// backend/models/userModel.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
   username: { 
     type: String, 
-    required: true 
+    required: true,
+    unique: true  // Username bhi unique hona chahiye
   },
   email: { 
     type: String, 
@@ -19,17 +21,16 @@ const userSchema = new mongoose.Schema({
     default: null 
   },
   
+  //  OAuth fields with proper sparse indexing
   googleId: {
     type: String,
-    default: null,
-     unique: true,      
-    sparse: true 
+    sparse: true,    
+    unique: true    
   },
   facebookId: {
     type: String,
-    default: null,
-     unique: true,      
-    sparse: true 
+    sparse: true,
+    unique: true
   },
   provider: {
     type: String,
@@ -39,5 +40,9 @@ const userSchema = new mongoose.Schema({
 }, { 
   timestamps: true 
 });
+
+// Explicitly create sparse indexes (best practice)
+userSchema.index({ googleId: 1 }, { sparse: true, unique: true });
+userSchema.index({ facebookId: 1 }, { sparse: true, unique: true });
 
 export default mongoose.model("User", userSchema);

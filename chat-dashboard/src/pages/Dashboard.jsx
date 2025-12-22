@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
@@ -7,7 +5,9 @@ import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import axios from "axios";
-import ConfirmationDialog, { AlertDialog } from "../components/ConfirmationDialog";
+import ConfirmationDialog, {
+  AlertDialog,
+} from "../components/ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import ProfileSetting from "../components/ProfileSetting";
 
@@ -62,7 +62,7 @@ export default function Dashboard() {
           }
         );
         setCurrentUser(response.data);
-        
+
         // SET SHARED PROFILE IMAGE
         if (response.data.profileImage) {
           setSharedProfileImage(response.data.profileImage);
@@ -81,13 +81,13 @@ export default function Dashboard() {
 
   // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl) => {
-    console.log('Profile image updated:', newImageUrl);
+    console.log("Profile image updated:", newImageUrl);
     setSharedProfileImage(newImageUrl);
-    
+
     // update currentUser state
-    setCurrentUser(prev => ({
+    setCurrentUser((prev) => ({
       ...prev,
-      profileImage: newImageUrl
+      profileImage: newImageUrl,
     }));
   };
 
@@ -102,7 +102,7 @@ export default function Dashboard() {
 
       // UPDATE SHARED STATE
       setSharedProfileImage(null);
-      setCurrentUser(prev => ({ ...prev, profileImage: null }));
+      setCurrentUser((prev) => ({ ...prev, profileImage: null }));
       setShowProfileSettings(false);
 
       setAlertDialog({
@@ -122,37 +122,36 @@ export default function Dashboard() {
     }
   };
 
+  // Add this around line 146
+  const formatAttachmentText = (attachments) => {
+    if (!attachments || attachments.length === 0) return "";
 
-// Add this around line 146
-const formatAttachmentText = (attachments) => {
-  if (!attachments || attachments.length === 0) return "";
+    const file = attachments[0];
 
-  const file = attachments[0];
-  
-  //  Check isVoiceMessage flag (most reliable)
-  if (file.isVoiceMessage) {
-    const duration = file.duration || 0;
-    if (duration > 0) {
-      const mins = Math.floor(duration / 60);
-      const secs = Math.floor(duration % 60);
-      return `🎤 Voice (${mins}:${secs.toString().padStart(2, '0')})`;
+    //  Check isVoiceMessage flag (most reliable)
+    if (file.isVoiceMessage) {
+      const duration = file.duration || 0;
+      if (duration > 0) {
+        const mins = Math.floor(duration / 60);
+        const secs = Math.floor(duration % 60);
+        return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
+      }
+      return "🎤 Voice message";
     }
-    return "🎤 Voice message";
-  }
-  
-  // Priority 2: Check fileType
-  const fileType = file.fileType || file.type || "";
-  
-  if (fileType.startsWith("image/")) return "📷 Photo";
-  if (fileType.startsWith("video/")) return "🎥 Video";
-  if (fileType === "application/pdf") return "📕 PDF";
-  if (fileType.startsWith("audio/")) return "🎵 Audio"; 
-  if (fileType.includes("word")) return "📄 Document";
-  if (fileType === "text/plain") return "📝 Text file";
-  
-  // Default fallback
-  return "📎 File";
-};
+
+    // Priority 2: Check fileType
+    const fileType = file.fileType || file.type || "";
+
+    if (fileType.startsWith("image/")) return "📷 Photo";
+    if (fileType.startsWith("video/")) return "🎥 Video";
+    if (fileType === "application/pdf") return "📕 PDF";
+    if (fileType.startsWith("audio/")) return "🎵 Audio";
+    if (fileType.includes("word")) return "📄 Document";
+    if (fileType === "text/plain") return "📝 Text file";
+
+    // Default fallback
+    return "📎 File";
+  };
 
   // Initial data fetch
   useEffect(() => {
@@ -334,16 +333,142 @@ const formatAttachmentText = (attachments) => {
         return newState;
       });
     };
+    const handleMessageDeleted = async (data) => {
+      console.log(" Message deleted:", data);
+
+      if (data.messageId && data.conversationId) {
+        try {
+          //  Fetch all messages to find previous one
+          const token = localStorage.getItem("token");
+          const response = await axios.get(
+            `http://localhost:5000/api/messages/${data.conversationId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          // Filter out deleted message
+          const messages = response.data.filter(
+            (msg) => msg._id !== data.messageId
+          );
+          const previousMessage = messages[messages.length - 1];
+
+          setLastMessages((prev) => {
+            const updated = { ...prev };
+
+            for (const [userId, msgData] of Object.entries(prev)) {
+              if (msgData?.conversationId === data.conversationId) {
+                if (previousMessage) {
+                  //  Show previous message
+                  const messageText =
+                    previousMessage.text ||
+                    (previousMessage.attachments?.length > 0
+                      ? formatAttachmentText(previousMessage.attachments)
+                      : "");
+
+                  updated[userId] = {
+                    ...msgData,
+                    text: messageText,
+                    lastMessageId: previousMessage._id,
+                    time: previousMessage.createdAt,
+                    sender:
+                      previousMessage.sender._id || previousMessage.sender,
+                    status: previousMessage.status || "sent",
+                    _updated: Date.now(),
+                  };
+                } else {
+                  //  No messages left in conversation
+                  updated[userId] = {
+                    ...msgData,
+                    text: "",
+                    lastMessageId: null,
+                    _updated: Date.now(),
+                  };
+                }
+                break;
+              }
+            }
+
+            return updated;
+          });
+        } catch (err) {
+          console.error(" Error fetching previous message:", err);
+        }
+      }
+    };
+
+    const handleMessageDeletedForEveryone = async (data) => {
+      console.log("Message deleted for everyone:", data);
+
+      if (data.messageId && data.conversationId) {
+        try {
+          // Fetch messages to find previous one
+          const token = localStorage.getItem("token");
+          const response = await axios.get(
+            `http://localhost:5000/api/messages/${data.conversationId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          // Filter out deleted message
+          const messages = response.data.filter(
+            (msg) => msg._id !== data.messageId && !msg.deletedForEveryone
+          );
+          const previousMessage = messages[messages.length - 1];
+
+          setLastMessages((prev) => {
+            const updated = { ...prev };
+
+            for (const [userId, msgData] of Object.entries(prev)) {
+              if (msgData?.conversationId === data.conversationId) {
+                if (previousMessage) {
+                  //  Show previous message
+                  const messageText =
+                    previousMessage.text ||
+                    (previousMessage.attachments?.length > 0
+                      ? formatAttachmentText(previousMessage.attachments)
+                      : "");
+
+                  updated[userId] = {
+                    ...msgData,
+                    text: messageText,
+                    lastMessageId: previousMessage._id,
+                    time: previousMessage.createdAt,
+                    sender:
+                      previousMessage.sender._id || previousMessage.sender,
+                    status: previousMessage.status || "sent",
+                    _updated: Date.now(),
+                  };
+                } else {
+                  // No messages left
+                  updated[userId] = {
+                    ...msgData,
+                    text: "",
+                    lastMessageId: null,
+                    _updated: Date.now(),
+                  };
+                }
+                break;
+              }
+            }
+
+            return updated;
+          });
+        } catch (err) {
+          console.error(" Error fetching previous message:", err);
+        }
+      }
+    };
 
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
+    socket.on("messageDeleted", handleMessageDeleted);
+    socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
 
     return () => {
       socket.off("receiveMessage", handleNewMessage);
       socket.off("messageStatusUpdate", handleStatusUpdate);
+      socket.off("messageDeleted", handleMessageDeleted);
+      socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     };
   }, [socket, currentUserId]);
-
   // Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
@@ -443,34 +568,34 @@ const formatAttachmentText = (attachments) => {
         )}
 
         {/*  RESPONSIVE SIDEBAR */}
-    <Sidebar
-  users={users}
-  selectedUserId={selectedUser?._id}
-  onSelectUser={(user) => {
-    console.log(" Selected user object:", user);
-    console.log(" Selected user profile image:", user.profileImage);
-    setSelectedUser(user);
-    setIsMobileSidebarOpen(false);
-  }}
-  onlineUsers={onlineUsers}
-  currentUsername={username}
-  currentUserId={currentUserId}
-  onLogout={handleLogout}
-  unreadCounts={unreadCounts}
-  lastMessages={lastMessages}
-  isMobileSidebarOpen={isMobileSidebarOpen}
-  onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-  onOpenProfileSettings={() => setShowProfileSettings(true)}
-  profileImageUrl={sharedProfileImage}
-/>
+        <Sidebar
+          users={users}
+          selectedUserId={selectedUser?._id}
+          onSelectUser={(user) => {
+            console.log(" Selected user object:", user);
+            console.log(" Selected user profile image:", user.profileImage);
+            setSelectedUser(user);
+            setIsMobileSidebarOpen(false);
+          }}
+          onlineUsers={onlineUsers}
+          currentUsername={username}
+          currentUserId={currentUserId}
+          onLogout={handleLogout}
+          unreadCounts={unreadCounts}
+          lastMessages={lastMessages}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+          onOpenProfileSettings={() => setShowProfileSettings(true)}
+          profileImageUrl={sharedProfileImage}
+        />
 
-{showProfileSettings && (
-  <ProfileSetting
-    currentUser={currentUser}
-    onClose={() => setShowProfileSettings(false)}
-       onProfileImageUpdate={handleProfileImageUpdate} 
-  />
-)}
+        {showProfileSettings && (
+          <ProfileSetting
+            currentUser={currentUser}
+            onClose={() => setShowProfileSettings(false)}
+            onProfileImageUpdate={handleProfileImageUpdate}
+          />
+        )}
         <div className="flex-1 flex flex-col min-w-0">
           {selectedUser ? (
             <>
@@ -591,12 +716,12 @@ const formatAttachmentText = (attachments) => {
                                 setAlertDialog({
                                   isOpen: true,
                                   title: "User Info",
-                                  message: `👤 ${selectedUser.username}\n📧 ${
+                                  message: ` ${selectedUser.username}\n📧 ${
                                     selectedUser.email
                                   }\n${
                                     onlineUsers.has(selectedUser._id)
-                                      ? "🟢 Online"
-                                      : "⚫ Offline"
+                                      ? " Online"
+                                      : " Offline"
                                   }`,
                                   type: "info",
                                 });
