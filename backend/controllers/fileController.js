@@ -1,29 +1,10 @@
-// backend/controllers/fileController.js
+
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "../models/Attachment.js";
 import Conversation from "../models/conversationModel.js";
-
-// Allowed MIME types and extensions
-const ALLOWED_TYPES = [
-  "image/jpeg", "image/jpg", "image/png", "image/gif",
-  "application/pdf", "text/plain",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "video/mp4", "video/quicktime", "video/x-msvideo",
-  "audio/webm", "audio/mpeg", "audio/mp3", "audio/ogg", "audio/wav"
-];
-
-const ALLOWED_EXTENSIONS = [
-  ".jpg", ".jpeg", ".png", ".gif",
-  ".pdf", ".txt", ".doc", ".docx",
-  ".mp4", ".mov", ".avi",
-  ".webm", ".mp3", ".mpeg", ".ogg", ".wav"
-];
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>
@@ -39,7 +20,7 @@ const calculateFileHash = (filePath) =>
 export const downloadFile = async (req, res) => {
   try {
     const filename = req.params.filename;
-    const userId = req.user.userId || req.user.id; // Support both
+    const userId = req.user.userId || req.user.id;
 
     // Prevent path traversal
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
@@ -102,13 +83,13 @@ export const uploadFile = async (req, res) => {
     console.log(" Body:", req.body);
     console.log(" User:", req.user);
 
-    //  Check if file exists
+    // Check if file exists
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
     const { conversationId } = req.body;
-    const userId = req.user.userId || req.user.id; 
+    const userId = req.user.userId || req.user.id;
 
     console.log(" User ID extracted:", userId);
 
@@ -136,37 +117,24 @@ export const uploadFile = async (req, res) => {
       });
     }
 
-    // File type check
-    if (!ALLOWED_TYPES.includes(req.file.mimetype) ||
-        !ALLOWED_EXTENSIONS.includes(path.extname(req.file.originalname).toLowerCase())) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: "File type or extension not allowed" });
-    }
+    
 
-    // File size check
-    if (req.file.size > MAX_FILE_SIZE) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: "File too large (max 10MB)" });
-    }
-
-    //  Calculate audio duration for audio files
+    // Calculate audio duration for audio files
     let audioDuration = null;
     let isVoiceMessage = false;
 
     if (req.file.mimetype.startsWith('audio/')) {
       try {
-        console.log(" Calculating audio duration...");
+        console.log("🎵 Calculating audio duration...");
         audioDuration = await getAudioDurationInSeconds(req.file.path);
-        audioDuration = Math.floor(audioDuration); // Round to seconds
+        audioDuration = Math.floor(audioDuration);
         
-        // Check if it's a voice message based on filename or body flag
         isVoiceMessage = req.file.originalname.includes('voice_') || 
                         req.body.isVoiceMessage === 'true';
         
-        console.log(` Audio duration: ${audioDuration}s, Voice message: ${isVoiceMessage}`);
+        console.log(` Audio duration: ${audioDuration}s, Voice: ${isVoiceMessage}`);
       } catch (err) {
-        console.error("Duration calculation failed:", err);
-        // Continue with null duration - not a critical error
+        console.error(" Duration calculation failed:", err);
       }
     }
 
@@ -183,7 +151,7 @@ export const uploadFile = async (req, res) => {
     });
 
     if (existingAttachment) {
-      console.log(" Duplicate file found, reusing existing");
+      console.log("Duplicate file found, reusing existing");
       fs.unlinkSync(req.file.path);
       
       return res.json({
@@ -199,7 +167,7 @@ export const uploadFile = async (req, res) => {
       });
     }
 
-    //  Save new attachment with duration and voice flag
+    // Save new attachment
     console.log(" Saving new attachment to database...");
     const attachment = await Attachment.create({
       conversationId,
@@ -216,7 +184,6 @@ export const uploadFile = async (req, res) => {
 
     console.log(" Upload successful:", attachment._id);
 
-    //  Include duration and voice flag in response
     res.json({
       url: `/api/file/get/${req.file.filename}`,
       filename: req.file.originalname,
@@ -231,7 +198,6 @@ export const uploadFile = async (req, res) => {
   } catch (error) {
     console.error(" Upload error:", error);
     console.error(" Error details:", error.message);
-    console.error(" Error stack:", error.stack);
     
     // Cleanup uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {
@@ -239,9 +205,9 @@ export const uploadFile = async (req, res) => {
       console.log(" Cleaned up uploaded file");
     }
     
-    // Handle duplicate key error (concurrent uploads)
+    // Handle duplicate key error
     if (error.code === 11000) {
-      console.log(" Duplicate key error - file already exists");
+      console.log(" Duplicate key error");
       return res.status(200).json({
         message: "File already exists in this conversation",
         isDuplicate: true

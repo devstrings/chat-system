@@ -1,3 +1,4 @@
+// backend/middleware/upload.js
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -20,12 +21,13 @@ const storage = multer.diskStorage({
   },
 });
 
-// Allowed MIME types and extensions (INCLUDING AUDIO)
+// Allowed MIME types and extensions
 const allowedMimeTypes = [
   "image/jpeg", 
   "image/jpg", 
   "image/png", 
   "image/gif",
+  "image/webp",
   "application/pdf", 
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -33,7 +35,6 @@ const allowedMimeTypes = [
   "video/mp4", 
   "video/quicktime", 
   "video/x-msvideo",
-  //  Audio types added
   "audio/webm", 
   "audio/mpeg", 
   "audio/mp3", 
@@ -46,6 +47,7 @@ const allowedExtensions = [
   ".jpeg", 
   ".png", 
   ".gif",
+  ".webp",
   ".pdf", 
   ".doc", 
   ".docx", 
@@ -53,26 +55,39 @@ const allowedExtensions = [
   ".mp4", 
   ".mov", 
   ".avi",
-  //  Audio extensions added
   ".webm", 
   ".mp3", 
   ".mpeg", 
   ".ogg",
-  ".wav"
+  ".wav",
+  ".jfif"  
 ];
 
-// File filter
+// File filter with error messages
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
+  const mimetype = file.mimetype.toLowerCase();
 
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    return cb(new Error("Invalid file type. Only specific file types allowed."));
+  console.log(" File validation:");
+  console.log("  - Original name:", file.originalname);
+  console.log("  - Extension:", ext);
+  console.log("  - MIME type:", mimetype);
+
+  //  Check MIME type first
+  if (!allowedMimeTypes.includes(mimetype)) {
+    console.log(" Invalid MIME type:", mimetype);
+    console.log("  Allowed:", allowedMimeTypes.join(", "));
+    return cb(new Error(`File type not allowed: ${mimetype}`), false);
   }
 
+  // Check extension
   if (!allowedExtensions.includes(ext)) {
-    return cb(new Error("Invalid file extension."));
+    console.log(" Invalid extension:", ext);
+    console.log("  Allowed:", allowedExtensions.join(", "));
+    return cb(new Error(`File extension not allowed: ${ext}`), false);
   }
 
+  console.log(" File validation passed");
   cb(null, true);
 };
 
@@ -80,7 +95,7 @@ const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10 MB
-    files: 1, // Only 1 file at a time
+    files: 1,
   },
   fileFilter,
 });
