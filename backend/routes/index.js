@@ -1,9 +1,9 @@
 import express from "express";
-import authRoutes from "./authRoutes.js";
-import userRoutes from "./userRoutes.js";
-import messageRoutes from "./messageRoutes.js";
-import fileRoutes from "./fileRoutes.js";
-import friendRoutes from "./friendRoutes.js";
+import authRoutes from "./auth.js";
+import userRoutes from "./user.js";
+import messageRoutes from "./message.js";
+import fileRoutes from "./file.js";
+import friendRoutes from "./friend.js";
 
 export default function (app) {
   const router = express.Router();
