@@ -7,7 +7,7 @@ import {
   deleteMessageForMe,        
   deleteMessageForEveryone,  
   bulkDeleteMessages         
-} from "../controllers/messageController.js";
+} from "../controllers/message.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();

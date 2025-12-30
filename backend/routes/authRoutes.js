@@ -5,7 +5,7 @@ import {
   login, 
   googleCallback, 
   facebookCallback 
-} from "../controllers/authController.js";
+} from "../controllers/auth.js";
 import config from "../config/index.js"; 
 
 const router = express.Router();
