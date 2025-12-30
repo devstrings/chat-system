@@ -51,7 +51,7 @@ export function handleMessage(io, socket) {
       });
 
       // Update conversation with last message
-      const lastMessageText = text || (attachmentIds.length > 0 ? "📎 Attachment" : "");
+      const lastMessageText = text || (attachmentIds.length > 0 ? " Attachment" : "");
       await Conversation.findByIdAndUpdate(conversationId, {
         lastMessage: lastMessageText,
         lastMessageTime: Date.now(),
