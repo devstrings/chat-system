@@ -9,7 +9,7 @@ import {
   uploadProfileImage,
   serveProfileImage
   // upload - DELETE THIS, multer se import karenge
-} from "../controllers/userController.js";
+} from "../controllers/user.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { uploadProfile } from "../config/multer.js"; 
 

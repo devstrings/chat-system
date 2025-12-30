@@ -11,7 +11,7 @@ import {
   getBlockedUsers,
   getRelationshipStatus,
   getFriends  
-} from "../controllers/friendController.js";
+} from "../controllers/friend.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
