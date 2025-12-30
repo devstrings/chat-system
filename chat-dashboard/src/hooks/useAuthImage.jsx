@@ -14,20 +14,57 @@ export const useAuthImage = (imageUrl) => {
 
     const loadImage = async () => {
       try {
-        // ✅ FIX: Extract only the filename from the full path
-        let filename = imageUrl;
+        console.log(' Loading image:', imageUrl);
         
-        // If full path is stored (e.g., "/uploads/profileImages/1234.jpg")
-        if (imageUrl.includes('/')) {
-          filename = imageUrl.split('/').pop();
+        //  Remove localhost prefix if exists
+        let cleanUrl = imageUrl;
+        if (imageUrl.includes('localhost:5000https://')) {
+          cleanUrl = imageUrl.split('localhost:5000')[1];
+          console.log(' Cleaned URL:', cleanUrl);
+        } else if (imageUrl.includes('localhost:5000http://')) {
+          cleanUrl = imageUrl.split('localhost:5000')[1];
+          console.log(' Cleaned URL:', cleanUrl);
         }
         
-        // ✅ CORRECT API URL matching your backend route
-        const fullUrl = `http://localhost:5000/api/file/profile/${filename}`;
+        //  PRIORITY 1: Check for external OAuth URLs FIRST
+        const isGoogleUrl = cleanUrl.includes('googleusercontent.com');
+        const isFacebookUrl = cleanUrl.includes('fbsbx.com') || cleanUrl.includes('graph.facebook.com');
+        const isExternalHttps = (cleanUrl.startsWith('https://') || cleanUrl.startsWith('http://')) && 
+                                !cleanUrl.includes('localhost');
         
-        console.log('🔍 Loading image:', fullUrl);
+        if (isGoogleUrl || isFacebookUrl || isExternalHttps) {
+          console.log(' External URL (Google/Facebook):', cleanUrl);
+          setImageSrc(cleanUrl);
+          setLoading(false);
+          return;
+        }
+
+        // PRIORITY 2: Local backend images
+        console.log(' Local image detected');
+        
+        let filename = cleanUrl;
+        
+        // Extract filename from various formats
+        if (filename.includes('/uploads/profileImages/')) {
+          filename = filename.split('/uploads/profileImages/').pop();
+        } else if (filename.includes('/')) {
+          filename = filename.split('/').pop();
+        }
+        
+        console.log(' Extracted filename:', filename);
+        
+        const fullUrl = `http://localhost:5000/api/file/profile/${filename}`;
+        console.log(' Full URL:', fullUrl);
         
         const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.warn(' No token found');
+          setImageSrc(null);
+          setLoading(false);
+          return;
+        }
+
         const response = await axios.get(fullUrl, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob'
@@ -36,9 +73,13 @@ export const useAuthImage = (imageUrl) => {
         const blob = response.data;
         const objectUrl = URL.createObjectURL(blob);
         setImageSrc(objectUrl);
-        console.log('✅ Image loaded successfully');
+        console.log(' Local image loaded');
       } catch (err) {
-        console.error('❌ Failed to load image:', err.response?.status, err.message);
+        console.error(' Image load error:', {
+          status: err.response?.status,
+          message: err.message,
+          url: imageUrl
+        });
         setImageSrc(null);
       } finally {
         setLoading(false);
@@ -47,7 +88,6 @@ export const useAuthImage = (imageUrl) => {
 
     loadImage();
 
-    // Cleanup blob URL when component unmounts
     return () => {
       if (imageSrc && imageSrc.startsWith('blob:')) {
         URL.revokeObjectURL(imageSrc);

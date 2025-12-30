@@ -1,5 +1,5 @@
-import Message from "../models/messageModel.js";
-import Conversation from "../models/conversationModel.js";
+import Message from "../models/message.js";
+import Conversation from "../models/Conversation.js";
 import Attachment from "../models/Attachment.js";
 import Friendship from "../models/Friendship.js"; 
 

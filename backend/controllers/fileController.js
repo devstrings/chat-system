@@ -1,10 +1,9 @@
-
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "../models/Attachment.js";
-import Conversation from "../models/conversationModel.js";
+import Conversation from "../models/Conversation.js";
 
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>
@@ -16,58 +15,76 @@ const calculateFileHash = (filePath) =>
     stream.on("error", (err) => reject(err));
   });
 
-// Download file controller (authenticated & authorized)
+//  Download file controller (authenticated & authorized)
 export const downloadFile = async (req, res) => {
   try {
     const filename = req.params.filename;
     const userId = req.user.userId || req.user.id;
+
+    console.log(' Download request:', { filename, userId });
 
     // Prevent path traversal
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
       return res.status(400).json({ message: "Invalid filename" });
     }
 
-    // Find attachment in database
+    //  Try multiple possible file paths
+    const possiblePaths = [
+      path.join(process.cwd(), "uploads", "messages", filename),
+      path.join(process.cwd(), "uploads", filename)
+    ];
+
+    let filePath = null;
+    for (const tryPath of possiblePaths) {
+      console.log(' Checking path:', tryPath);
+      if (fs.existsSync(tryPath)) {
+        filePath = tryPath;
+        console.log('File found at:', filePath);
+        break;
+      }
+    }
+
+    if (!filePath) {
+      console.error(' File not found in any location:', filename);
+      return res.status(404).json({ message: "File not found on server" });
+    }
+
+    // Find attachment ( - for permission check)
     const attachment = await Attachment.findOne({ 
       serverFileName: filename,
       status: "completed"
     });
 
-    if (!attachment) {
-      return res.status(404).json({ message: "File not found" });
+    if (attachment) {
+      console.log(' Attachment found in database');
+      
+      // Verify conversation access
+      const conversation = await Conversation.findById(attachment.conversationId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // Check if user is participant
+      const isParticipant = conversation.participants.some(
+        participantId => participantId.toString() === userId.toString()
+      );
+
+      if (!isParticipant) {
+        return res.status(403).json({ 
+          message: "Access denied: You don't have permission to access this file" 
+        });
+      }
+
+      // Send file with proper headers
+      res.setHeader('Content-Type', attachment.fileType);
+      res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
+      return res.sendFile(filePath);
+    } else {
+      console.log(' Attachment not in database, serving file anyway (backward compatibility)');
+      // Send file without metadata (for backward compatibility)
+      return res.sendFile(filePath);
     }
-
-    // Find conversation and verify user access
-    const conversation = await Conversation.findById(attachment.conversationId);
-    
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
-    }
-
-    // Check if user is participant in the conversation
-    const isParticipant = conversation.participants.some(
-      participantId => participantId.toString() === userId.toString()
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({ 
-        message: "Access denied: You don't have permission to access this file" 
-      });
-    }
-
-    // Construct file path
-    const filePath = path.join(process.cwd(), "uploads", filename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found on server" });
-    }
-
-    // Set proper headers for download
-    res.setHeader('Content-Type', attachment.fileType);
-    res.setHeader('Content-Disposition', `attachment; filename="${attachment.fileName}"`);
-    
-    // Send file
-    res.sendFile(filePath);
 
   } catch (error) {
     console.error(" File download error:", error);
@@ -117,22 +134,20 @@ export const uploadFile = async (req, res) => {
       });
     }
 
-    
-
     // Calculate audio duration for audio files
     let audioDuration = null;
     let isVoiceMessage = false;
 
     if (req.file.mimetype.startsWith('audio/')) {
       try {
-        console.log("🎵 Calculating audio duration...");
+        console.log(" Calculating audio duration...");
         audioDuration = await getAudioDurationInSeconds(req.file.path);
         audioDuration = Math.floor(audioDuration);
         
         isVoiceMessage = req.file.originalname.includes('voice_') || 
                         req.body.isVoiceMessage === 'true';
         
-        console.log(` Audio duration: ${audioDuration}s, Voice: ${isVoiceMessage}`);
+        console.log(`Audio duration: ${audioDuration}s, Voice: ${isVoiceMessage}`);
       } catch (err) {
         console.error(" Duration calculation failed:", err);
       }
@@ -151,7 +166,7 @@ export const uploadFile = async (req, res) => {
     });
 
     if (existingAttachment) {
-      console.log("Duplicate file found, reusing existing");
+      console.log(" Duplicate file found, reusing existing");
       fs.unlinkSync(req.file.path);
       
       return res.json({
@@ -196,13 +211,13 @@ export const uploadFile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(" Upload error:", error);
+    console.error("Upload error:", error);
     console.error(" Error details:", error.message);
     
     // Cleanup uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
-      console.log(" Cleaned up uploaded file");
+      console.log("Cleaned up uploaded file");
     }
     
     // Handle duplicate key error

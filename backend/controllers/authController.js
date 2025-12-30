@@ -1,9 +1,19 @@
-// backend/controllers/authController.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js";
+import User from "../models/user.js";
+import AuthProvider from "../models/AuthProvider.js";
+import config from "../config/index.js"; 
 
-// Register new user
+// Helper function
+const generateToken = (userId, username) => {
+  return jwt.sign(
+    { id: userId, username },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
+  );
+};
+
+//  REGISTER 
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -18,14 +28,22 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
     });
 
-    res.status(201).json({ 
-      message: "User registered successfully", 
+    await AuthProvider.create({
+      userId: newUser._id,
+      provider: "local"
+    });
+
+    console.log(" User registered:", email);
+
+    res.status(201).json({
+      message: "User registered successfully",
       user: {
         _id: newUser._id,
         username: newUser.username,
@@ -34,18 +52,46 @@ export const register = async (req, res) => {
       }
     });
   } catch (err) {
+    console.error(" Registration error:", err);
     res.status(500).json({ message: "Registration failed", error: err.message });
   }
 };
 
-// Login existing user
+// LOGIN 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    let localProvider = await AuthProvider.findOne({
+      userId: user._id,
+      provider: "local"
+    });
+
+    // Auto-migration fallback
+    if (!localProvider && user.password) {
+      console.log(" Auto-creating local provider for:", email);
+      
+      localProvider = await AuthProvider.create({
+        userId: user._id,
+        provider: "local"
+      });
+      
+      console.log(" Local provider auto-created");
+    }
+
+    if (!localProvider) {
+      return res.status(400).json({
+        message: "This account was created with Google or Facebook. Please use social login."
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -53,11 +99,9 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign(
-      { id: user._id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken(user._id, user.username);
+
+    console.log(" User logged in:", email);
 
     res.json({
       message: "Login successful",
@@ -66,54 +110,41 @@ export const login = async (req, res) => {
       profileImage: user.profileImage
     });
   } catch (err) {
+    console.error(" Login error:", err);
     res.status(500).json({ message: "Login failed", error: err.message });
   }
 };
 
-//  GOOGLE OAUTH CALLBACK HANDLER
+// GOOGLE CALLBACk
 export const googleCallback = (req, res) => {
   try {
-    const token = jwt.sign(
-      { id: req.user._id, username: req.user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
+    const token = generateToken(req.user._id, req.user.username);
     const profileImage = req.user.profileImage || "";
-    const redirectUrl = `http://localhost:5173/auth/callback?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
     
-    console.log(" Google OAuth success:", { 
-      username: req.user.username, 
-      email: req.user.email 
-    });
-    
+    const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+
+    console.log(" Google OAuth success:", req.user.email);
+
     res.redirect(redirectUrl);
   } catch (err) {
     console.error(" Google callback error:", err);
-    res.redirect("http://localhost:5173/login?error=token_generation_failed");
+    res.redirect(`${config.frontend.loginUrl}?error=token_generation_failed`);
   }
 };
 
-//  FACEBOOK OAUTH CALLBACK HANDLER
+// FACEBOOK CALLBACK
 export const facebookCallback = (req, res) => {
   try {
-    const token = jwt.sign(
-      { id: req.user._id, username: req.user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
+    const token = generateToken(req.user._id, req.user.username);
     const profileImage = req.user.profileImage || "";
-    const redirectUrl = `http://localhost:5173/auth/callback?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
     
-    console.log(" Facebook OAuth success:", { 
-      username: req.user.username, 
-      email: req.user.email 
-    });
-    
+    const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+
+    console.log(" Facebook OAuth success:", req.user.email);
+
     res.redirect(redirectUrl);
   } catch (err) {
-    console.error(" Facebook callback error:", err);
-    res.redirect("http://localhost:5173/login?error=token_generation_failed");
+    console.error("Facebook callback error:", err);
+    res.redirect(`${config.frontend.loginUrl}?error=token_generation_failed`);
   }
 };

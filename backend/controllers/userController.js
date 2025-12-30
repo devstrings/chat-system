@@ -1,24 +1,10 @@
-import User from "../models/userModel.js";
+import User from "../models/user.js";
 import BlockedUser from "../models/BlockedUser.js";
-import multer from "multer";
 import fs from "fs";
 import path from "path";
 
-// ------------------- MULTER SETUP -------------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = "uploads/profileImages";
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
 
-export const upload = multer({ storage });
-
-// ------------------- USER CONTROLLERS -------------------
+// USER CONTROLLERS 
 
 // Get all users except current user
 export const getUsers = async (req, res) => {
@@ -131,7 +117,7 @@ export const getCurrentUser = async (req, res) => {
   }
 };
 
-// ------------------- PROFILE IMAGE -------------------
+// PROFILE IMAGE 
 
 // Serve profile image with authentication
 export const serveProfileImage = async (req, res) => {
@@ -169,7 +155,7 @@ export const uploadProfileImage = async (req, res) => {
       imageUrl,
     });
   } catch (err) {
-    console.error("Upload profile image error:", err);
+    console.error(" Upload profile image error:", err);
     res.status(500).json({ message: "Upload failed", error: err.message });
   }
 };
@@ -202,7 +188,7 @@ export const updateProfileImage = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Update profile image error:", err);
+    console.error(" Update profile image error:", err);
     res.status(500).json({ message: "Failed to update profile image", error: err.message });
   }
 };
@@ -237,7 +223,7 @@ export const removeProfileImage = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Remove profile image error:", err);
+    console.error(" Remove profile image error:", err);
     res.status(500).json({ message: "Failed to remove profile image" });
   }
 };
