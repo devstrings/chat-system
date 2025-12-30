@@ -7,10 +7,11 @@ import {
   updateProfileImage,
   removeProfileImage,
   uploadProfileImage,
-  serveProfileImage, 
-  upload
+  serveProfileImage
+  // upload - DELETE THIS, multer se import karenge
 } from "../controllers/userController.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { uploadProfile } from "../config/multer.js"; 
 
 const router = express.Router();
 
@@ -20,8 +21,8 @@ router.get("/search", verifyToken, searchUsers);
 router.get("/", verifyToken, getUsers);
 router.get("/:id", verifyToken, getUserById); 
 
-// Profile image routes
-router.post("/profile/upload", verifyToken, upload.single("image"), uploadProfileImage);
+// Profile image routes - FIX upload reference
+router.post("/profile/upload", verifyToken, uploadProfile.single("image"), uploadProfileImage);
 router.put("/profile/update-image", verifyToken, updateProfileImage);
 router.delete("/profile/remove-image", verifyToken, removeProfileImage);
 

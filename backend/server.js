@@ -1,94 +1,153 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import dotenv from "dotenv";
 import cors from "cors";
+import session from "express-session";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import fs from "fs";
 import swaggerUi from "swagger-ui-express";
-import session from "express-session";
+import passport from "./config/passport.js";
+import connectDB from "./config/db.js";
+import { connectRedis } from "./config/redis.js";
+import routes from "./routes/index.js";
+import config from "./config/index.js"; 
+import { setupSocket } from "./socket/index.js";
 
-// GET CURRENT DIRECTORY
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// EXPLICITLY LOAD .env FILE
-dotenv.config({ path: path.join(__dirname, '.env') });
+const app = express();
+const server = http.createServer(app);
 
-// DEBUG - CHECK IF LOADED
-// console.log("=== ENV DEBUG ===");
-// console.log("ENV File Path:", path.join(__dirname, '.env'));
-// console.log("Google Client ID:", process.env.GOOGLE_CLIENT_ID);
-// console.log("Google Secret:", process.env.GOOGLE_CLIENT_SECRET);
-// console.log("Session Secret:", process.env.SESSION_SECRET);
-// console.log("================");
+// Socket.IO setup
+const io = new Server(server, {
+  cors: {
+    origin: config.frontend.url, 
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
 
-// DYNAMIC IMPORTS (after dotenv loaded)
-const { default: passport } = await import("./config/passport.js");
-const { config } = await import("./config/index.js");
-const { default: connectDB } = await import("./config/db.js");
-const { connectRedis } = await import("./config/redis.js");
-const { default: setupRoutes } = await import("./routes/index.js");
-const { setupSocket } = await import("./socket/index.js");
+// Middleware
+app.use(cors({
+  origin: config.frontend.url, 
+  credentials: true,
+}));
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session middleware
+app.use(
+  session({
+    secret: config.jwtSecret, 
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.nodeEnv === "production", 
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+// Passport initialization
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Static files
+app.use("/uploads", express.static("uploads"));
+
+// Swagger UI (optional)
+const swaggerFilePath = path.join(__dirname, "openapi.json");
+if (fs.existsSync(swaggerFilePath)) {
+  try {
+    const swaggerDocument = JSON.parse(fs.readFileSync(swaggerFilePath, "utf-8"));
+    app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    console.log(` Swagger docs: http://localhost:${config.port}/api-docs`);
+  } catch (err) {
+    console.error(" Swagger setup failed:", err.message);
+  }
+}
+
+// API routes
+routes(app);
+
+// Socket.IO handler
+setupSocket(io);
+
+// Health check
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "OK",
+    message: "Chat server active!",
+    timestamp: new Date().toISOString(),
+    environment: config.nodeEnv 
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    environment: config.nodeEnv 
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(" Server error:", err);
+  res.status(500).json({ 
+    message: "Internal server error", 
+    error: config.nodeEnv === "development" ? err.message : undefined 
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// Start server
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
-
-    // Connect to Redis
     await connectRedis();
-
-    // Setup Express + Socket.io
-    const app = express();
-    const server = http.createServer(app);
-    const io = new Server(server, {
-      cors: { origin: "*", methods: ["GET", "POST"] },
-      pingTimeout: 60000,
-      pingInterval: 25000,
+    
+    server.listen(config.port, () => { 
+      console.log(`Server running on port ${config.port}`);
+      console.log(` Environment: ${config.nodeEnv}`);
+      console.log(` Frontend URL: ${config.frontend.url}`);
     });
-
-    app.use(cors());
-    app.use(express.json());
-
-    // ADD SESSION & PASSPORT
-    app.use(
-      session({
-        secret: process.env.SESSION_SECRET || "your-secret-key",
-        resave: false,
-        saveUninitialized: false,
-      })
-    );
-    app.use(passport.initialize());
-    app.use(passport.session());
-
-    // Swagger UI Setup
-    const swaggerFilePath = path.join(__dirname, "openapi.json");
-    if (fs.existsSync(swaggerFilePath)) {
-      const swaggerDocument = JSON.parse(fs.readFileSync(swaggerFilePath, "utf-8"));
-      app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-      console.log(`Swagger docs available at http://localhost:${config.port}/api-docs`);
-    } else {
-      console.warn("OpenAPI file not found. Swagger UI not available.");
-    }
-
-    // Setup routes
-    setupRoutes(app);
-
-    // Default route
-    app.get("/", (_, res) => res.send("Chat server active!"));
-
-    // Setup Socket.io
-    setupSocket(io);
-
-    // Start server
-    server.listen(config.port, () =>
-      console.log(`Server running on port 5000`)
-    );
-  } catch (err) {
-    console.error("Server startup failed:", err);
+  } catch (error) {
+    console.error(" Failed to start server:", error);
+    process.exit(1);
   }
 };
 
 startServer();
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+  
+  server.close(async () => {
+    console.log(" HTTP server closed");
+    
+    try {
+      if (redisClient.isOpen) {
+        await redisClient.quit();
+        console.log(" Redis connection closed");
+      }
+    } catch (err) {
+      console.error(" Redis shutdown error:", err);
+    }
+    
+    process.exit(0);
+  });
+});
+
+export default app;

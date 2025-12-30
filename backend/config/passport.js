@@ -1,14 +1,14 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
-import User from "../models/userModel.js";
+import User from "../models/user.js";
+import AuthProvider from "../models/AuthProvider.js";
+import config from "./index.js"; 
 
-// Serialize user
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
-// Deserialize user
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await User.findById(id);
@@ -18,84 +18,162 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-//  GOOGLE STRATEGY
+// GOOGLE STRATEGY 
 passport.use(
   new GoogleStrategy(
     {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:5000/api/auth/google/callback", 
+      clientID: config.google.clientId,
+      clientSecret: config.google.clientSecret,
+      callbackURL: config.google.callbackUrl,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        // Check if user already exists
-        let user = await User.findOne({ email: profile.emails[0].value });
+        const email = profile.emails[0].value;
+        const googleId = profile.id;
+        const name = profile.displayName;
+        const picture = profile.photos[0]?.value;
+
+        console.log(" Google login attempt:", email);
+
+        let user = await User.findOne({ email });
 
         if (user) {
-          // Update Google ID if not set
-          if (!user.googleId) {
-            user.googleId = profile.id;
-            user.provider = "google";
-            user.profileImage = profile.photos[0]?.value || user.profileImage;
-            await user.save();
+          console.log(" Existing user found");
+
+          const googleProvider = await AuthProvider.findOne({
+            userId: user._id,
+            provider: "google"
+          });
+
+          if (!googleProvider) {
+            console.log(" Linking Google to existing account");
+
+            await AuthProvider.create({
+              userId: user._id,
+              provider: "google",
+              providerId: googleId,
+              providerData: { name, picture }
+            });
+
+            if (!user.profileImage && picture) {
+              user.profileImage = picture;
+              await user.save();
+            }
           }
-          return done(null, user);
+        } else {
+          console.log(" Creating new user");
+
+          // Generate unique username
+          let username = name || `user_${Date.now()}`;
+          
+          // Check if username exists
+          const existingUsername = await User.findOne({ username });
+          if (existingUsername) {
+            username = `${username}_${Date.now()}`;
+          }
+          
+          user = await User.create({
+            email,
+            username,
+            profileImage: picture
+          });
+
+          await AuthProvider.create({
+            userId: user._id,
+            provider: "google",
+            providerId: googleId,
+            providerData: { name, picture }
+          });
         }
 
-        // Create new user
-        user = await User.create({
-          googleId: profile.id,
-          username: profile.displayName || profile.emails[0].value.split("@")[0],
-          email: profile.emails[0].value,
-          profileImage: profile.photos[0]?.value,
-          provider: "google",
-          password: "OAUTH_USER_NO_PASSWORD",
-        });
-
-        done(null, user);
+        return done(null, user);
       } catch (err) {
-        done(err, null);
+        console.error(" Google strategy error:", err);
+        return done(err, null);
       }
     }
   )
 );
 
-
-//  FACEBOOK STRATEGY
+//FACEBOOK STRATEGY 
 passport.use(
   new FacebookStrategy(
     {
-      clientID: process.env.FACEBOOK_APP_ID,
-      clientSecret: process.env.FACEBOOK_APP_SECRET,
-      callbackURL: "http://localhost:5000/api/auth/facebook/callback", 
+      clientID: config.facebook.appId,
+      clientSecret: config.facebook.appSecret,
+      callbackURL: config.facebook.callbackUrl,
       profileFields: ["id", "displayName", "photos", "email"],
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        let user = await User.findOne({ email: profile.emails[0].value });
+        const email = profile.emails?.[0]?.value;
 
-        if (user) {
-          if (!user.facebookId) {
-            user.facebookId = profile.id;
-            user.provider = "facebook";
-            user.profileImage = profile.photos[0]?.value || user.profileImage;
-            await user.save();
-          }
-          return done(null, user);
+        if (!email) {
+          console.error(" Facebook email not provided");
+          return done(new Error("Email not provided by Facebook"), null);
         }
 
-        user = await User.create({
-          facebookId: profile.id,
-          username: profile.displayName || profile.emails[0].value.split("@")[0],
-          email: profile.emails[0].value,
-          profileImage: profile.photos[0]?.value,
-          provider: "facebook",
-          password: "OAUTH_USER_NO_PASSWORD",
-        });
+        const facebookId = profile.id;
+        const name = profile.displayName;
+        const picture = profile.photos?.[0]?.value;
 
-        done(null, user);
+        console.log(" Facebook login attempt:", email);
+
+        let user = await User.findOne({ email });
+
+        if (user) {
+          console.log(" Existing user found");
+
+          const facebookProvider = await AuthProvider.findOne({
+            userId: user._id,
+            provider: "facebook"
+          });
+
+          if (!facebookProvider) {
+            console.log(" Linking Facebook to existing account");
+
+            await AuthProvider.create({
+              userId: user._id,
+              provider: "facebook",
+              providerId: facebookId,
+              providerData: { name, picture }
+            });
+
+            if (!user.profileImage && picture) {
+              user.profileImage = picture;
+              await user.save();
+            }
+          }
+        } else {
+          console.log(" Creating new user");
+
+          //  Generate unique username
+          let username = name || `user_${Date.now()}`;
+          
+          // Check if username exists
+          const existingUsername = await User.findOne({ username });
+          if (existingUsername) {
+            username = `${username}_${Date.now()}`;
+          }
+          
+          user = await User.create({
+            email,
+            username,
+            profileImage: picture
+          });
+
+          await AuthProvider.create({
+            userId: user._id,
+            provider: "facebook",
+            providerId: facebookId,
+            providerData: { name, picture }
+          });
+        }
+
+        return done(null, user);
       } catch (err) {
-        done(err, null);
+        console.error(" Facebook strategy error:", err);
+        return done(err, null);
       }
     }
   )

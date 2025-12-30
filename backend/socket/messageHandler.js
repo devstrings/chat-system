@@ -1,5 +1,5 @@
-import Message from "../models/messageModel.js";
-import Conversation from "../models/conversationModel.js";
+import Message from "../models/message.js";
+import Conversation from "../models/Conversation.js";
 
 export function handleMessage(io, socket) {
   console.log(` User connected: ${socket.user.id}`);
@@ -270,7 +270,7 @@ export function handleMessage(io, socket) {
   //   DELETE FOR ME
 socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
   try {
-    console.log("🗑️ Delete for me request:", messageId);
+    console.log(" Delete for me request:", messageId);
 
     const message = await Message.findById(messageId).populate('conversationId');
     if (!message) {

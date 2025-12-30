@@ -111,56 +111,84 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
     const fiveMinutes = 5 * 60 * 1000;
     return messageAge <= fiveMinutes;
   };
-
-  const toggleAudio = (index, audioUrl) => {
-    const audio = audioRefs.current[index];
+// Line 127 ke baad - toggleAudio function mein
+const toggleAudio = (index, audioUrl) => {
+  const audio = audioRefs.current[index];
+  
+  if (!audio) {
+    const newAudio = new Audio();
+    const token = localStorage.getItem("token");
     
-    if (!audio) {
-      const newAudio = new Audio();
-      const token = localStorage.getItem("token");
+    //  Check if URL is external
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      // External URL - use directly
+      newAudio.src = audioUrl;
+      newAudio.play();
       
-      fetch(`http://localhost:5000${audioUrl}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(res => res.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        newAudio.src = url;
-        newAudio.play();
-        
-        newAudio.onloadedmetadata = () => {
-          setAudioDuration(prev => ({ ...prev, [index]: newAudio.duration }));
-        };
-        
-        newAudio.ontimeupdate = () => {
-          setAudioProgress(prev => ({ 
-            ...prev, 
-            [index]: (newAudio.currentTime / newAudio.duration) * 100 
-          }));
-        };
-        
-        newAudio.onended = () => {
-          setPlayingAudio(null);
-          setAudioProgress(prev => ({ ...prev, [index]: 0 }));
-        };
-        
-        audioRefs.current[index] = newAudio;
-        setPlayingAudio(index);
-      })
-      .catch(err => console.error('Audio load error:', err));
+      newAudio.onloadedmetadata = () => {
+        setAudioDuration(prev => ({ ...prev, [index]: newAudio.duration }));
+      };
       
+      newAudio.ontimeupdate = () => {
+        setAudioProgress(prev => ({ 
+          ...prev, 
+          [index]: (newAudio.currentTime / newAudio.duration) * 100 
+        }));
+      };
+      
+      newAudio.onended = () => {
+        setPlayingAudio(null);
+        setAudioProgress(prev => ({ ...prev, [index]: 0 }));
+      };
+      
+      audioRefs.current[index] = newAudio;
+      setPlayingAudio(index);
       return;
     }
     
-    if (playingAudio === index) {
-      audio.pause();
-      setPlayingAudio(null);
-    } else {
-      Object.values(audioRefs.current).forEach(a => a?.pause());
-      audio.play();
+    // Local file - fetch from backend with auth
+    fetch(`http://localhost:5000${audioUrl}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.blob())
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      newAudio.src = url;
+      newAudio.play();
+      
+      newAudio.onloadedmetadata = () => {
+        setAudioDuration(prev => ({ ...prev, [index]: newAudio.duration }));
+      };
+      
+      newAudio.ontimeupdate = () => {
+        setAudioProgress(prev => ({ 
+          ...prev, 
+          [index]: (newAudio.currentTime / newAudio.duration) * 100 
+        }));
+      };
+      
+      newAudio.onended = () => {
+        setPlayingAudio(null);
+        setAudioProgress(prev => ({ ...prev, [index]: 0 }));
+      };
+      
+      audioRefs.current[index] = newAudio;
       setPlayingAudio(index);
-    }
-  };
+    })
+    .catch(err => console.error('Audio load error:', err));
+    
+    return;
+  }
+  
+  if (playingAudio === index) {
+    audio.pause();
+    setPlayingAudio(null);
+  } else {
+    Object.values(audioRefs.current).forEach(a => a?.pause());
+    audio.play();
+    setPlayingAudio(index);
+  }
+};
 
   const formatAudioTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -169,82 +197,133 @@ export default function Message({ message, isOwn, isSelectionMode, isSelected, o
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    const fetchSecureImages = async () => {
-      if (!message.attachments || message.attachments.length === 0) return;
+ 
 
-      const token = localStorage.getItem("token");
-      if (!token) return;
+useEffect(() => {
+  const fetchSecureImages = async () => {
+    if (!message.attachments || message.attachments.length === 0) return;
 
-      for (const [index, file] of message.attachments.entries()) {
-        if (file.fileType?.startsWith("image/")) {
-          setImageLoading(prev => ({ ...prev, [index]: true }));
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-          try {
-            const response = await fetch(`http://localhost:5000${file.url}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
+    for (const [index, file] of message.attachments.entries()) {
+      if (file.fileType?.startsWith("image/")) {
+        setImageLoading(prev => ({ ...prev, [index]: true }));
 
-            if (!response.ok) {
-              throw new Error('Failed to load image');
-            }
-
-            const blob = await response.blob();
-            const imageUrl = URL.createObjectURL(blob);
-
+        try {
+          let imageUrl;
+          
+          // Check if URL is external (Google, Facebook, etc.)
+          if (file.url.startsWith('http://') || file.url.startsWith('https://')) {
+            console.log(' External image URL:', file.url);
+            imageUrl = file.url;
             setImageUrls(prev => ({ ...prev, [index]: imageUrl }));
-          } catch (error) {
-            console.error('Error loading image:', error);
-          } finally {
             setImageLoading(prev => ({ ...prev, [index]: false }));
+            continue;
           }
+
+          // Local file - extract filename correctly
+          let filename = file.url;
+          
+          // If stored as full path like "/uploads/messages/filename.jpg"
+          if (filename.includes('/')) {
+            filename = filename.split('/').pop();
+          }
+          
+          //  Use correct endpoint matching your backend route
+          const fullUrl = `http://localhost:5000/api/file/get/${filename}`;
+          
+          console.log('Fetching local image:', fullUrl);
+
+          const response = await fetch(fullUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to load image: ${response.status}`);
+          }
+
+          const blob = await response.blob();
+          imageUrl = URL.createObjectURL(blob);
+
+          setImageUrls(prev => ({ ...prev, [index]: imageUrl }));
+          console.log(' Image loaded successfully');
+        } catch (error) {
+          console.error(' Error loading image:', error.message);
+          setImageUrls(prev => ({ ...prev, [index]: null }));
+        } finally {
+          setImageLoading(prev => ({ ...prev, [index]: false }));
         }
       }
-    };
-
-    fetchSecureImages();
-
-    return () => {
-      Object.values(imageUrls).forEach(url => {
-        if (url) URL.revokeObjectURL(url);
-      });
-    };
-  }, [message.attachments]);
-
-  const handleFileDownload = async (file) => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        alert("Please login to download files");
-        return;
-      }
-
-      const response = await fetch(`http://localhost:5000${file.url}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Download failed');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = getFileName(file);
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Failed to download file');
     }
   };
+
+  fetchSecureImages();
+
+  return () => {
+    Object.values(imageUrls).forEach(url => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  };
+}, [message.attachments]);
+
+  // handleFileDownload function
+const handleFileDownload = async (file) => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login to download files");
+      return;
+    }
+
+    let downloadUrl;
+    let needsAuth = true;
+    
+    //  Check if URL is external
+    if (file.url.startsWith('http://') || file.url.startsWith('https://')) {
+      downloadUrl = file.url;
+      needsAuth = false; 
+    } else {
+      //  Local file - extract filename
+      let filename = file.url;
+      if (filename.includes('/')) {
+        filename = filename.split('/').pop();
+      }
+      downloadUrl = `http://localhost:5000/api/file/get/${filename}`;
+    }
+
+    console.log('⬇ Downloading:', downloadUrl);
+
+    const response = await fetch(downloadUrl, {
+      headers: needsAuth ? {
+        'Authorization': `Bearer ${token}`
+      } : {}
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = getFileName(file);
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    console.log('Download successful');
+  } catch (error) {
+    console.error(' Download error:', error);
+    alert('Failed to download file');
+  }
+};
 
   const getStatusIcon = () => {
     const status = message.status || 'sent';

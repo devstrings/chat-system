@@ -35,9 +35,9 @@ export default function ConfirmationDialog({
   message = "Are you sure you want to proceed?",
   confirmText = "Confirm",
   cancelText = "Cancel",
-  highlightText = null, // Text to highlight in message
-  icon = "warning", // warning, block, delete, success
-  type = "danger" // danger, success, info
+  highlightText = null, 
+  icon = "warning", 
+  type = "danger" 
 }) {
   if (!isOpen) return null;
 
