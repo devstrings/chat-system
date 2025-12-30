@@ -5,7 +5,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // ✅ FIX: Use only currentUser.profileImage
+  // Use only currentUser.profileImage
   const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
     currentUser?.profileImage
   );
@@ -111,7 +111,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
         }
       );
       
-      // ✅ Notify Dashboard of the change
+      //  Notify Dashboard of the change
       onProfileImageUpdate(imageUrl);
       alert("Profile picture uploaded successfully!");
     } catch (err) {
@@ -134,7 +134,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
         }
       );
       
-      // ✅ Notify Dashboard of the change
+      //  Notify Dashboard of the change
       onProfileImageUpdate(null);
       setShowPhotoMenu(false);
       alert("Profile picture removed successfully");
@@ -310,7 +310,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
-                          Remove Photo
+                          Remove Profile
                         </button>
                       )}
                     </div>
