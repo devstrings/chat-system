@@ -6,7 +6,10 @@ import {
   clearChat,
   deleteMessageForMe,        
   deleteMessageForEveryone,  
-  bulkDeleteMessages         
+  bulkDeleteMessages,
+  pinConversation,        
+  unpinConversation,      
+  getPinnedConversations, 
 } from "../controllers/message.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
@@ -17,6 +20,11 @@ router.get("/conversations", verifyToken, getUserConversations);
 
 // Get or create conversation
 router.post("/conversation", verifyToken, getOrCreateConversation);
+
+//  Pin routes
+router.post("/conversation/:conversationId/pin", verifyToken, pinConversation);
+router.delete("/conversation/:conversationId/unpin", verifyToken, unpinConversation);
+router.get("/pinned", verifyToken, getPinnedConversations);
 
 // Clear chat (delete messages) - Must be before /:conversationId
 router.delete("/conversation/:conversationId", verifyToken, clearChat);
@@ -30,7 +38,7 @@ router.delete("/message/:messageId/for-everyone", verifyToken, deleteMessageForE
 // Bulk delete messages
 router.post("/messages/bulk-delete", verifyToken, bulkDeleteMessages);
 
-// Get messages for a conversation (keep at end)
+// Get messages for a conversation 
 router.get("/:conversationId", verifyToken, getMessages);
 
 export default router;
