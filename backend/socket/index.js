@@ -6,7 +6,7 @@ import User from "../models/user.js";
 
 const userSockets = new Map(); 
 
-// HELPER: Get user details (no URL modification needed here)
+// HELPER
 const getUserDetailsWithImage = async (userId) => {
   try {
     const user = await User.findById(userId).select("username email profileImage");

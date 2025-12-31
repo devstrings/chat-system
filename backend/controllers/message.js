@@ -90,7 +90,6 @@ export const getMessages = async (req, res) => {
       .populate("sender", "username email")
       .populate({
         path: "attachments",
-        // Added duration & isVoiceMessage
         select: "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage"
       })
       .sort({ createdAt: 1 })
@@ -106,7 +105,6 @@ export const getMessages = async (req, res) => {
       messageObj.isDeletedForEveryone = msg.deletedForEveryone;
       
       if (messageObj.attachments && messageObj.attachments.length > 0) {
-        // Added duration & isVoiceMessage to transformation
         messageObj.attachments = messageObj.attachments.map(att => ({
           url: `/api/file/get/${att.serverFileName}`,
           filename: att.fileName,
@@ -134,7 +132,9 @@ export const getUserConversations = async (req, res) => {
     const currentUserId = req.user.id;
 
     const conversations = await Conversation.find({
-      participants: currentUserId
+      participants: currentUserId,
+      // EXCLUDE ARCHIVED CONVERSATIONS
+      "archivedBy.userId": { $ne: currentUserId }
     })
       .populate("participants", "username email")
       .populate("lastMessageSender", "username") 
@@ -357,7 +357,8 @@ export const bulkDeleteMessages = async (req, res) => {
     res.status(500).json({ message: "Failed to delete messages", error: err.message });
   }
 };
-// ==================== PIN CONVERSATION ====================
+
+// PIN CONVERSATION 
 export const pinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -418,7 +419,7 @@ export const pinConversation = async (req, res) => {
   }
 };
 
-// ==================== UNPIN CONVERSATION ====================
+//  UNPIN CONVERSATION 
 export const unpinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -449,7 +450,7 @@ export const unpinConversation = async (req, res) => {
   }
 };
 
-// ==================== GET PINNED STATUS ====================
+// GET PINNED CONVERSATIONS 
 export const getPinnedConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -464,5 +465,105 @@ export const getPinnedConversations = async (req, res) => {
   } catch (err) {
     console.error(" Get pinned conversations error:", err);
     res.status(500).json({ message: "Failed to fetch pinned conversations" });
+  }
+};
+
+// ARCHIVE CONVERSATION 
+export const archiveConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Check if user is participant
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Check if already archived
+    const alreadyArchived = conversation.archivedBy.some(
+      (archive) => archive.userId.toString() === userId
+    );
+
+    if (alreadyArchived) {
+      return res.status(400).json({ message: "Already archived" });
+    }
+
+    // Add to archive
+    conversation.archivedBy.push({
+      userId: userId,
+      archivedAt: new Date(),
+    });
+
+    await conversation.save();
+
+    console.log(` Conversation archived: ${conversationId} by ${userId}`);
+
+    res.json({
+      message: "Conversation archived successfully",
+      conversation,
+    });
+  } catch (err) {
+    console.error(" Archive conversation error:", err);
+    res.status(500).json({ message: "Failed to archive conversation" });
+  }
+};
+
+// UNARCHIVE CONVERSATION 
+export const unarchiveConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Remove from archive
+    conversation.archivedBy = conversation.archivedBy.filter(
+      (archive) => archive.userId.toString() !== userId
+    );
+
+    await conversation.save();
+
+    console.log(` Conversation unarchived: ${conversationId} by ${userId}`);
+
+    res.json({
+      message: "Conversation unarchived successfully",
+      conversation,
+    });
+  } catch (err) {
+    console.error("Unarchive conversation error:", err);
+    res.status(500).json({ message: "Failed to unarchive conversation" });
+  }
+};
+
+//  GET ARCHIVED CONVERSATIONS
+export const getArchivedConversations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const archivedConversations = await Conversation.find({
+      "archivedBy.userId": userId,
+    })
+      .populate("participants", "username email profileImage")
+      .populate("lastMessageSender", "username")
+      .sort({ "archivedBy.archivedAt": -1 });
+
+    res.json(archivedConversations);
+  } catch (err) {
+    console.error(" Get archived conversations error:", err);
+    res.status(500).json({ message: "Failed to fetch archived conversations" });
   }
 };

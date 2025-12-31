@@ -30,7 +30,8 @@ export default function Dashboard() {
   const selectedUserRef = useRef(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
-
+ const [archivedConversations, setArchivedConversations] = useState(new Set());
+  const [showArchived, setShowArchived] = useState(false);
   //  Shared profile image state
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
 
@@ -100,7 +101,27 @@ export default function Dashboard() {
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage
   );
+  // Load archived conversations
+  useEffect(() => {
+    const loadArchivedConversations = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/messages/archived",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
+        const archivedIds = new Set(response.data.map((conv) => conv._id));
+        setArchivedConversations(archivedIds);
+      } catch (err) {
+        console.error("Failed to load archived conversations:", err);
+      }
+    };
+
+    if (currentUserId) {
+      loadArchivedConversations();
+    }
+  }, [currentUserId]);
   // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl) => {
     console.log("Profile image updated:", newImageUrl);
@@ -143,6 +164,62 @@ export default function Dashboard() {
       });
     }
   };
+
+  //Archeived 
+    const handleArchiveConversation = async (conversationId, isArchived) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (isArchived) {
+        // Unarchive
+        await axios.delete(
+          `http://localhost:5000/api/messages/conversation/${conversationId}/unarchive`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setArchivedConversations((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(conversationId);
+          return newSet;
+        });
+
+        setAlertDialog({
+          isOpen: true,
+          title: "Chat Unarchived",
+          message: "Chat has been restored to main list.",
+          type: "success",
+        });
+      } else {
+        // Archive
+        await axios.post(
+          `http://localhost:5000/api/messages/conversation/${conversationId}/archive`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+                  );
+
+        setArchivedConversations((prev) => new Set([...prev, conversationId]));
+
+        setAlertDialog({
+          isOpen: true,
+          title: "Chat Archived",
+          message: "Chat has been moved to archive.",
+          type: "success",
+        });
+      }
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.response?.data?.message || "Failed to update archive status",
+        type: "error",
+      });
+    }
+  };
+
+  
+
+
+  // Pin/Unpin conversation handler
   const handlePinConversation = async (conversationId, isPinned) => {
     try {
       const token = localStorage.getItem("token");
@@ -660,6 +737,10 @@ export default function Dashboard() {
           profileImageUrl={sharedProfileImage}
           pinnedConversations={pinnedConversations}
           onPinConversation={handlePinConversation}
+          archivedConversations={archivedConversations}
+          onArchiveConversation={handleArchiveConversation}
+          showArchived={showArchived}
+          onToggleArchived={(show) => setShowArchived(show)}
         />
 
         {showProfileSettings && (

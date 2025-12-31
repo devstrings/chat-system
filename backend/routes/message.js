@@ -9,36 +9,33 @@ import {
   bulkDeleteMessages,
   pinConversation,        
   unpinConversation,      
-  getPinnedConversations, 
+  getPinnedConversations,
+  archiveConversation,
+  unarchiveConversation,
+  getArchivedConversations,
 } from "../controllers/message.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all conversations for user
+// 1. (Get conversations/messages)
 router.get("/conversations", verifyToken, getUserConversations);
-
-// Get or create conversation
-router.post("/conversation", verifyToken, getOrCreateConversation);
-
-//  Pin routes
-router.post("/conversation/:conversationId/pin", verifyToken, pinConversation);
-router.delete("/conversation/:conversationId/unpin", verifyToken, unpinConversation);
 router.get("/pinned", verifyToken, getPinnedConversations);
+router.get("/archived", verifyToken, getArchivedConversations); 
 
-// Clear chat (delete messages) - Must be before /:conversationId
-router.delete("/conversation/:conversationId", verifyToken, clearChat);
 
-// Delete message for me
-router.delete("/message/:messageId/for-me", verifyToken, deleteMessageForMe);
-
-// Delete message for everyone
-router.delete("/message/:messageId/for-everyone", verifyToken, deleteMessageForEveryone);
-
-// Bulk delete messages
+router.post("/conversation", verifyToken, getOrCreateConversation);
 router.post("/messages/bulk-delete", verifyToken, bulkDeleteMessages);
 
-// Get messages for a conversation 
-router.get("/:conversationId", verifyToken, getMessages);
+// 3. (Pin/Archive actions)
+router.post("/conversation/:conversationId/pin", verifyToken, pinConversation);
+router.delete("/conversation/:conversationId/unpin", verifyToken, unpinConversation);
+router.post("/conversation/:conversationId/archive", verifyToken, archiveConversation);
+router.delete("/conversation/:conversationId/unarchive", verifyToken, unarchiveConversation);
 
+// 4.  General ID routes
+router.delete("/conversation/:conversationId", verifyToken, clearChat);
+router.delete("/message/:messageId/for-me", verifyToken, deleteMessageForMe);
+router.delete("/message/:messageId/for-everyone", verifyToken, deleteMessageForEveryone);
+router.get("/:conversationId", verifyToken, getMessages);
 export default router;

@@ -15,8 +15,10 @@ const UserItem = memo(function UserItem({
   lastMessageStatus = "sent",
   onRelationshipChange,
   isPinned = false,
+  isArchived = false,
   conversationId,
   onPinConversation = () => {},
+  onArchiveConversation = () => {},
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [relationshipStatus, setRelationshipStatus] = useState("loading");
@@ -43,6 +45,14 @@ const UserItem = memo(function UserItem({
   });
 
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+
+    const handleArchiveClick = (e) => {
+    e.stopPropagation();
+    if (conversationId) {
+      onArchiveConversation(conversationId, isArchived);
+    }
+    setShowMenu(false);
+  };
 
   const handlePinClick = (e) => {
     e.stopPropagation();
@@ -657,7 +667,18 @@ const UserItem = memo(function UserItem({
                     {isPinned ? "Unpin Chat" : "Pin Chat"}
                   </button>
                 )}
-
+      {/* ARCHIVE OPTION */}
+                {relationshipStatus === "friends" && conversationId && (
+                  <button
+                    onClick={handleArchiveClick}
+                    className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    {isArchived ? "Unarchive Chat" : "Archive Chat"}
+                  </button>
+                )}
                 <button
                   onClick={handleShowProfile}
                   className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm"
