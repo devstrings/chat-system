@@ -16,10 +16,11 @@ export default function Sidebar({
   lastMessages = {},
   isMobileSidebarOpen = false,
   profileImageUrl,
-
   onCloseMobileSidebar = () => {},
   currentUser = null,
   onOpenProfileSettings = () => {},
+  pinnedConversations = new Set(),
+  onPinConversation = () => {},
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,7 +52,20 @@ export default function Sidebar({
         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
     return [...filteredUsers].sort((a, b) => {
+      // Get conversation IDs for pin status
+      const convIdA = lastMessages[a._id]?.conversationId;
+      const convIdB = lastMessages[b._id]?.conversationId;
+
+      const aPinned = convIdA && pinnedConversations.has(convIdA);
+      const bPinned = convIdB && pinnedConversations.has(convIdB);
+
+      // Pinned chats first
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      // Then sort by last message time
       const timeA = lastMessages[a._id]?.time
         ? new Date(lastMessages[a._id].time).getTime()
         : 0;
@@ -60,7 +74,7 @@ export default function Sidebar({
         : 0;
       return timeB - timeA;
     });
-  }, [users, searchQuery, lastMessages]);
+  }, [users, searchQuery, lastMessages, pinnedConversations]);
 
   const onlineCount = memoizedUsers.filter((user) =>
     onlineUsers.has(user._id)
@@ -783,6 +797,9 @@ export default function Sidebar({
               {memoizedUsers.map((user) => {
                 const lastMsg = lastMessages[user._id];
                 const formattedText = formatLastMessageText(lastMsg);
+                const conversationId = lastMsg?.conversationId;
+                const isPinned =
+                  conversationId && pinnedConversations.has(conversationId);
 
                 return (
                   <UserItem
@@ -798,6 +815,9 @@ export default function Sidebar({
                     lastMessageStatus={lastMsg?.status || "sent"}
                     currentUserId={currentUserId}
                     onRelationshipChange={() => window.location.reload()}
+                    isPinned={isPinned}
+                    conversationId={conversationId}
+                    onPinConversation={onPinConversation}
                   />
                 );
               })}

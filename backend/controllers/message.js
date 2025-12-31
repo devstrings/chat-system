@@ -357,3 +357,112 @@ export const bulkDeleteMessages = async (req, res) => {
     res.status(500).json({ message: "Failed to delete messages", error: err.message });
   }
 };
+// ==================== PIN CONVERSATION ====================
+export const pinConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Check if user is participant
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Check if already pinned
+    const alreadyPinned = conversation.pinnedBy.some(
+      (pin) => pin.userId.toString() === userId
+    );
+
+    if (alreadyPinned) {
+      return res.status(400).json({ message: "Already pinned" });
+    }
+
+    // Check pin limit (max 3 like WhatsApp)
+    const userPinnedCount = await Conversation.countDocuments({
+      "pinnedBy.userId": userId,
+    });
+
+    if (userPinnedCount >= 3) {
+      return res.status(400).json({ 
+        message: "Maximum 3 chats can be pinned. Unpin a chat first." 
+      });
+    }
+
+    // Add pin
+    conversation.pinnedBy.push({
+      userId: userId,
+      pinnedAt: new Date(),
+    });
+
+    await conversation.save();
+
+    console.log(` Conversation pinned: ${conversationId} by ${userId}`);
+
+    res.json({
+      message: "Conversation pinned successfully",
+      conversation,
+    });
+  } catch (err) {
+    console.error(" Pin conversation error:", err);
+    res.status(500).json({ message: "Failed to pin conversation" });
+  }
+};
+
+// ==================== UNPIN CONVERSATION ====================
+export const unpinConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Remove pin
+    conversation.pinnedBy = conversation.pinnedBy.filter(
+      (pin) => pin.userId.toString() !== userId
+    );
+
+    await conversation.save();
+
+    console.log(` Conversation unpinned: ${conversationId} by ${userId}`);
+
+    res.json({
+      message: "Conversation unpinned successfully",
+      conversation,
+    });
+  } catch (err) {
+    console.error(" Unpin conversation error:", err);
+    res.status(500).json({ message: "Failed to unpin conversation" });
+  }
+};
+
+// ==================== GET PINNED STATUS ====================
+export const getPinnedConversations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const pinnedConversations = await Conversation.find({
+      "pinnedBy.userId": userId,
+    })
+      .populate("participants", "username email profileImage")
+      .sort({ "pinnedBy.pinnedAt": -1 });
+
+    res.json(pinnedConversations);
+  } catch (err) {
+    console.error(" Get pinned conversations error:", err);
+    res.status(500).json({ message: "Failed to fetch pinned conversations" });
+  }
+};

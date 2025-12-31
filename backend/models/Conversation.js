@@ -24,6 +24,19 @@ const conversationSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  //  Add pinned field
+  pinnedBy: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      pinnedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   createdAt: { 
     type: Date, 
     default: Date.now 
@@ -33,5 +46,6 @@ const conversationSchema = new mongoose.Schema({
 // Index for faster queries
 conversationSchema.index({ participants: 1 });
 conversationSchema.index({ lastMessageTime: -1 }); 
+conversationSchema.index({ "pinnedBy.userId": 1 }); 
 
 export default mongoose.model("Conversation", conversationSchema);

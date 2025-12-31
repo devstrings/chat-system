@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [lastMessages, setLastMessages] = useState({});
   const selectedUserRef = useRef(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [pinnedConversations, setPinnedConversations] = useState(new Set());
 
   //  Shared profile image state
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
@@ -74,6 +75,27 @@ export default function Dashboard() {
 
     loadCurrentUser();
   }, []);
+  // Load pinned conversations
+  useEffect(() => {
+    const loadPinnedConversations = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/messages/pinned",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const pinnedIds = new Set(response.data.map((conv) => conv._id));
+        setPinnedConversations(pinnedIds);
+      } catch (err) {
+        console.error("Failed to load pinned conversations:", err);
+      }
+    };
+
+    if (currentUserId) {
+      loadPinnedConversations();
+    }
+  }, [currentUserId]);
 
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage
@@ -117,6 +139,55 @@ export default function Dashboard() {
         title: "Error",
         message:
           err.response?.data?.message || "Failed to remove profile picture",
+        type: "error",
+      });
+    }
+  };
+  const handlePinConversation = async (conversationId, isPinned) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (isPinned) {
+        // Unpin
+        await axios.delete(
+          `http://localhost:5000/api/messages/conversation/${conversationId}/unpin`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setPinnedConversations((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(conversationId);
+          return newSet;
+        });
+
+        setAlertDialog({
+          isOpen: true,
+          title: "Chat Unpinned",
+          message: "Chat has been unpinned successfully.",
+          type: "success",
+        });
+      } else {
+        // Pin
+        await axios.post(
+          `http://localhost:5000/api/messages/conversation/${conversationId}/pin`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setPinnedConversations((prev) => new Set([...prev, conversationId]));
+
+        setAlertDialog({
+          isOpen: true,
+          title: "Chat Pinned",
+          message: "Chat has been pinned to the top.",
+          type: "success",
+        });
+      }
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.response?.data?.message || "Failed to update pin status",
         type: "error",
       });
     }
@@ -587,6 +658,8 @@ export default function Dashboard() {
           onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
           onOpenProfileSettings={() => setShowProfileSettings(true)}
           profileImageUrl={sharedProfileImage}
+          pinnedConversations={pinnedConversations}
+          onPinConversation={handlePinConversation}
         />
 
         {showProfileSettings && (
