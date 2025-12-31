@@ -21,6 +21,10 @@ export default function Sidebar({
   onOpenProfileSettings = () => {},
   pinnedConversations = new Set(),
   onPinConversation = () => {},
+  archivedConversations = new Set(),
+  onArchiveConversation = () => {},
+  showArchived = false,
+  onToggleArchived = () => {},
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,27 +49,38 @@ export default function Sidebar({
     message: "",
     type: "success",
   });
-
   const memoizedUsers = useMemo(() => {
-    const filteredUsers = users.filter(
-      (user) =>
+    const filteredUsers = users.filter((user) => {
+      const matchesSearch =
         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Check archived status
+      const convId = lastMessages[user._id]?.conversationId;
+      const isArchived = convId && archivedConversations.has(convId);
+
+      // Show archived chats only when showArchived is true
+      if (showArchived) {
+        return matchesSearch && isArchived;
+      } else {
+        return matchesSearch && !isArchived;
+      }
+    });
 
     return [...filteredUsers].sort((a, b) => {
-      // Get conversation IDs for pin status
       const convIdA = lastMessages[a._id]?.conversationId;
       const convIdB = lastMessages[b._id]?.conversationId;
 
       const aPinned = convIdA && pinnedConversations.has(convIdA);
       const bPinned = convIdB && pinnedConversations.has(convIdB);
 
-      // Pinned chats first
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
+      // Pinned chats first (only in main view)
 
-      // Then sort by last message time
+      if (!showArchived) {
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+      }
+
       const timeA = lastMessages[a._id]?.time
         ? new Date(lastMessages[a._id].time).getTime()
         : 0;
@@ -74,7 +89,14 @@ export default function Sidebar({
         : 0;
       return timeB - timeA;
     });
-  }, [users, searchQuery, lastMessages, pinnedConversations]);
+  }, [
+    users,
+    searchQuery,
+    lastMessages,
+    pinnedConversations,
+    archivedConversations,
+    showArchived,
+  ]);
 
   const onlineCount = memoizedUsers.filter((user) =>
     onlineUsers.has(user._id)
@@ -84,7 +106,11 @@ export default function Sidebar({
     0
   );
 
-  //  - Add this around line 82
+  const archivedCount = users.filter((user) => {
+    const convId = lastMessages[user._id]?.conversationId;
+    return convId && archivedConversations.has(convId);
+  }).length;
+
   const formatLastMessageText = (message) => {
     if (!message) return "";
 
@@ -348,12 +374,57 @@ export default function Sidebar({
                 </div>
               </div>
               <div>
-                <h2 className="text-white font-semibold text-lg">Chats</h2>
+                <h2 className="text-white font-semibold text-lg">
+                  {showArchived ? "Archived" : "Chats"}
+                </h2>
                 <p className="text-xs text-gray-400">{currentUsername}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => onToggleArchived(!showArchived)}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
+                title={showArchived ? "Back to Chats" : "Archived Chats"}
+              >
+                {showArchived ? (
+                  // Back arrow icon
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                ) : (
+                  // Archive box icon
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                    />
+                  </svg>
+                )}
+                {/* Badge for archived count */}
+                {!showArchived && archivedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full text-white text-xs flex items-center justify-center">
+                    {archivedCount}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={loadBlockedUsers}
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
@@ -449,7 +520,9 @@ export default function Sidebar({
           <div className="relative">
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={
+                showArchived ? "Search archived..." : "Search conversations..."
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-10 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -737,11 +810,24 @@ export default function Sidebar({
         {/* Users Count & Stats */}
         <div className="px-4 py-2 bg-gray-900 bg-opacity-30">
           <p className="text-xs text-gray-400 font-medium">
-            {memoizedUsers.length}{" "}
-            {memoizedUsers.length === 1 ? "contact" : "contacts"}
-            {searchQuery && ` found`} • {onlineCount} online
-            {totalUnread > 0 && (
-              <span className="text-red-400 ml-2">• {totalUnread} unread</span>
+            {showArchived ? (
+              // ARCHIVED VIEW
+              <>
+                {archivedCount} archived{" "}
+                {archivedCount === 1 ? "chat" : "chats"}
+              </>
+            ) : (
+              //  MAIN VIEW
+              <>
+                {memoizedUsers.length}{" "}
+                {memoizedUsers.length === 1 ? "contact" : "contacts"}
+                {searchQuery && ` found`} • {onlineCount} online
+                {totalUnread > 0 && (
+                  <span className="text-red-400 ml-2">
+                    • {totalUnread} unread
+                  </span>
+                )}
+              </>
             )}
           </p>
         </div>
@@ -782,7 +868,9 @@ export default function Sidebar({
                 )}
               </div>
               <p className="text-gray-400 text-sm">
-                {searchQuery
+                {showArchived
+                  ? "No archived chats"
+                  : searchQuery
                   ? `No results for "${searchQuery}"`
                   : "No contacts yet"}
               </p>
@@ -800,6 +888,8 @@ export default function Sidebar({
                 const conversationId = lastMsg?.conversationId;
                 const isPinned =
                   conversationId && pinnedConversations.has(conversationId);
+                const isArchived =
+                  conversationId && archivedConversations.has(conversationId);
 
                 return (
                   <UserItem
@@ -818,6 +908,8 @@ export default function Sidebar({
                     isPinned={isPinned}
                     conversationId={conversationId}
                     onPinConversation={onPinConversation}
+                    isArchived={isArchived}
+                    onArchiveConversation={onArchiveConversation}
                   />
                 );
               })}
