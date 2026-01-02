@@ -1,31 +1,29 @@
 import React from 'react';
 
-
 const DIALOG_THEME = {
   // Overlay (background blur)
-  overlay: 'bg-black bg-opacity-60 backdrop-blur-sm',
+  overlay: 'bg-black bg-opacity-50 backdrop-blur-sm',
   
-  // Dialog box
-  dialogBg: 'bg-gradient-to-br from-gray-800 to-gray-900',
-  border: 'border-2 border-gray-700',
+  // Dialog box - WHITE THEME
+  dialogBg: 'bg-white',
+  border: 'border border-gray-200',
   
   // Icon background
-  iconBg: 'bg-red-500 bg-opacity-20',
-  iconColor: 'text-red-400',
+  iconBg: 'bg-red-50',
+  iconColor: 'text-red-500',
   
-  // Text colors
-  titleColor: 'text-white',
-  messageColor: 'text-gray-300',
-  highlightColor: 'text-blue-400',
+  // Text colors - DARK for readability
+  titleColor: 'text-gray-900',
+  messageColor: 'text-gray-600',
+  highlightColor: 'text-blue-600',
   
-  // Buttons
-  cancelBtn: 'bg-gray-700 hover:bg-gray-600 text-white',
-  confirmBtn: 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30',
+  // Buttons - Modern clean style
+  cancelBtn: 'bg-gray-100 hover:bg-gray-200 text-gray-900',
+  confirmBtn: 'bg-red-600 hover:bg-red-700 text-white',
   
   // Animation
   animation: 'transform transition-all duration-200 hover:scale-105',
 };
-
 
 export default function ConfirmationDialog({ 
   isOpen, 
@@ -80,9 +78,9 @@ export default function ConfirmationDialog({
   // Button color based on type
   const getConfirmButtonClass = () => {
     if (type === "success") {
-      return 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/30';
+      return 'bg-green-600 hover:bg-green-700 text-white';
     } else if (type === "info") {
-      return 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30';
+      return 'bg-blue-600 hover:bg-blue-700 text-white';
     }
     return DIALOG_THEME.confirmBtn;
   };
@@ -90,18 +88,18 @@ export default function ConfirmationDialog({
   // Icon color based on type
   const getIconBgClass = () => {
     if (type === "success") {
-      return 'bg-green-500 bg-opacity-20';
+      return 'bg-green-50';
     } else if (type === "info") {
-      return 'bg-blue-500 bg-opacity-20';
+      return 'bg-blue-50';
     }
     return DIALOG_THEME.iconBg;
   };
 
   const getIconColorClass = () => {
     if (type === "success") {
-      return 'text-green-400';
+      return 'text-green-500';
     } else if (type === "info") {
-      return 'text-blue-400';
+      return 'text-blue-500';
     }
     return DIALOG_THEME.iconColor;
   };
@@ -165,7 +163,6 @@ export default function ConfirmationDialog({
   );
 }
 
-
 export function AlertDialog({ 
   isOpen, 
   onClose, 
@@ -200,15 +197,15 @@ export function AlertDialog({
   };
 
   const getIconBgClass = () => {
-    if (type === "error") return 'bg-red-500 bg-opacity-20';
-    if (type === "info") return 'bg-blue-500 bg-opacity-20';
-    return 'bg-green-500 bg-opacity-20';
+    if (type === "error") return 'bg-red-50';
+    if (type === "info") return 'bg-blue-50';
+    return 'bg-green-50';
   };
 
   const getIconColorClass = () => {
-    if (type === "error") return 'text-red-400';
-    if (type === "info") return 'text-blue-400';
-    return 'text-green-400';
+    if (type === "error") return 'text-red-500';
+    if (type === "info") return 'text-blue-500';
+    return 'text-green-500';
   };
 
   const getButtonClass = () => {
