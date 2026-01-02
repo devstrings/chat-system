@@ -9,7 +9,7 @@ export default function ChatWindow({
   currentUserId,
   searchQuery = "",
   onUpdateLastMessageStatus,
-  selectedUser = null, 
+  selectedUser = null,
 }) {
   const { socket, onlineUsers } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -75,13 +75,14 @@ export default function ChatWindow({
     const handleReceiveMessage = (msg) => {
       if (msg.conversationId === conversationIdRef.current) {
         const processedMsg = {
-      ...msg,
-      attachments: msg.attachments?.map(att => ({
-        ...att,
-        duration: att.duration ?? 0,
-        isVoiceMessage: att.isVoiceMessage ?? false
-      })) || []
-    };
+          ...msg,
+          attachments:
+            msg.attachments?.map((att) => ({
+              ...att,
+              duration: att.duration ?? 0,
+              isVoiceMessage: att.isVoiceMessage ?? false,
+            })) || [],
+        };
         setMessages((prev) => [...prev, processedMsg]);
 
         if (onUpdateLastMessageStatus) {
@@ -256,7 +257,7 @@ export default function ChatWindow({
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30">
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3 mx-auto"></div>
           <p className="text-gray-400 text-sm">Loading messages...</p>
@@ -267,7 +268,7 @@ export default function ChatWindow({
 
   if (filteredMessages.length === 0 && searchQuery) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30 p-4">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center">
           <svg
             className="w-12 h-12 md:w-16 md:h-16 text-gray-600 mx-auto mb-3"
@@ -292,7 +293,7 @@ export default function ChatWindow({
 
   if (filteredMessages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900 bg-opacity-30 p-4">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center">
           <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 rounded-full bg-gray-800 bg-opacity-50 flex items-center justify-center">
             <svg
@@ -335,9 +336,7 @@ export default function ChatWindow({
 
   return (
     <>
-      <div className="flex-1 flex flex-col bg-gray-900 bg-opacity-30 min-h-0">
-      
-
+      <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
         {isSelectionMode && (
           <div className="bg-gray-800 bg-opacity-90 border-b border-gray-700 px-3 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
@@ -413,7 +412,7 @@ export default function ChatWindow({
             <div className="flex justify-center mb-4 sticky top-0 z-10">
               <button
                 onClick={toggleSelectionMode}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-xs md:text-sm"
+                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-xs md:text-sm"
               >
                 <svg
                   className="w-3.5 h-3.5 md:w-4 md:h-4"
@@ -436,8 +435,8 @@ export default function ChatWindow({
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date}>
               <div className="flex items-center justify-center my-4">
-                <div className="bg-gray-800 bg-opacity-70 px-3 md:px-4 py-1 rounded-full shadow-md">
-                  <p className="text-xs text-gray-400 font-medium">{date}</p>
+                <div className="bg-gray-200 px-3 md:px-4 py-1 rounded-full shadow-sm">
+                  <p className="text-xs text-gray-600 font-medium">{date}</p>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo } from "react";
 import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axios from "axios";
 import { useAuthImage } from "../hooks/useAuthImage";
+
 const UserItem = memo(function UserItem({
   user,
   selected,
@@ -46,7 +47,7 @@ const UserItem = memo(function UserItem({
 
   const [showProfileDialog, setShowProfileDialog] = useState(false);
 
-    const handleArchiveClick = (e) => {
+  const handleArchiveClick = (e) => {
     e.stopPropagation();
     if (conversationId) {
       onArchiveConversation(conversationId, isArchived);
@@ -503,8 +504,8 @@ const UserItem = memo(function UserItem({
       <div
         className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${
           selected
-            ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg"
-            : "hover:bg-gray-700 hover:bg-opacity-50 active:scale-95"
+            ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
+            : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
         }`}
         onClick={(e) => {
           if (relationshipStatus === "friends") {
@@ -569,7 +570,7 @@ const UserItem = memo(function UserItem({
                     ? "text-white"
                     : unreadCount > 0
                     ? "text-white"
-                    : "text-gray-200"
+                    : "text-gray-900"
                 }`}
               >
                 {user.username}
@@ -593,10 +594,10 @@ const UserItem = memo(function UserItem({
               <span
                 className={`text-xs flex-shrink-0 ml-2 ${
                   selected
-                    ? "text-white text-opacity-70"
+                    ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-blue-400 font-semibold"
-                    : "text-gray-500"
+                    ? "text-blue-600 font-bold"
+                    : "text-gray-700"
                 }`}
               >
                 {formatTime(lastMessageTime)}
@@ -611,10 +612,10 @@ const UserItem = memo(function UserItem({
               <p
                 className={`text-xs truncate ${
                   selected
-                    ? "text-white text-opacity-70"
+                    ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-gray-200 font-medium"
-                    : "text-gray-400"
+                    ? "text-gray-900 font-semibold"
+                    : "text-gray-600"
                 }`}
               >
                 {displayMessage}
@@ -632,10 +633,10 @@ const UserItem = memo(function UserItem({
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-2 hover:bg-gray-600 hover:bg-opacity-50 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <svg
-              className="w-5 h-5 text-gray-400"
+              className="w-5 h-5 text-gray-700"
               fill="currentColor"
               viewBox="0 0 24 24"
             >
@@ -651,14 +652,14 @@ const UserItem = memo(function UserItem({
                 onClick={() => setShowMenu(false)}
               ></div>
 
-              <div className="absolute right-0 mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+              <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
                 {relationshipStatus === "friends" && conversationId && (
                   <button
                     onClick={handlePinClick}
-                    className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm"
+                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm"
                   >
                     <svg
-                      className="w-4 h-4"
+                      className="w-4 h-4 text-blue-600"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                     >
@@ -667,24 +668,35 @@ const UserItem = memo(function UserItem({
                     {isPinned ? "Unpin Chat" : "Pin Chat"}
                   </button>
                 )}
-      {/* ARCHIVE OPTION */}
+
                 {relationshipStatus === "friends" && conversationId && (
                   <button
                     onClick={handleArchiveClick}
-                    className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    <svg
+                      className="w-4 h-4 text-purple-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                      />
                     </svg>
                     {isArchived ? "Unarchive Chat" : "Archive Chat"}
                   </button>
                 )}
+
                 <button
                   onClick={handleShowProfile}
-                  className="w-full px-4 py-2.5 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm"
+                  className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                 >
                   <svg
-                    className="w-4 h-4"
+                    className="w-4 h-4 text-green-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -702,7 +714,7 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "none" && (
                   <button
                     onClick={handleSendRequest}
-                    className="w-full px-4 py-2.5 text-left text-blue-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                    className="w-full px-4 py-2.5 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                   >
                     <svg
                       className="w-4 h-4"
@@ -725,7 +737,7 @@ const UserItem = memo(function UserItem({
                   <>
                     <button
                       onClick={handleAcceptRequest}
-                      className="w-full px-4 py-2.5 text-left text-green-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                      className="w-full px-4 py-2.5 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                     >
                       <svg
                         className="w-4 h-4"
@@ -744,7 +756,7 @@ const UserItem = memo(function UserItem({
                     </button>
                     <button
                       onClick={handleRejectRequest}
-                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                      className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                     >
                       <svg
                         className="w-4 h-4"
@@ -768,7 +780,7 @@ const UserItem = memo(function UserItem({
                   <>
                     <button
                       onClick={handleClearChat}
-                      className="w-full px-4 py-2.5 text-left text-orange-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                      className="w-full px-4 py-2.5 text-left text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                     >
                       <svg
                         className="w-4 h-4"
@@ -788,7 +800,7 @@ const UserItem = memo(function UserItem({
 
                     <button
                       onClick={handleUnfriend}
-                      className="w-full px-4 py-2.5 text-left text-yellow-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                      className="w-full px-4 py-2.5 text-left text-yellow-600 hover:bg-yellow-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                     >
                       <svg
                         className="w-4 h-4"
@@ -812,7 +824,7 @@ const UserItem = memo(function UserItem({
                   relationshipStatus !== "blocked_by" && (
                     <button
                       onClick={handleBlock}
-                      className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                      className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                     >
                       <svg
                         className="w-4 h-4"
@@ -834,7 +846,7 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "blocked" && (
                   <button
                     onClick={handleUnblock}
-                    className="w-full px-4 py-2.5 text-left text-green-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-sm border-t border-gray-700"
+                    className="w-full px-4 py-2.5 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
                   >
                     <svg
                       className="w-4 h-4"

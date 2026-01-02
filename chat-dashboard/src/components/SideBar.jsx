@@ -325,7 +325,7 @@ export default function Sidebar({
   return (
     <>
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 bg-gray-800 border-r border-gray-700 flex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 bg-white border-r border-gray-200 shadow-lgflex flex-col transform transition-transform duration-300 ease-in-out ${
           isMobileSidebarOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
@@ -350,7 +350,7 @@ export default function Sidebar({
           </svg>
         </button>
 
-        <div className="bg-gray-900 border-b border-gray-700 p-4">
+        <div className="bg-gradient-to-r from-[#2563EB] to-[#9333EA] border-b border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -525,7 +525,7 @@ export default function Sidebar({
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full pl-10 pr-10 py-2 bg-gray-50 border-gray-300 text-gray-900 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
             <svg
               className="w-5 h-5 text-gray-500 absolute left-3 top-2.5"
@@ -808,8 +808,8 @@ export default function Sidebar({
         )}
 
         {/* Users Count & Stats */}
-        <div className="px-4 py-2 bg-gray-900 bg-opacity-30">
-          <p className="text-xs text-gray-400 font-medium">
+        <div className="px-4 py-2 bg-white bg-opacity-10 border-b border-gray-200">
+          <p className="text-xs text-gray-900 font-bold">
             {showArchived ? (
               // ARCHIVED VIEW
               <>
@@ -831,7 +831,6 @@ export default function Sidebar({
             )}
           </p>
         </div>
-
         {/* Users List */}
         <div className="flex-1 overflow-y-auto">
           {memoizedUsers.length === 0 ? (

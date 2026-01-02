@@ -242,7 +242,7 @@ export default function MessageInput({ conversationId }) {
   };
 
   return (
-    <div className="bg-gray-800 bg-opacity-80 border-t border-gray-700 border-opacity-50 p-3 md:p-4">
+    <div className="bg-white border-t border-gray-200 p-3 md:p-4">
       <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3">
         {isRecording ? (
           <>
@@ -331,7 +331,7 @@ export default function MessageInput({ conversationId }) {
                 placeholder={uploading ? "Uploading file..." : "Type a message..."}
                 rows="1"
                 disabled={sending || uploading}
-                className="w-full px-3 md:px-4 py-2 md:py-3 pr-10 md:pr-12 bg-gray-700 bg-opacity-50 border border-gray-600 border-opacity-50 rounded-xl md:rounded-2xl text-gray-100 text-sm md:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 focus:border-transparent transition-all resize-none overflow-hidden disabled:opacity-50"
+                className="w-full px-3 md:px-4 py-2 md:py-3 pr-10 md:pr-12 bg-gray-50 border border-gray-300 rounded-xl md:rounded-2xl text-gray-900 text-sm md:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 focus:border-transparent transition-all resize-none overflow-hidden disabled:opacity-50"
                 style={{ maxHeight: "100px" }}
                 onInput={(e) => {
                   e.target.style.height = "auto";
@@ -398,7 +398,7 @@ export default function MessageInput({ conversationId }) {
               <button
                 onClick={startRecording}
                 disabled={uploading}
-                className="p-2 md:p-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl transition-all shadow-lg hover:shadow-blue-500 flex-shrink-0 transform hover:scale-105 active:scale-95 disabled:opacity-50"
+                className="p-2 md:p-3 bg-gradient-to-r from-[#2563EB] to-[#9333EA] hover:from-blue-700 hover:to-blue-600 text-white rounded-xl transition-all shadow-lg hover:shadow-blue-500 flex-shrink-0 transform hover:scale-105 active:scale-95 disabled:opacity-50"
                 title="Record voice message"
               >
                 <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,17 +411,17 @@ export default function MessageInput({ conversationId }) {
       </div>
 
       <div className="max-w-4xl mx-auto mt-2 px-1">
-        <p className="text-xs text-gray-500">
-          {uploading ? (
-            <span className="text-blue-400">Uploading...</span>
-          ) : isRecording ? (
-            <span className="text-red-400">Recording... Click send to finish</span>
-          ) : (
-            <span className="hidden md:inline">
-              Press <kbd className="px-1.5 py-0.5 bg-gray-700 bg-opacity-50 rounded text-gray-400 font-mono">Enter</kbd> to send, <kbd className="px-1.5 py-0.5 bg-gray-700 bg-opacity-50 rounded text-gray-400 font-mono">Shift+Enter</kbd> for new line
-            </span>
-          )}
-        </p>
+      <p className="text-xs text-gray-500">
+  {uploading ? (
+    <span className="text-blue-400">Uploading...</span>
+  ) : isRecording ? (
+    <span className="text-red-400">Recording... Click send to finish</span>
+  ) : (
+    <span className="hidden md:inline">
+      Press <kbd className="px-1.5 py-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded text-white font-mono shadow-sm">Enter</kbd> to send, <kbd className="px-1.5 py-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded text-white font-mono shadow-sm">Shift+Enter</kbd> for new line
+    </span>
+  )}
+</p>
       </div>
     </div>
   );
