@@ -490,13 +490,13 @@ export default function Message({
                     onClick={() => setShowOptions(false)}
                   ></div>
 
-                  <div className="absolute right-0 mt-1 w-44 md:w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+                 <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
                     <button
                       onClick={() => {
                         setShowDeleteModal(true);
                         setShowOptions(false);
                       }}
-                      className="w-full px-3 md:px-4 py-2 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-2 text-xs md:text-sm"
+                      className="w-full px-3 md:px-4 py-2 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
                     >
                       <svg
                         className="w-4 h-4"
@@ -757,7 +757,7 @@ export default function Message({
           ></div>
 
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 max-w-sm w-full shadow-2xl">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 max-w-sm w-full shadow-2xl">
               <h3 className="text-base md:text-lg font-semibold text-white mb-4">
                 Delete Message?
               </h3>
@@ -765,7 +765,7 @@ export default function Message({
               <div className="space-y-2">
                 <button
                   onClick={handleDeleteForMe}
-                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
+                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
                 >
                   <svg
                     className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0"
@@ -822,7 +822,7 @@ export default function Message({
 
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm md:text-base"
+                className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-sm md:text-base"
               >
                 Cancel
               </button>

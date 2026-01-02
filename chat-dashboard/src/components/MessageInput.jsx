@@ -291,7 +291,7 @@ export default function MessageInput({ conversationId }) {
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className={`p-2 md:p-3 hover:bg-gray-700 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${
+                className={`p-2 md:p-3 hover:bg-gray-100 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${
                   uploading 
                     ? "text-blue-400 cursor-wait" 
                     : "text-gray-400 hover:text-blue-400"
@@ -357,15 +357,15 @@ export default function MessageInput({ conversationId }) {
                       className="fixed inset-0 z-10" 
                       onClick={() => setShowEmojiPicker(false)}
                     ></div>
-                    
-                    <div className="absolute bottom-full right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg p-2 md:p-3 shadow-xl z-20 w-64 md:w-80 max-h-48 md:max-h-64 overflow-y-auto">
-                      <p className="text-xs text-gray-400 mb-2 font-medium">Select Emoji</p>
+
+                    <div className="absolute bottom-full right-0 mb-2 bg-white border border-gray-300 rounded-lg p-2 md:p-3 shadow-xl z-20 w-64 md:w-80 max-h-48 md:max-h-64 overflow-y-auto">
+                      <p className="text-xs text-gray-600 mb-2 font-medium">Select Emoji</p>
                       <div className="grid grid-cols-8 md:grid-cols-10 gap-1">
                         {emojis.map((emoji, index) => (
                           <button
                             key={index}
                             onClick={() => handleEmojiClick(emoji)}
-                            className="text-xl md:text-2xl hover:bg-gray-700 rounded p-1 transition-colors"
+                            className="text-xl md:text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
                           >
                             {emoji}
                           </button>

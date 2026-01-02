@@ -886,207 +886,261 @@ const UserItem = memo(function UserItem({
         )}
       </div>
 
-      {/* PROFILE DIALOG */}
-      {showProfileDialog && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-in fade-in"
-            onClick={() => setShowProfileDialog(false)}
-          ></div>
+    
 
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-in zoom-in fade-in">
-            <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl backdrop-blur-xl">
-              {/* Close Button */}
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => setShowProfileDialog(false)}
-                  className="text-gray-400 hover:text-white transition-all hover:bg-white/10 p-2 rounded-xl"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+{/* MODERN PROFILE DIALOG */}
+{showProfileDialog && (
+  <>
+    {/* Backdrop with blur */}
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200"
+      onClick={() => setShowProfileDialog(false)}
+    ></div>
+
+    {/* Profile Card */}
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-in zoom-in fade-in duration-300">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden">
+        
+        {/* Gradient Background Header */}
+        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 -z-10"></div>
+
+        {/* Close Button */}
+        <button
+          onClick={() => setShowProfileDialog(false)}
+          className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full transition-all z-10"
+        >
+          <svg
+            className="w-5 h-5 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+
+        {/* Profile Picture with Ring */}
+        <div className="relative w-28 h-28 mx-auto mb-4 mt-8">
+          {/* Animated gradient ring */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full animate-spin" style={{ animationDuration: "3s" }}></div>
+          
+          {/* White ring inside */}
+          <div className="absolute inset-1 bg-white rounded-full"></div>
+          
+          {/* Profile image */}
+          <div className="absolute inset-2 rounded-full overflow-hidden shadow-xl">
+            {userImage ? (
+              <img
+                src={userImage}
+                alt={user.username}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 text-white text-4xl font-bold">
+                {user.username.charAt(0).toUpperCase()}
               </div>
+            )}
+          </div>
 
-              {/* Profile Picture with Gradient Ring */}
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <div
-                  className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full animate-spin"
-                  style={{ animationDuration: "3s" }}
-                ></div>
-                <div className="absolute inset-1 rounded-full overflow-hidden bg-slate-900 shadow-xl">
-                  {userImage ? (
-                    <img
-                      src={userImage}
-                      alt={user.username}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 text-white text-5xl font-bold">
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                {/* Online Status Badge */}
-                {isOnline && (
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-green-500 px-3 py-1 rounded-full shadow-lg">
-                    <div className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-300 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                    </div>
-                    <span className="text-white text-xs font-bold">Online</span>
-                  </div>
-                )}
-                {!isOnline && (
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-slate-700 px-3 py-1 rounded-full shadow-lg">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                    <span className="text-gray-300 text-xs font-semibold">
-                      Offline
-                    </span>
-                  </div>
-                )}
+          {/* Online/Offline Badge */}
+          {isOnline ? (
+            <div className="absolute bottom-0 right-0 flex items-center gap-1.5 bg-green-500 px-3 py-1.5 rounded-full shadow-lg border-2 border-white">
+              <div className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-300 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
               </div>
+              <span className="text-white text-xs font-bold">Online</span>
+            </div>
+          ) : (
+            <div className="absolute bottom-0 right-0 flex items-center gap-1.5 bg-gray-500 px-3 py-1.5 rounded-full shadow-lg border-2 border-white">
+              <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+              <span className="text-white text-xs font-semibold">Offline</span>
+            </div>
+          )}
+        </div>
 
-              {/* Username with Gradient */}
-              <h2 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                {user.username}
-              </h2>
+        {/* Username with gradient */}
+        <h2 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          {user.username}
+        </h2>
 
-              {/* Email */}
-              <div className="flex items-center justify-center gap-2 mb-6">
-                <svg
-                  className="w-4 h-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                <p className="text-sm text-gray-400">{user.email}</p>
-              </div>
+        {/* Email */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <svg
+            className="w-4 h-4 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+          <p className="text-sm text-gray-600">{user.email}</p>
+        </div>
 
-              {/* Relationship Status Badge */}
-              <div className="flex justify-center mb-6">
-                {relationshipStatus === "friends" && (
-                  <div className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    Friends
-                  </div>
-                )}
-                {relationshipStatus === "request_sent" && (
-                  <div className="px-6 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 animate-pulse"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Request Sent
-                  </div>
-                )}
-                {relationshipStatus === "request_received" && (
-                  <div className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2 animate-pulse">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                      />
-                    </svg>
-                    Pending Request
-                  </div>
-                )}
-                {relationshipStatus === "blocked" && (
-                  <div className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                      />
-                    </svg>
-                    Blocked
-                  </div>
-                )}
-              </div>
-
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center">
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {isOnline ? "Active" : "Inactive"}
-                  </div>
-                  <div className="text-xs text-gray-400 font-medium">
-                    Status
-                  </div>
-                </div>
-                <div className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center">
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {relationshipStatus === "friends" ? "Yes" : "No"}
-                  </div>
-                  <div className="text-xs text-gray-400 font-medium">
-                    Connected
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <button
-                onClick={() => setShowProfileDialog(false)}
-                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-blue-500/50 transform hover:scale-105"
+        {/* Relationship Status Badge */}
+        <div className="flex justify-center mb-6">
+          {relationshipStatus === "friends" && (
+            <div className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                Close Profile
-              </button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              Friends
+            </div>
+          )}
+          {relationshipStatus === "request_sent" && (
+            <div className="px-6 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
+              <svg
+                className="w-4 h-4 animate-pulse"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Request Sent
+            </div>
+          )}
+          {relationshipStatus === "request_received" && (
+            <div className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2 animate-pulse">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              Pending Request
+            </div>
+          )}
+          {relationshipStatus === "blocked" && (
+            <div className="px-6 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                />
+              </svg>
+              Blocked
+            </div>
+          )}
+          {relationshipStatus === "none" && (
+            <div className="px-6 py-2.5 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-sm rounded-full font-semibold shadow-lg flex items-center gap-2">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+              Not Connected
+            </div>
+          )}
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600 mb-1">
+              {isOnline ? "Active" : "Away"}
+            </div>
+            <div className="text-xs text-gray-600 font-medium uppercase tracking-wide">
+              Status
             </div>
           </div>
-        </>
-      )}
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-purple-600 mb-1">
+              {relationshipStatus === "friends" ? "Yes" : "No"}
+            </div>
+            <div className="text-xs text-gray-600 font-medium uppercase tracking-wide">
+              Connected
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Message Button (only for friends) */}
+          {relationshipStatus === "friends" && (
+            <button
+              onClick={() => {
+                setShowProfileDialog(false);
+                onClick(); // Open chat
+              }}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+              Send Message
+            </button>
+          )}
+
+          {/* Close Button */}
+          <button
+            onClick={() => setShowProfileDialog(false)}
+            className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all"
+          >
+            Close Profile
+          </button>
+        </div>
+      </div>
+    </div>
+  </>
+)}
 
       {/* DIALOGS */}
       <ConfirmationDialog

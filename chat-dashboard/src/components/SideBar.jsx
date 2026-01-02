@@ -564,12 +564,12 @@ export default function Sidebar({
         </div>
 
         {showBlocked && (
-          <div className="p-4 bg-gray-900 border-b border-gray-700 max-h-80 overflow-y-auto">
+          <div className="p-4 bg-white border-b border-gray-200 max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">Blocked Users</h3>
+              <h3 className="text-gray-900 font-semibold">Blocked Users</h3>
               <button
                 onClick={() => setShowBlocked(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-gray-200"
               >
                 <svg
                   className="w-5 h-5"
@@ -593,7 +593,7 @@ export default function Sidebar({
             ) : (
               <div className="space-y-2">
                 {blockedUsers.map((block) => (
-                  <div key={block._id} className="bg-gray-800 rounded-lg p-3">
+                  <div key={block._id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
@@ -610,7 +610,7 @@ export default function Sidebar({
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-gray-900">
                             {block.blocked.username}
                           </p>
                           <p className="text-xs text-gray-400">
@@ -633,12 +633,12 @@ export default function Sidebar({
         )}
 
         {showRequests && (
-          <div className="p-4 bg-gray-900 border-b border-gray-700 max-h-80 overflow-y-auto">
+          <div className="p-4 bg-white border-b border-gray-200 max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">Friend Requests</h3>
+              <h3 className="text-gray-900 font-semibold">Friend Requests</h3>
               <button
                 onClick={() => setShowRequests(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-gray-200"
               >
                 <svg
                   className="w-5 h-5"
@@ -662,7 +662,7 @@ export default function Sidebar({
             ) : (
               <div className="space-y-2">
                 {pendingRequests.map((request) => (
-                  <div key={request._id} className="bg-gray-800 rounded-lg p-3">
+                  <div key={request._id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
@@ -679,7 +679,7 @@ export default function Sidebar({
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-gray-900">
                             {request.sender.username}
                           </p>
                           <p className="text-xs text-gray-400">
@@ -711,9 +711,9 @@ export default function Sidebar({
 
         {/* Add Friend Modal */}
         {showAddFriend && (
-          <div className="p-4 bg-gray-900 border-b border-gray-700">
+          <div className="p-4 bg-white border-b border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">Add Friend</h3>
+              <h3 className="text-gray-900 font-semibold">Add Friend</h3>
               <button
                 onClick={() => {
                   setShowAddFriend(false);
@@ -745,7 +745,7 @@ export default function Sidebar({
                 value={searchUsers}
                 onChange={(e) => setSearchUsers(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearchUsers()}
-                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 onClick={handleSearchUsers}
@@ -772,7 +772,7 @@ export default function Sidebar({
               {allUsers.map((user) => (
                 <div
                   key={user._id}
-                  className="flex items-center justify-between p-2 bg-gray-800 rounded-lg hover:bg-gray-750"
+                  className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-750"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full overflow-hidden">
@@ -789,7 +789,7 @@ export default function Sidebar({
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-gray-900">
                         {user.username}
                       </p>
                       <p className="text-xs text-gray-400">{user.email}</p>
