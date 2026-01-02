@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "../hooks/useAuthImage";
 
-export default function ProfileSettings({ currentUser, onClose, onProfileImageUpdate }) {
+export default function ProfileSettings({
+  currentUser,
+  onClose,
+  onProfileImageUpdate,
+}) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   // Use only currentUser.profileImage
   const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
     currentUser?.profileImage
   );
-  
+
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [notifications, setNotifications] = useState({
@@ -85,7 +89,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
       const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("image", file);
-      
+
       const uploadRes = await fetch(
         "http://localhost:5000/api/users/profile/upload",
         {
@@ -98,19 +102,16 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
       );
       const uploadData = await uploadRes.json();
       const imageUrl = uploadData.imageUrl;
-      
-      await fetch(
-        "http://localhost:5000/api/users/profile/update-image",
-        {
-          method: "PUT",
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ profileImage: imageUrl })
-        }
-      );
-      
+
+      await fetch("http://localhost:5000/api/users/profile/update-image", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ profileImage: imageUrl }),
+      });
+
       //  Notify Dashboard of the change
       onProfileImageUpdate(imageUrl);
       alert("Profile picture uploaded successfully!");
@@ -126,14 +127,11 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await fetch(
-        "http://localhost:5000/api/users/profile/remove-image",
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      
+      await fetch("http://localhost:5000/api/users/profile/remove-image", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       //  Notify Dashboard of the change
       onProfileImageUpdate(null);
       setShowPhotoMenu(false);
@@ -149,13 +147,10 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
   const handleUnblockUser = async (userId) => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(
-        `http://localhost:5000/api/friends/unblock/${userId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`http://localhost:5000/api/friends/unblock/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
       alert("User unblocked successfully!");
     } catch (err) {
@@ -203,16 +198,28 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gray-900 px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Profile Settings</h2>
+        <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Profile Settings
+          </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-900"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -220,11 +227,14 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Profile Section */}
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h3 className="text-white font-semibold mb-4 text-lg">Profile Picture</h3>
+          {/* Profile Section */}
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-gray-900 font-semibold mb-4 text-lg">
+              Profile Picture
+            </h3>
             <div className="flex items-center gap-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-700">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-300 shadow-md">
                   {imageLoading ? (
                     <div className="w-full h-full bg-gray-700 animate-pulse" />
                   ) : profilePreview ? (
@@ -242,10 +252,10 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
               </div>
 
               <div className="flex-1">
-                <p className="text-white font-medium text-lg mb-1">
+                <p className="text-gray-900 font-semibold text-lg mb-1">
                   {currentUser?.username || "User"}
                 </p>
-                <p className="text-gray-400 text-sm mb-3">
+                <p className="text-gray-600 text-sm mb-3">
                   {currentUser?.email || "email@example.com"}
                 </p>
 
@@ -271,10 +281,10 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                   </button>
 
                   {showPhotoMenu && (
-                    <div className="absolute left-0 top-12 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <div className="absolute left-0 top-12 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
                       <button
                         onClick={handleUploadClick}
-                        className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-600 transition-colors flex items-center gap-3 text-sm"
+                        className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
                       >
                         <svg
                           className="w-4 h-4"
@@ -289,13 +299,15 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                        {currentUser?.profileImage ? "Change Photo" : "Upload Photo"}
+                        {currentUser?.profileImage
+                          ? "Change Photo"
+                          : "Upload Photo"}
                       </button>
 
                       {currentUser?.profileImage && (
                         <button
                           onClick={handleRemoveImage}
-                          className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-600 transition-colors flex items-center gap-3 text-sm border-t border-gray-600"
+                          className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
                         >
                           <svg
                             className="w-4 h-4"
@@ -329,8 +341,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
           </div>
 
           {/* Notifications Section */}
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h3 className="text-white font-semibold mb-4 text-lg flex items-center gap-2">
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-gray-900 font-semibold mb-4 text-lg flex items-center gap-2">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -347,8 +359,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
               Notifications
             </h3>
             <div className="space-y-3">
-              <label className="flex items-center justify-between p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-750 transition-colors">
-                <span className="text-gray-300 text-sm">
+              <label className="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200">
+                <span className="text-gray-900 text-sm">
                   Message Notifications
                 </span>
                 <input
@@ -363,8 +375,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                   className="w-5 h-5 text-blue-600 rounded"
                 />
               </label>
-              <label className="flex items-center justify-between p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-750 transition-colors">
-                <span className="text-gray-300 text-sm">Friend Requests</span>
+              <label className="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200">
+                <span className="text-gray-900 text-sm">Friend Requests</span>
                 <input
                   type="checkbox"
                   checked={notifications.friendRequests}
@@ -377,8 +389,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                   className="w-5 h-5 text-blue-600 rounded"
                 />
               </label>
-              <label className="flex items-center justify-between p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-750 transition-colors">
-                <span className="text-gray-300 text-sm">Sound Enabled</span>
+              <label className="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200">
+                <span className="text-gray-900 text-sm">Sound Enabled</span>
                 <input
                   type="checkbox"
                   checked={notifications.soundEnabled}
@@ -395,8 +407,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
           </div>
 
           {/* Friend Requests Section */}
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h3 className="text-white font-semibold mb-4 text-lg flex items-center gap-2">
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-gray-900 font-semibold mb-4 text-lg flex items-center gap-2">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -419,7 +431,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
             </h3>
 
             {pendingRequests.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">
+              <p className="text-gray-600 text-sm text-center py-4">
                 No pending requests
               </p>
             ) : (
@@ -427,7 +439,7 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                 {pendingRequests.map((request) => (
                   <div
                     key={request._id}
-                    className="bg-gray-800 rounded-lg p-3"
+                    className="bg-white rounded-lg p-3 border border-gray-200"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -445,10 +457,10 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-gray-900">
                             {request.sender.username}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-600">
                             {request.sender.email}
                           </p>
                         </div>
@@ -475,8 +487,8 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
           </div>
 
           {/* Blocked Users Section */}
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h3 className="text-white font-semibold mb-4 text-lg flex items-center gap-2">
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-gray-900 font-semibold mb-4 text-lg flex items-center gap-2">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -499,13 +511,16 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
             </h3>
 
             {blockedUsers.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">
+              <p className="text-gray-600 text-sm text-center py-4">
                 No blocked users
               </p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {blockedUsers.map((block) => (
-                  <div key={block._id} className="bg-gray-800 rounded-lg p-3">
+                  <div
+                    key={block._id}
+                    className="bg-white rounded-lg p-3 border border-gray-200"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-full overflow-hidden">
@@ -522,10 +537,10 @@ export default function ProfileSettings({ currentUser, onClose, onProfileImageUp
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-gray-900">
                             {block.blocked.username}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-600">
                             {block.blocked.email}
                           </p>
                         </div>

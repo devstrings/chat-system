@@ -30,7 +30,7 @@ export default function Dashboard() {
   const selectedUserRef = useRef(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
- const [archivedConversations, setArchivedConversations] = useState(new Set());
+  const [archivedConversations, setArchivedConversations] = useState(new Set());
   const [showArchived, setShowArchived] = useState(false);
   //  Shared profile image state
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
@@ -165,8 +165,8 @@ export default function Dashboard() {
     }
   };
 
-  //Archeived 
-    const handleArchiveConversation = async (conversationId, isArchived) => {
+  //Archeived
+  const handleArchiveConversation = async (conversationId, isArchived) => {
     try {
       const token = localStorage.getItem("token");
 
@@ -195,7 +195,7 @@ export default function Dashboard() {
           `http://localhost:5000/api/messages/conversation/${conversationId}/archive`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
-                  );
+        );
 
         setArchivedConversations((prev) => new Set([...prev, conversationId]));
 
@@ -210,14 +210,12 @@ export default function Dashboard() {
       setAlertDialog({
         isOpen: true,
         title: "Error",
-        message: err.response?.data?.message || "Failed to update archive status",
+        message:
+          err.response?.data?.message || "Failed to update archive status",
         type: "error",
       });
     }
   };
-
-  
-
 
   // Pin/Unpin conversation handler
   const handlePinConversation = async (conversationId, isPinned) => {
@@ -695,7 +693,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <div className="flex items-center justify-center h-screen bg-white">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
           <p className="text-gray-300 text-lg">Loading...</p>
@@ -750,17 +748,17 @@ export default function Dashboard() {
             onProfileImageUpdate={handleProfileImageUpdate}
           />
         )}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
           {selectedUser ? (
             <>
               {/*  RESPONSIVE HEADER */}
-              <div className="bg-gray-800 bg-opacity-80 border-b border-gray-700 border-opacity-50 px-3 md:px-6 py-3 md:py-4 shadow-lg">
+              <div className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
                     {/*  HAMBURGER MENU (MOBILE ONLY) */}
                     <button
                       onClick={() => setIsMobileSidebarOpen(true)}
-                      className="md:hidden p-2 text-gray-400 hover:text-white transition-colors flex-shrink-0"
+                      className="md:hidden p-2 text-black transition-colors flex-shrink-0"
                     >
                       <svg
                         className="w-6 h-6"
@@ -778,7 +776,7 @@ export default function Dashboard() {
                     </button>
 
                     <div className="relative flex-shrink-0">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden shadow-lg">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden shadow-md">
                         {selectedUserImage ? (
                           <img
                             src={selectedUserImage}
@@ -786,21 +784,21 @@ export default function Dashboard() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base md:text-lg">
+                          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold text-base md:text-lg">
                             {selectedUser.username.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
                       {onlineUsers.has(selectedUser._id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 md:w-3.5 md:h-3.5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 md:w-3.5 md:h-3.5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                       )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h2 className="text-white font-semibold text-base md:text-lg truncate">
+                      <h2 className="text-black font-semibold text-base md:text-lg truncate">
                         {selectedUser.username}
                       </h2>
-                      <p className="text-xs md:text-sm text-gray-400 flex items-center gap-1">
+                      <p className="text-xs md:text-sm text-black flex items-center gap-1">
                         {onlineUsers.has(selectedUser._id) ? (
                           <>
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -808,7 +806,7 @@ export default function Dashboard() {
                           </>
                         ) : (
                           <>
-                            <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                            <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
                             Offline
                           </>
                         )}
@@ -819,7 +817,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-1 md:gap-2 relative">
                     <button
                       onClick={() => setShowSearchBox(!showSearchBox)}
-                      className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
                       title="Search in chat"
                     >
                       <svg
@@ -840,7 +838,7 @@ export default function Dashboard() {
                     <div className="relative">
                       <button
                         onClick={() => setShowChatMenu(!showChatMenu)}
-                        className="p-2 hover:bg-gray-700 hover:bg-opacity-50 rounded-lg transition-colors text-gray-400 hover:text-white"
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
                         title="Chat options"
                       >
                         <svg
@@ -864,27 +862,28 @@ export default function Dashboard() {
                             className="fixed inset-0 z-10"
                             onClick={() => setShowChatMenu(false)}
                           ></div>
-                          <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
+
+                          <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
                             <button
                               onClick={() => {
                                 setAlertDialog({
                                   isOpen: true,
                                   title: "User Info",
-                                  message: ` ${selectedUser.username}\n📧 ${
+                                  message: `👤 ${selectedUser.username}\n📧 ${
                                     selectedUser.email
                                   }\n${
                                     onlineUsers.has(selectedUser._id)
-                                      ? " Online"
-                                      : " Offline"
+                                      ? "🟢 Online"
+                                      : "⚫ Offline"
                                   }`,
                                   type: "info",
                                 });
                                 setShowChatMenu(false);
                               }}
-                              className="w-full px-4 py-3 text-left text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm"
+                              className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
                             >
                               <svg
-                                className="w-4 h-4"
+                                className="w-5 h-5 text-blue-600"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -896,7 +895,7 @@ export default function Dashboard() {
                                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                                 />
                               </svg>
-                              View Profile
+                              <span className="font-medium">View Profile</span>
                             </button>
 
                             <button
@@ -907,10 +906,10 @@ export default function Dashboard() {
                                 });
                                 setShowChatMenu(false);
                               }}
-                              className="w-full px-4 py-3 text-left text-red-400 hover:bg-gray-700 transition-colors flex items-center gap-3 text-sm border-t border-gray-700"
+                              className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
                             >
                               <svg
-                                className="w-4 h-4"
+                                className="w-5 h-5"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -922,7 +921,7 @@ export default function Dashboard() {
                                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                 />
                               </svg>
-                              Clear Chat
+                              <span className="font-medium">Clear Chat</span>
                             </button>
                           </div>
                         </>
@@ -938,7 +937,7 @@ export default function Dashboard() {
                       placeholder="Search in messages..."
                       value={searchInChat}
                       onChange={(e) => setSearchInChat(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-300 rounded-lg text-black placeholder-black placeholder-opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <svg
                       className="w-4 h-4 text-gray-500 absolute left-3 top-3"
@@ -956,7 +955,7 @@ export default function Dashboard() {
                     {searchInChat && (
                       <button
                         onClick={() => setSearchInChat("")}
-                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-200 transition-colors"
+                        className="absolute right-3 top-3 text-black hover:text-gray-700 transition-colors"
                       >
                         <svg
                           className="w-4 h-4"
@@ -1018,7 +1017,7 @@ export default function Dashboard() {
               <MessageInput conversationId={conversationId} />
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-4">
+            <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
               <div className="text-center">
                 {/*  MOBILE: Show menu button when no chat selected */}
                 <button
