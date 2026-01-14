@@ -10,13 +10,14 @@ import ConfirmationDialog, {
 } from "../components/ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import ProfileSetting from "../components/ProfileSetting";
-
+import GroupChatWindow from "../components/GroupChatWindow";
 export default function Dashboard() {
   const navigate = useNavigate();
   const { socket, onlineUsers } = useSocket();
   const [username, setUsername] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -32,9 +33,15 @@ export default function Dashboard() {
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
   const [archivedConversations, setArchivedConversations] = useState(new Set());
   const [showArchived, setShowArchived] = useState(false);
-  //  Shared profile image state
+  
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
-
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [isGroupChat, setIsGroupChat] = useState(false);
+  // Group image hook (add after line 119)
+  const { imageSrc: selectedGroupImage } = useAuthImage(
+    isGroupChat ? selectedGroup?.groupImage : null,
+    "group"
+  );
   // Clear chat dialog state
   const [clearChatDialog, setClearChatDialog] = useState({
     isOpen: false,
@@ -76,6 +83,7 @@ export default function Dashboard() {
 
     loadCurrentUser();
   }, []);
+  
   // Load pinned conversations
   useEffect(() => {
     const loadPinnedConversations = async () => {
@@ -98,9 +106,11 @@ export default function Dashboard() {
     }
   }, [currentUserId]);
 
+  
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage
   );
+
   // Load archived conversations
   useEffect(() => {
     const loadArchivedConversations = async () => {
@@ -122,6 +132,27 @@ export default function Dashboard() {
       loadArchivedConversations();
     }
   }, [currentUserId]);
+
+  //  ADD THIS NEW useEffect - LOAD ARCHIVED GROUPS
+  useEffect(() => {
+    const loadArchivedGroups = () => {
+      if (!groups || groups.length === 0) return;
+
+      // Extract archived group IDs
+      const archivedGroupIds = groups
+        .filter((g) => g.archivedBy?.some((a) => a.userId === currentUserId))
+        .map((g) => g._id);
+
+      // Add to archivedConversations Set
+      setArchivedConversations((prev) => {
+        const newSet = new Set(prev);
+        archivedGroupIds.forEach((id) => newSet.add(id));
+        return newSet;
+      });
+    };
+
+    loadArchivedGroups();
+  }, [groups, currentUserId]);
   // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl) => {
     console.log("Profile image updated:", newImageUrl);
@@ -170,12 +201,18 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
 
+      //  CHECK IF IT'S A GROUP
+      const isGroup = groups.some((g) => g._id === conversationId);
+
       if (isArchived) {
         // Unarchive
-        await axios.delete(
-          `http://localhost:5000/api/messages/conversation/${conversationId}/unarchive`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const endpoint = isGroup
+          ? `http://localhost:5000/api/groups/${conversationId}/unarchive`
+          : `http://localhost:5000/api/messages/conversation/${conversationId}/unarchive`;
+
+        await axios.delete(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setArchivedConversations((prev) => {
           const newSet = new Set(prev);
@@ -183,26 +220,67 @@ export default function Dashboard() {
           return newSet;
         });
 
+        // UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        if (isGroup) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g._id === conversationId
+                ? {
+                    ...g,
+                    archivedBy:
+                      g.archivedBy?.filter((a) => a.userId !== currentUserId) ||
+                      [],
+                  }
+                : g
+            )
+          );
+        }
+
         setAlertDialog({
           isOpen: true,
-          title: "Chat Unarchived",
-          message: "Chat has been restored to main list.",
+          title: isGroup ? "Group Unarchived" : "Chat Unarchived",
+          message: isGroup
+            ? "Group has been restored to main list."
+            : "Chat has been restored to main list.",
           type: "success",
         });
       } else {
         // Archive
+        const endpoint = isGroup
+          ? `http://localhost:5000/api/groups/${conversationId}/archive`
+          : `http://localhost:5000/api/messages/conversation/${conversationId}/archive`;
+
         await axios.post(
-          `http://localhost:5000/api/messages/conversation/${conversationId}/archive`,
+          endpoint,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
         setArchivedConversations((prev) => new Set([...prev, conversationId]));
 
+        //  UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        if (isGroup) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g._id === conversationId
+                ? {
+                    ...g,
+                    archivedBy: [
+                      ...(g.archivedBy || []),
+                      { userId: currentUserId, archivedAt: new Date() },
+                    ],
+                  }
+                : g
+            )
+          );
+        }
+
         setAlertDialog({
           isOpen: true,
-          title: "Chat Archived",
-          message: "Chat has been moved to archive.",
+          title: isGroup ? "Group Archived" : "Chat Archived",
+          message: isGroup
+            ? "Group has been moved to archive."
+            : "Chat has been moved to archive.",
           type: "success",
         });
       }
@@ -222,12 +300,18 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
 
+      // CHECK IF IT'S A GROUP
+      const isGroup = groups.some((g) => g._id === conversationId);
+
       if (isPinned) {
         // Unpin
-        await axios.delete(
-          `http://localhost:5000/api/messages/conversation/${conversationId}/unpin`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const endpoint = isGroup
+          ? `http://localhost:5000/api/groups/${conversationId}/unpin`
+          : `http://localhost:5000/api/messages/conversation/${conversationId}/unpin`;
+
+        await axios.delete(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setPinnedConversations((prev) => {
           const newSet = new Set(prev);
@@ -235,26 +319,67 @@ export default function Dashboard() {
           return newSet;
         });
 
+        //  UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        if (isGroup) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g._id === conversationId
+                ? {
+                    ...g,
+                    pinnedBy:
+                      g.pinnedBy?.filter((p) => p.userId !== currentUserId) ||
+                      [],
+                  }
+                : g
+            )
+          );
+        }
+
         setAlertDialog({
           isOpen: true,
-          title: "Chat Unpinned",
-          message: "Chat has been unpinned successfully.",
+          title: isGroup ? "Group Unpinned" : "Chat Unpinned",
+          message: isGroup
+            ? "Group has been unpinned successfully."
+            : "Chat has been unpinned successfully.",
           type: "success",
         });
       } else {
         // Pin
+        const endpoint = isGroup
+          ? `http://localhost:5000/api/groups/${conversationId}/pin`
+          : `http://localhost:5000/api/messages/conversation/${conversationId}/pin`;
+
         await axios.post(
-          `http://localhost:5000/api/messages/conversation/${conversationId}/pin`,
+          endpoint,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
         setPinnedConversations((prev) => new Set([...prev, conversationId]));
 
+        // UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        if (isGroup) {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g._id === conversationId
+                ? {
+                    ...g,
+                    pinnedBy: [
+                      ...(g.pinnedBy || []),
+                      { userId: currentUserId, pinnedAt: new Date() },
+                    ],
+                  }
+                : g
+            )
+          );
+        }
+
         setAlertDialog({
           isOpen: true,
-          title: "Chat Pinned",
-          message: "Chat has been pinned to the top.",
+          title: isGroup ? "Group Pinned" : "Chat Pinned",
+          message: isGroup
+            ? "Group has been pinned to the top."
+            : "Chat has been pinned to the top.",
           type: "success",
         });
       }
@@ -266,6 +391,35 @@ export default function Dashboard() {
         type: "error",
       });
     }
+  };
+
+  
+   
+  const handleConversationDeleted = (userId) => {
+    console.log(" Conversation deleted for user:", userId);
+
+    //  REMOVE from lastMessages
+    setLastMessages((prev) => {
+      const updated = { ...prev };
+      delete updated[userId];
+      return updated;
+    });
+
+    //  REMOVE from unreadCounts
+    setUnreadCounts((prev) => {
+      const updated = { ...prev };
+      delete updated[userId];
+      return updated;
+    });
+
+    // CLEAR selection if this was the selected user
+    if (selectedUser?._id === userId) {
+      setSelectedUser(null);
+      setConversationId(null);
+    }
+
+    
+    console.log(" User removed from sidebar view");
   };
 
   // Add this around line 146
@@ -338,14 +492,35 @@ export default function Dashboard() {
     fetchUsers();
   }, [navigate]);
 
+
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/groups/list",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setGroups(response.data);
+      } catch (err) {
+        console.error("Failed to load groups:", err);
+      }
+    };
+
+    if (currentUserId) {
+      loadGroups();
+    }
+  }, [currentUserId]);
+
   // Load last messages for all users on mount
   useEffect(() => {
-    if (!currentUserId || users.length === 0) return;
+    if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
 
     const loadLastMessages = async () => {
       try {
         const token = localStorage.getItem("token");
 
+        // Users ke liye
         for (const user of users) {
           const convRes = await axios.post(
             "http://localhost:5000/api/messages/conversation",
@@ -396,18 +571,62 @@ export default function Dashboard() {
             }
           }
         }
+
+        // Groups ke liye (NEW CODE)
+        for (const group of groups) {
+          try {
+            const msgRes = await axios.get(
+              `http://localhost:5000/api/messages/group/${group._id}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const messages = msgRes.data;
+            if (messages.length > 0) {
+              const lastMsg = messages[messages.length - 1];
+
+              const messageText =
+                lastMsg.text ||
+                (lastMsg.attachments?.length > 0
+                  ? formatAttachmentText(lastMsg.attachments)
+                  : "");
+
+              setLastMessages((prev) => ({
+                ...prev,
+                [group._id]: {
+                  text: messageText,
+                  time: lastMsg.createdAt,
+                  sender: lastMsg.sender._id || lastMsg.sender,
+                  status: lastMsg.status || "sent",
+                  lastMessageId: lastMsg._id,
+                  conversationId: group._id,
+                  attachments: lastMsg.attachments,
+                  _updated: Date.now(),
+                  isGroup: true,
+                },
+              }));
+            }
+          } catch (err) {
+            console.error(
+              `Error loading messages for group ${group._id}:`,
+              err
+            );
+          }
+        }
       } catch (err) {
-        console.error(" Error loading last messages:", err);
+        console.error("Error loading last messages:", err);
       }
     };
 
     loadLastMessages();
-  }, [currentUserId, users]);
-
+  }, [currentUserId, users, groups]);
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
     const handleNewMessage = (msg) => {
+      console.log(" Full message object:", msg);
+      console.log("Has groupId?", msg.groupId);
+      console.log("Has conversationId?", msg.conversationId);
+      console.log("Sender:", msg.sender);
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
 
@@ -416,32 +635,50 @@ export default function Dashboard() {
         (msg.attachments?.length > 0
           ? formatAttachmentText(msg.attachments)
           : "");
-
-      const associatedUserId =
-        senderId === currentUserId ? receiverId : senderId;
-
-      setLastMessages((prev) => ({
-        ...prev,
-        [associatedUserId]: {
-          text: messageText,
-          time: msg.createdAt || new Date().toISOString(),
-          sender: senderId,
-          status: msg.status || "sent",
-          conversationId: msg.conversationId,
-          lastMessageId: msg._id,
-          attachments: msg.attachments,
-          _updated: Date.now(),
-        },
-      }));
-
-      if (
-        senderId !== currentUserId &&
-        selectedUserRef.current?._id !== senderId
-      ) {
-        setUnreadCounts((prev) => ({
+      // Check if message is from a group
+      if (msg.groupId) {
+        setLastMessages((prev) => ({
           ...prev,
-          [senderId]: (prev[senderId] || 0) + 1,
+          [msg.groupId]: {
+            text: messageText,
+            time: msg.createdAt || new Date().toISOString(),
+            sender: senderId,
+            status: msg.status || "sent",
+            conversationId: msg.groupId,
+            lastMessageId: msg._id,
+            attachments: msg.attachments,
+            _updated: Date.now(),
+            isGroup: true,
+          },
         }));
+      } else {
+        // Individual message
+        const associatedUserId =
+          senderId === currentUserId ? receiverId : senderId;
+
+        setLastMessages((prev) => ({
+          ...prev,
+          [associatedUserId]: {
+            text: messageText,
+            time: msg.createdAt || new Date().toISOString(),
+            sender: senderId,
+            status: msg.status || "sent",
+            conversationId: msg.conversationId,
+            lastMessageId: msg._id,
+            attachments: msg.attachments,
+            _updated: Date.now(),
+          },
+        }));
+
+        if (
+          senderId !== currentUserId &&
+          selectedUserRef.current?._id !== senderId
+        ) {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [senderId]: (prev[senderId] || 0) + 1,
+          }));
+        }
       }
     };
 
@@ -603,12 +840,38 @@ export default function Dashboard() {
       }
     };
 
+
+    //  GROUP MESSAGE LISTENER
+    socket.on("receiveGroupMessage", (msg) => {
+      console.log(" Group msg received:", msg);
+
+      if (msg.groupId) {
+        const messageText = msg.text || formatAttachmentText(msg.attachments);
+
+        setLastMessages((prev) => ({
+          ...prev,
+          [msg.groupId]: {
+            text: messageText,
+            time: msg.createdAt || new Date().toISOString(),
+            sender: msg.sender._id || msg.sender,
+            status: msg.status || "sent",
+            conversationId: msg.groupId,
+            lastMessageId: msg._id,
+            attachments: msg.attachments,
+            _updated: Date.now(),
+            isGroup: true,
+          },
+        }));
+      }
+    });
+
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
     socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
 
     return () => {
+      socket.off("receiveGroupMessage");
       socket.off("receiveMessage", handleNewMessage);
       socket.off("messageStatusUpdate", handleStatusUpdate);
       socket.off("messageDeleted", handleMessageDeleted);
@@ -716,11 +979,24 @@ export default function Dashboard() {
         {/*  RESPONSIVE SIDEBAR */}
         <Sidebar
           users={users}
+          groups={groups}
           selectedUserId={selectedUser?._id}
           onSelectUser={(user) => {
-            console.log(" Selected user object:", user);
-            console.log(" Selected user profile image:", user.profileImage);
-            setSelectedUser(user);
+            console.log(" Selected:", user);
+
+            if (user.isGroup) {
+              // Group selected
+              setSelectedGroup(user);
+              setSelectedUser(null);
+              setIsGroupChat(true);
+              setConversationId(null);
+            } else {
+              // Individual user selected
+              setSelectedUser(user);
+              setSelectedGroup(null);
+              setIsGroupChat(false);
+            }
+
             setIsMobileSidebarOpen(false);
           }}
           onlineUsers={onlineUsers}
@@ -739,6 +1015,17 @@ export default function Dashboard() {
           onArchiveConversation={handleArchiveConversation}
           showArchived={showArchived}
           onToggleArchived={(show) => setShowArchived(show)}
+          onGroupUpdate={(updatedGroup) => {
+            console.log(" Dashboard: Group updated:", updatedGroup);
+            setGroups((prev) => {
+              const updated = prev.map((g) =>
+                g._id === updatedGroup._id ? updatedGroup : g
+              );
+              console.log("Groups after update:", updated);
+              return updated;
+            });
+          }}
+          onConversationDeleted={handleConversationDeleted}
         />
 
         {showProfileSettings && (
@@ -748,14 +1035,14 @@ export default function Dashboard() {
             onProfileImageUpdate={handleProfileImageUpdate}
           />
         )}
+
         <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
-          {selectedUser ? (
+          {selectedUser || selectedGroup ? (
             <>
-              {/*  RESPONSIVE HEADER */}
               <div className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                    {/*  HAMBURGER MENU (MOBILE ONLY) */}
+                    {/* HAMBURGER MENU (MOBILE ONLY) */}
                     <button
                       onClick={() => setIsMobileSidebarOpen(true)}
                       className="md:hidden p-2 text-black transition-colors flex-shrink-0"
@@ -775,36 +1062,65 @@ export default function Dashboard() {
                       </svg>
                     </button>
 
+                    {/* AVATAR */}
+                    {/* AVATAR */}
                     <div className="relative flex-shrink-0">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden shadow-md">
-                        {selectedUserImage ? (
+                      <div className="w-10 h-10 aspect-square rounded-full overflow-hidden shadow-md flex items-center justify-center">
+                        {isGroupChat ? (
+                          selectedGroupImage ? (
+                            <img
+                              src={selectedGroupImage}
+                              className="w-full h-full object-cover"
+                              alt={selectedGroup?.name}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                              <svg
+                                className="w-7 h-7 text-white"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                            </div>
+                          )
+                        ) : selectedUserImage ? (
                           <img
                             src={selectedUserImage}
-                            alt={selectedUser.username}
                             className="w-full h-full object-cover"
+                            alt={selectedUser?.username}
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold text-base md:text-lg">
+                          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold">
                             {selectedUser.username.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
-                      {onlineUsers.has(selectedUser._id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 md:w-3.5 md:h-3.5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+
+                      {!isGroupChat && onlineUsers.has(selectedUser._id) && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                       )}
                     </div>
 
+                    {/* NAME & STATUS */}
                     <div className="min-w-0 flex-1">
                       <h2 className="text-black font-semibold text-base md:text-lg truncate">
-                        {selectedUser.username}
+                        {isGroupChat
+                          ? selectedGroup.name
+                          : selectedUser.username}
                       </h2>
                       <p className="text-xs md:text-sm text-black flex items-center gap-1">
-                        {onlineUsers.has(selectedUser._id) ? (
+                        {isGroupChat ? (
+                          //  GROUP MEMBER COUNT
+                          `${selectedGroup.members?.length || 0} members`
+                        ) : onlineUsers.has(selectedUser._id) ? (
+                          //  USER ONLINE
                           <>
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                             Online
                           </>
                         ) : (
+                          //  USER OFFLINE
                           <>
                             <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
                             Offline
@@ -814,6 +1130,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* HEADER ACTIONS (Search, Menu) */}
                   <div className="flex items-center gap-1 md:gap-2 relative">
                     <button
                       onClick={() => setShowSearchBox(!showSearchBox)}
@@ -835,101 +1152,106 @@ export default function Dashboard() {
                       </svg>
                     </button>
 
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowChatMenu(!showChatMenu)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
-                        title="Chat options"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                    {/* THREE DOTS MENU - Only for individual chats */}
+                    {!isGroupChat && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowChatMenu(!showChatMenu)}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
+                          title="Chat options"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                            />
+                          </svg>
+                        </button>
 
-                      {showChatMenu && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowChatMenu(false)}
-                          ></div>
-
-                          <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
-                            <button
-                              onClick={() => {
-                                setAlertDialog({
-                                  isOpen: true,
-                                  title: "User Info",
-                                  message: `👤 ${selectedUser.username}\n📧 ${
-                                    selectedUser.email
-                                  }\n${
-                                    onlineUsers.has(selectedUser._id)
-                                      ? "🟢 Online"
-                                      : "⚫ Offline"
-                                  }`,
-                                  type: "info",
-                                });
-                                setShowChatMenu(false);
-                              }}
-                              className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
-                            >
-                              <svg
-                                className="w-5 h-5 text-blue-600"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                        {showChatMenu && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setShowChatMenu(false)}
+                            ></div>
+                            <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
+                              <button
+                                onClick={() => {
+                                  setAlertDialog({
+                                    isOpen: true,
+                                    title: "User Info",
+                                    message: ` ${selectedUser.username}\n📧 ${
+                                      selectedUser.email
+                                    }\n${
+                                      onlineUsers.has(selectedUser._id)
+                                        ? " Online"
+                                        : " Offline"
+                                    }`,
+                                    type: "info",
+                                  });
+                                  setShowChatMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                />
-                              </svg>
-                              <span className="font-medium">View Profile</span>
-                            </button>
+                                <svg
+                                  className="w-5 h-5 text-blue-600"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                  />
+                                </svg>
+                                <span className="font-medium">
+                                  View Profile
+                                </span>
+                              </button>
 
-                            <button
-                              onClick={() => {
-                                setClearChatDialog({
-                                  isOpen: true,
-                                  username: selectedUser.username,
-                                });
-                                setShowChatMenu(false);
-                              }}
-                              className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                              <button
+                                onClick={() => {
+                                  setClearChatDialog({
+                                    isOpen: true,
+                                    username: selectedUser.username,
+                                  });
+                                  setShowChatMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                              <span className="font-medium">Clear Chat</span>
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                                <svg
+                                  className="w-5 h-5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                                <span className="font-medium">Clear Chat</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* SEARCH BOX */}
                 {showSearchBox && (
                   <div className="mt-3 relative">
                     <input
@@ -976,50 +1298,62 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <ChatWindow
-                conversationId={conversationId}
-                currentUserId={currentUserId}
-                searchQuery={searchInChat}
-                selectedUser={selectedUser}
-                onUpdateLastMessageStatus={(updateData) => {
-                  if (
-                    updateData &&
-                    updateData.status &&
-                    updateData.conversationId
-                  ) {
-                    setLastMessages((prev) => {
-                      let targetUserId = null;
-
-                      for (const [userId, msgData] of Object.entries(prev)) {
-                        if (
-                          msgData?.conversationId === updateData.conversationId
-                        ) {
-                          targetUserId = userId;
-                          break;
-                        }
+              {isGroupChat ? (
+                //  GROUP CHAT
+                <>
+                  <GroupChatWindow
+                    group={selectedGroup}
+                    currentUserId={currentUserId}
+                    searchQuery={searchInChat}
+                  />
+                  <MessageInput groupId={selectedGroup._id} isGroup={true} />
+                </>
+              ) : (
+                <>
+                  <ChatWindow
+                    conversationId={conversationId}
+                    currentUserId={currentUserId}
+                    searchQuery={searchInChat}
+                    selectedUser={selectedUser}
+                    onUpdateLastMessageStatus={(updateData) => {
+                      if (
+                        updateData &&
+                        updateData.status &&
+                        updateData.conversationId
+                      ) {
+                        setLastMessages((prev) => {
+                          let targetUserId = null;
+                          for (const [userId, msgData] of Object.entries(
+                            prev
+                          )) {
+                            if (
+                              msgData?.conversationId ===
+                              updateData.conversationId
+                            ) {
+                              targetUserId = userId;
+                              break;
+                            }
+                          }
+                          if (!targetUserId) return prev;
+                          return {
+                            ...prev,
+                            [targetUserId]: {
+                              ...prev[targetUserId],
+                              status: updateData.status,
+                              _updated: Date.now(),
+                            },
+                          };
+                        });
                       }
-
-                      if (!targetUserId) return prev;
-
-                      return {
-                        ...prev,
-                        [targetUserId]: {
-                          ...prev[targetUserId],
-                          status: updateData.status,
-                          _updated: Date.now(),
-                        },
-                      };
-                    });
-                  }
-                }}
-              />
-
-              <MessageInput conversationId={conversationId} />
+                    }}
+                  />
+                  <MessageInput conversationId={conversationId} />
+                </>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
               <div className="text-center">
-                {/*  MOBILE: Show menu button when no chat selected */}
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
                   className="md:hidden mb-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg"

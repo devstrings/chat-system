@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import UserItem from "./UserItem";
+import GroupItem from "./GroupItem";
 import axios from "axios";
 import { AlertDialog } from "./ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import { useSocket } from "../context/SocketContext";
-
+import { CreateGroupDialog } from "./ConfirmationDialog";
 export default function Sidebar({
   users = [],
+  groups = [],
   selectedUserId,
   onSelectUser,
   currentUsername = "",
@@ -25,6 +27,8 @@ export default function Sidebar({
   onArchiveConversation = () => {},
   showArchived = false,
   onToggleArchived = () => {},
+  onGroupUpdate = () => {},
+  onConversationDeleted = () => {},
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,9 +41,9 @@ export default function Sidebar({
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [showBlocked, setShowBlocked] = useState(false);
 
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const { imageSrc: profilePreview, loading: imageLoading } =
     useAuthImage(profileImageUrl);
-  // const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -49,36 +53,125 @@ export default function Sidebar({
     message: "",
     type: "success",
   });
-  const memoizedUsers = useMemo(() => {
-    const filteredUsers = users.filter((user) => {
-      const matchesSearch =
-        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Check archived status
-      const convId = lastMessages[user._id]?.conversationId;
-      const isArchived = convId && archivedConversations.has(convId);
+  const formatTime = (date) => {
+    if (!date) return "";
 
-      // Show archived chats only when showArchived is true
-      if (showArchived) {
-        return matchesSearch && isArchived;
-      } else {
-        return matchesSearch && !isArchived;
-      }
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+
+    return d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     });
+  };
 
-    return [...filteredUsers].sort((a, b) => {
-      const convIdA = lastMessages[a._id]?.conversationId;
-      const convIdB = lastMessages[b._id]?.conversationId;
+  const memoizedItems = useMemo(() => {
+    // If searching, show ALL friends (even without conversations)
+    if (searchQuery.trim()) {
+      // Search in ALL friends, not just those with conversations
+      const allFilteredUsers = users
+        .filter(
+          (user) =>
+            user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .map((user) => ({ ...user, isGroup: false }));
 
-      const aPinned = convIdA && pinnedConversations.has(convIdA);
-      const bPinned = convIdB && pinnedConversations.has(convIdB);
+      const filteredGroups = groups
+        .filter((group) => {
+          const matchesSearch = group.name
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase());
 
-      // Pinned chats first (only in main view)
+          const isArchived = group.archivedBy?.some(
+            (a) => a.userId === currentUserId
+          );
 
+          if (showArchived) {
+            return matchesSearch && isArchived;
+          } else {
+            return matchesSearch && !isArchived;
+          }
+        })
+        .map((group) => ({ ...group, isGroup: true }));
+
+      // Combine and sort by last message time
+      const allItems = [...filteredGroups, ...allFilteredUsers];
+
+      return allItems.sort((a, b) => {
+        const timeA = lastMessages[a._id]?.time
+          ? new Date(lastMessages[a._id].time).getTime()
+          : 0;
+        const timeB = lastMessages[b._id]?.time
+          ? new Date(lastMessages[b._id].time).getTime()
+          : 0;
+        return timeB - timeA;
+      });
+    }
+
+    // When NOT searching, only show users WITH conversations
+    const filteredUsers = users
+      .filter((user) => {
+        const convId = lastMessages[user._id]?.conversationId;
+        const isArchived = convId && archivedConversations.has(convId);
+
+        // Only show if has conversation
+        if (!lastMessages[user._id]?.conversationId) return false;
+
+        if (showArchived) {
+          return isArchived;
+        } else {
+          return !isArchived;
+        }
+      })
+      .map((user) => ({ ...user, isGroup: false }));
+
+    const filteredGroups = groups
+      .filter((group) => {
+        const isArchived = group.archivedBy?.some(
+          (a) => a.userId === currentUserId
+        );
+
+        if (showArchived) {
+          return isArchived;
+        } else {
+          return !isArchived;
+        }
+      })
+      .map((group) => ({ ...group, isGroup: true }));
+
+    const allItems = [...filteredGroups, ...filteredUsers];
+
+    return allItems.sort((a, b) => {
       if (!showArchived) {
+        let convIdA, convIdB, aPinned, bPinned;
+
+        if (a.isGroup) {
+          convIdA = a._id;
+          aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
+        } else {
+          convIdA = lastMessages[a._id]?.conversationId;
+          aPinned = convIdA && pinnedConversations.has(convIdA);
+        }
+
+        if (b.isGroup) {
+          convIdB = b._id;
+          bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
+        } else {
+          convIdB = lastMessages[b._id]?.conversationId;
+          bPinned = convIdB && pinnedConversations.has(convIdB);
+        }
+
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
+      }
+
+      const updatedA = lastMessages[a._id]?._updated || 0;
+      const updatedB = lastMessages[b._id]?._updated || 0;
+
+      if (updatedA !== updatedB) {
+        return updatedB - updatedA;
       }
 
       const timeA = lastMessages[a._id]?.time
@@ -87,20 +180,24 @@ export default function Sidebar({
       const timeB = lastMessages[b._id]?.time
         ? new Date(lastMessages[b._id].time).getTime()
         : 0;
+
       return timeB - timeA;
     });
   }, [
     users,
+    groups,
     searchQuery,
     lastMessages,
     pinnedConversations,
     archivedConversations,
     showArchived,
+    currentUserId,
   ]);
 
-  const onlineCount = memoizedUsers.filter((user) =>
-    onlineUsers.has(user._id)
+  const onlineCount = memoizedItems.filter(
+    (item) => !item.isGroup && onlineUsers.has(item._id)
   ).length;
+
   const totalUnread = Object.values(unreadCounts).reduce(
     (sum, count) => sum + count,
     0
@@ -197,7 +294,7 @@ export default function Sidebar({
       setAlertDialog({
         isOpen: true,
         title: "Cannot Send Request",
-        message: errorMessage, // Backend se "Request already exists" aayega
+        message: errorMessage,
         type: "error",
       });
     }
@@ -319,13 +416,13 @@ export default function Sidebar({
   };
 
   const handleProfileClick = () => {
-    onOpenProfileSettings(); // This prop will come from Dashboard
+    onOpenProfileSettings();
   };
 
   return (
     <>
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 bg-white border-r border-gray-200 shadow-lgflex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${
           isMobileSidebarOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
@@ -352,8 +449,8 @@ export default function Sidebar({
 
         <div className="bg-gradient-to-r from-[#2563EB] to-[#9333EA] border-b border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="relative flex-shrink-0">
                 <div
                   className="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-700"
                   onClick={handleProfileClick}
@@ -373,15 +470,18 @@ export default function Sidebar({
                   )}
                 </div>
               </div>
-              <div>
-                <h2 className="text-white font-semibold text-lg">
+
+              <div className="min-w-0 flex-1">
+                <h2 className="text-white font-semibold text-lg truncate">
                   {showArchived ? "Archived" : "Chats"}
                 </h2>
-                <p className="text-xs text-gray-400">{currentUsername}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {currentUsername}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
               <button
                 onClick={() => onToggleArchived(!showArchived)}
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
@@ -496,6 +596,19 @@ export default function Sidebar({
               </button>
 
               <button
+                onClick={() => setShowCreateGroup(true)}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-green-400 hover:text-green-300"
+                title="Create Group"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                </svg>
+              </button>
+              <button
                 onClick={onLogout}
                 className="p-2 hover:bg-red-500 hover:bg-opacity-20 rounded-lg transition-colors text-red-400 hover:text-red-300"
                 title="Logout"
@@ -593,9 +706,12 @@ export default function Sidebar({
             ) : (
               <div className="space-y-2">
                 {blockedUsers.map((block) => (
-                  <div key={block._id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div
+                    key={block._id}
+                    className="bg-gray-50 border border-gray-200 rounded-lg p-3"
+                  >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
                           {block.blocked.profileImage ? (
                             <img
@@ -662,9 +778,12 @@ export default function Sidebar({
             ) : (
               <div className="space-y-2">
                 {pendingRequests.map((request) => (
-                  <div key={request._id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div
+                    key={request._id}
+                    className="bg-gray-50 border border-gray-200 rounded-lg p-3"
+                  >
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
                           {request.sender.profileImage ? (
                             <img
@@ -738,7 +857,7 @@ export default function Sidebar({
               </button>
             </div>
 
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-1 flex-shrink-0 ml-2 mb-3">
               <input
                 type="text"
                 placeholder="Search users by username..."
@@ -774,7 +893,7 @@ export default function Sidebar({
                   key={user._id}
                   className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-750"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                     <div className="w-8 h-8 rounded-full overflow-hidden">
                       {user.profileImage ? (
                         <img
@@ -808,7 +927,7 @@ export default function Sidebar({
         )}
 
         {/* Users Count & Stats */}
-        <div className="px-4 py-2 bg-white bg-opacity-10 border-b border-gray-200">
+        <div className="px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
           <p className="text-xs text-gray-900 font-bold">
             {showArchived ? (
               // ARCHIVED VIEW
@@ -819,8 +938,8 @@ export default function Sidebar({
             ) : (
               //  MAIN VIEW
               <>
-                {memoizedUsers.length}{" "}
-                {memoizedUsers.length === 1 ? "contact" : "contacts"}
+                {memoizedItems.length}{" "}
+                {memoizedItems.length === 1 ? "contact" : "contacts"}
                 {searchQuery && ` found`} • {onlineCount} online
                 {totalUnread > 0 && (
                   <span className="text-red-400 ml-2">
@@ -833,7 +952,7 @@ export default function Sidebar({
         </div>
         {/* Users List */}
         <div className="flex-1 overflow-y-auto">
-          {memoizedUsers.length === 0 ? (
+          {memoizedItems.length === 0 ? (
             <div className="text-center py-12 px-4">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
                 {searchQuery ? (
@@ -870,53 +989,106 @@ export default function Sidebar({
                 {showArchived
                   ? "No archived chats"
                   : searchQuery
-                  ? `No results for "${searchQuery}"`
+                  ? `No friends found for "${searchQuery}"`
                   : "No contacts yet"}
               </p>
-              {!searchQuery && (
-                <p className="text-gray-500 text-xs mt-1">
-                  Start by adding some friends!
-                </p>
-              )}
+              <p className="text-gray-500 text-xs mt-1">
+                {searchQuery
+                  ? "Try searching by username or email"
+                  : "Start by adding some friends!"}
+              </p>
             </div>
           ) : (
             <div className="py-2">
-              {memoizedUsers.map((user) => {
-                const lastMsg = lastMessages[user._id];
-                const formattedText = formatLastMessageText(lastMsg);
-                const conversationId = lastMsg?.conversationId;
-                const isPinned =
-                  conversationId && pinnedConversations.has(conversationId);
-                const isArchived =
-                  conversationId && archivedConversations.has(conversationId);
+              {memoizedItems.map((item) => {
+                if (item.isGroup) {
+                  // Render Group
+                  const lastMsg = lastMessages[item._id];
+                  const formattedText = formatLastMessageText(lastMsg);
 
-                return (
-                  <UserItem
-                    key={user._id}
-                    user={user}
-                    selected={user._id === selectedUserId}
-                    onClick={() => onSelectUser(user)}
-                    isOnline={onlineUsers.has(user._id)}
-                    unreadCount={unreadCounts[user._id] || 0}
-                    lastMessage={formattedText}
-                    lastMessageTime={lastMsg?.time || null}
-                    lastMessageSender={lastMsg?.sender || null}
-                    lastMessageStatus={lastMsg?.status || "sent"}
-                    currentUserId={currentUserId}
-                    onRelationshipChange={() => window.location.reload()}
-                    isPinned={isPinned}
-                    conversationId={conversationId}
-                    onPinConversation={onPinConversation}
-                    isArchived={isArchived}
-                    onArchiveConversation={onArchiveConversation}
-                  />
-                );
+                  return (
+                    <GroupItem
+                      key={item._id}
+                      group={item}
+                      selected={selectedUserId === item._id}
+                      onClick={() => onSelectUser({ ...item, isGroup: true })}
+                      onPinConversation={onPinConversation}
+                      onArchiveConversation={onArchiveConversation}
+                      isPinned={item.pinnedBy?.some(
+                        (p) => p.userId === currentUserId
+                      )}
+                      isArchived={item.archivedBy?.some(
+                        (a) => a.userId === currentUserId
+                      )}
+                      conversationId={item._id}
+                      currentUserId={currentUserId}
+                      unreadCount={unreadCounts[item._id] || 0}
+                      lastMessage={formattedText}
+                      lastMessageTime={lastMsg?.time || null}
+                      lastMessageSender={lastMsg?.sender || null}
+                      lastMessageStatus={lastMsg?.status || "sent"}
+                      onGroupUpdate={(updatedGroup) => {
+                        if (typeof onGroupUpdate === "function") {
+                          onGroupUpdate(updatedGroup);
+                        }
+                      }}
+                      onGroupDeleted={() => {
+                        // Reload to refresh group list
+                        window.location.reload();
+                      }}
+                    />
+                  );
+                } else {
+                  // Render User
+                  const lastMsg = lastMessages[item._id];
+                  const formattedText = formatLastMessageText(lastMsg);
+                  const conversationId = lastMsg?.conversationId;
+                  const isPinned =
+                    conversationId && pinnedConversations.has(conversationId);
+                  const isArchived =
+                    conversationId && archivedConversations.has(conversationId);
+
+                  return (
+                    <UserItem
+                      key={item._id}
+                      user={item}
+                      selected={item._id === selectedUserId}
+                      onClick={() => onSelectUser(item)}
+                      isOnline={onlineUsers.has(item._id)}
+                      unreadCount={unreadCounts[item._id] || 0}
+                      lastMessage={formattedText}
+                      lastMessageTime={lastMsg?.time || null}
+                      lastMessageSender={lastMsg?.sender || null}
+                      lastMessageStatus={lastMsg?.status || "sent"}
+                      currentUserId={currentUserId}
+                      onRelationshipChange={() => window.location.reload()}
+                      isPinned={isPinned}
+                      conversationId={conversationId}
+                      onPinConversation={onPinConversation}
+                      isArchived={isArchived}
+                      onArchiveConversation={onArchiveConversation}
+                      onConversationDeleted={onConversationDeleted}
+                    />
+                  );
+                }
               })}
             </div>
           )}
         </div>
       </div>
 
+      {showCreateGroup && (
+        <CreateGroupDialog
+          friends={users}
+          currentUserId={currentUserId}
+          onClose={() => setShowCreateGroup(false)}
+          onSuccess={(newGroup) => {
+            setGroups((prev) => [newGroup, ...prev]);
+            setShowCreateGroup(false);
+            onSelectUser({ ...newGroup, isGroup: true });
+          }}
+        />
+      )}
       <AlertDialog
         isOpen={alertDialog.isOpen}
         onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}

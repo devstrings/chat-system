@@ -65,21 +65,29 @@ export default function Message({
     message.deletedForEveryone || message.isDeletedForEveryone;
   const isDeletedForMe =
     message.deletedFor?.includes(message.sender._id) || message.isDeletedForMe;
-
   const handleDeleteForMe = async () => {
     try {
-      const token = localStorage.getItem("token");
-
-      await axios.delete(
-        `http://localhost:5000/api/messages/message/${message._id}/for-me`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (socket) {
-        socket.emit("deleteMessageForMe", {
+      // Check if it's a group message
+      if (message.isGroupMessage && message.groupId) {
+        // Use socket for group messages
+        socket?.emit("deleteGroupMessageForMe", {
           messageId: message._id,
-          conversationId: message.conversationId,
+          groupId: message.groupId,
         });
+      } else {
+        // HTTP endpoint for regular messages
+        const token = localStorage.getItem("token");
+        await axios.delete(
+          `http://localhost:5000/api/messages/message/${message._id}/for-me`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (socket) {
+          socket.emit("deleteMessageForMe", {
+            messageId: message._id,
+            conversationId: message.conversationId,
+          });
+        }
       }
 
       setShowDeleteModal(false);
@@ -92,18 +100,27 @@ export default function Message({
 
   const handleDeleteForEveryone = async () => {
     try {
-      const token = localStorage.getItem("token");
-
-      await axios.delete(
-        `http://localhost:5000/api/messages/message/${message._id}/for-everyone`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (socket) {
-        socket.emit("deleteMessageForEveryone", {
+      // Check if it's a group message
+      if (message.isGroupMessage && message.groupId) {
+        // Use socket for group messages
+        socket?.emit("deleteGroupMessageForEveryone", {
           messageId: message._id,
-          conversationId: message.conversationId,
+          groupId: message.groupId,
         });
+      } else {
+        // HTTP endpoint for regular messages
+        const token = localStorage.getItem("token");
+        await axios.delete(
+          `http://localhost:5000/api/messages/message/${message._id}/for-everyone`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (socket) {
+          socket.emit("deleteMessageForEveryone", {
+            messageId: message._id,
+            conversationId: message.conversationId,
+          });
+        }
       }
 
       setShowDeleteModal(false);
@@ -490,7 +507,7 @@ export default function Message({
                     onClick={() => setShowOptions(false)}
                   ></div>
 
-                 <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
+                  <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
                     <button
                       onClick={() => {
                         setShowDeleteModal(true);
