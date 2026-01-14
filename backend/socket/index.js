@@ -2,7 +2,8 @@ import jwt from "jsonwebtoken";
 import { handleMessage } from "./messageHandler.js";
 import config from "../config/index.js"; 
 import { redisClient } from "../config/redis.js";
-import User from "../models/user.js"; 
+import User from "../models/user.js";
+import Conversation from "../models/Conversation.js"; 
 
 const userSockets = new Map(); 
 
@@ -64,7 +65,7 @@ export const setupSocket = (io) => {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(socket.id);
-    console.log(`User ${userId} has ${userSockets.get(userId).size} active socket(s)`);
+    console.log(`👥 User ${userId} has ${userSockets.get(userId).size} active socket(s)`);
 
     try {
       await redisClient.hSet("onlineUsers", userId, socket.id);
@@ -98,12 +99,59 @@ export const setupSocket = (io) => {
 
     handleMessage(io, socket);
 
-    socket.on("typing", ({ conversationId, isTyping }) => {
-      socket.to(conversationId).emit("userTyping", { conversationId, userId, isTyping });
-    });
+    //  TYPING INDICATOR
+   socket.on("typing", async ({ conversationId, isTyping }) => {
+  try {
+    console.log(`${isTyping ? '⌨️' : '✋'} User ${userId} ${isTyping ? 'started' : 'stopped'} typing in conversation ${conversationId}`);
+    
+    const conversation = await Conversation.findById(conversationId).populate("participants", "_id");
+
+    if (!conversation) {
+      console.warn(" Conversation not found:", conversationId);
+      return;
+    }
+
+    console.log(" Participants:", conversation.participants.map(p => p._id.toString()));
+
+    const receiverId = conversation.participants.find(
+      (p) => p._id.toString() !== userId
+    )?._id;
+
+    if (!receiverId) {
+      console.warn(" Receiver not found in conversation");
+      return;
+    }
+
+    console.log(" Target receiver:", receiverId.toString());
+
+    //  Find ALL sockets for the receiver (no Redis dependency)
+    const receiverSockets = Array.from(io.sockets.sockets.values()).filter(
+      s => s.user && s.user.id === receiverId.toString()
+    );
+
+    console.log(`Found ${receiverSockets.length} socket(s) for receiver ${receiverId}`);
+
+    if (receiverSockets.length > 0) {
+      receiverSockets.forEach(receiverSocket => {
+        receiverSocket.emit("userTyping", {
+          userId,
+          conversationId,
+          isTyping
+        });
+        console.log(` Sent typing to socket: ${receiverSocket.id}`);
+      });
+    } else {
+      console.log(` Receiver ${receiverId} has no active sockets (offline)`);
+    }
+
+  } catch (err) {
+    console.error(" Typing handler error:", err);
+    console.error("Stack:", err.stack);
+  }
+});
 
     socket.on("disconnect", async (reason) => {
-      console.log(`Socket ${socket.id} disconnected (${reason}) - User: ${userId}`);
+      console.log(` Socket ${socket.id} disconnected (${reason}) - User: ${userId}`);
       
       try {
         if (userSockets.has(userId)) {
@@ -135,11 +183,11 @@ export const setupSocket = (io) => {
             });
             console.log(`Broadcasted userOffline for ${userId}`);
           } else {
-            console.log(`User ${userId} still has ${remainingSockets} socket(s) - staying online`);
+            console.log(` User ${userId} still has ${remainingSockets} socket(s) - staying online`);
           }
         }
       } catch (err) {
-        console.error(" Redis disconnect cleanup error:", err);
+        console.error("Redis disconnect cleanup error:", err);
       }
     });
   });

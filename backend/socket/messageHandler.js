@@ -1,5 +1,6 @@
 import Message from "../models/message.js";
 import Conversation from "../models/Conversation.js";
+import Group from "../models/Group.js";
 
 export function handleMessage(io, socket) {
   console.log(` User connected: ${socket.user.id}`);
@@ -466,6 +467,222 @@ export function handleMessage(io, socket) {
       console.error(" Delete for everyone error:", err);
     }
   });
+  
+
+/// GROUP MESSAGE HANDLER
+socket.on("sendGroupMessage", async ({ groupId, text, attachments = [] }) => {
+  try {
+    console.log(" Sending group message:", { groupId, text, senderId: socket.user.id });
+
+    const group = await Group.findById(groupId).populate("members", "_id username email profileImage");
+    if (!group) return socket.emit("errorMessage", { message: "Group not found" });
+
+    if (!group.members.some(m => m._id.toString() === socket.user.id)) {
+      return socket.emit("errorMessage", { message: "Not a member of this group" });
+    }
+
+    const attachmentIds = attachments?.map(att => att.attachmentId).filter(Boolean) || [];
+
+    const msg = await Message.create({
+      groupId,
+      sender: socket.user.id,
+      text: text || "",
+      attachments: attachmentIds,
+      isGroupMessage: true,
+      status: "sent"
+    });
+
+    await msg.populate("sender", "username email profileImage");
+    await msg.populate({ path: "attachments", select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage" });
+
+    await Group.findByIdAndUpdate(groupId, {
+      lastMessage: text || "📎 Attachment",
+      lastMessageTime: Date.now(),
+      lastMessageSender: socket.user.id
+    });
+
+    const transformedAttachments = msg.attachments?.map(att => ({
+      url: `/api/file/get/${att.serverFileName}`,
+      filename: att.fileName,
+      fileType: att.fileType,
+      fileSize: att.sizeInKilobytes * 1024,
+      attachmentId: att._id,
+      duration: att.duration || 0,
+      isVoiceMessage: att.isVoiceMessage || false
+    })) || [];
+
+    const messageData = {
+      _id: msg._id,
+      groupId: msg.groupId,
+      sender: {
+        _id: msg.sender._id,
+        username: msg.sender.username,
+        email: msg.sender.email,
+        profileImage: msg.sender.profileImage
+      },
+      text: msg.text,
+      attachments: transformedAttachments,
+      status: msg.status,
+      createdAt: msg.createdAt,
+      isGroupMessage: true
+    };
+
+  
+    //  Emit to all group members with CORRECT event name
+console.log(" Broadcasting to", group.members.length, "members");
+
+for (const member of group.members) {
+  const memberSockets = [...io.sockets.sockets.values()].filter(s => s.user?.id === member._id.toString());
+  
+  console.log(` Member ${member.username}:`, memberSockets.length, "sockets");
+  
+  for (const s of memberSockets) {
+    s.emit("receiveGroupMessage", messageData);  
+    console.log(" Sent to socket:", s.id);
+  }
+}
+
+console.log(" Group message broadcast complete");
+
+  } catch (err) {
+    console.error(" sendGroupMessage error:", err);
+    socket.emit("errorMessage", { message: "Failed to send message" });
+  }
+});
+
+// GROUP TYPING INDICATOR
+socket.on("groupTyping", async ({ groupId, isTyping }) => {
+  try {
+    const group = await Group.findById(groupId).populate("members", "_id");
+    if (!group || !group.members.some(m => m._id.toString() === socket.user.id)) return;
+
+    for (const member of group.members) {
+      if (member._id.toString() === socket.user.id) continue;
+
+      const memberSockets = [...io.sockets.sockets.values()].filter(s => s.user?.id === member._id.toString());
+      for (const s of memberSockets) {
+        s.emit("groupUserTyping", { userId: socket.user.id, groupId, isTyping });
+      }
+    }
+  } catch (err) {
+    console.error(" groupTyping error:", err);
+  }
+});
+
+// DELETE GROUP MESSAGE FOR ME
+socket.on("deleteGroupMessageForMe", async ({ messageId, groupId }) => {
+  try {
+    console.log(" Delete group message for me:", messageId);
+
+    const message = await Message.findById(messageId);
+    if (!message || !message.isGroupMessage) {
+      socket.emit("errorMessage", { message: "Message not found" });
+      return;
+    }
+
+    const userId = socket.user.id;
+
+    // Verify user is group member
+    const group = await Group.findById(groupId);
+    if (!group || !group.members.includes(userId)) {
+      socket.emit("errorMessage", { message: "Not authorized" });
+      return;
+    }
+
+    // Add user to deletedFor array
+    if (!message.deletedFor.includes(userId)) {
+      message.deletedFor.push(userId);
+    }
+
+    // Check if all members deleted it
+    const allDeleted = group.members.every(
+      m => message.deletedFor.includes(m.toString())
+    );
+
+    if (allDeleted) {
+      message.isDeleted = true;
+      message.deletedAt = new Date();
+      await message.save();
+      await Message.findByIdAndDelete(messageId);
+    } else {
+      await message.save();
+    }
+
+    // Emit only to this user
+    socket.emit("groupMessageDeleted", {
+      messageId,
+      groupId,
+      deletedFor: [userId]
+    });
+
+    console.log(" Group message deleted for user");
+  } catch (err) {
+    console.error(" Delete group message error:", err);
+    socket.emit("errorMessage", { message: "Failed to delete message" });
+  }
+});
+
+// DELETE GROUP MESSAGE FOR EVERYONE
+socket.on("deleteGroupMessageForEveryone", async ({ messageId, groupId }) => {
+  try {
+    console.log(" Delete group message for everyone:", messageId);
+
+    const message = await Message.findById(messageId);
+    if (!message || !message.isGroupMessage) {
+      socket.emit("errorMessage", { message: "Message not found" });
+      return;
+    }
+
+    const userId = socket.user.id;
+
+    // Only sender can delete for everyone
+    if (message.sender.toString() !== userId) {
+      socket.emit("errorMessage", { message: "Only sender can delete for everyone" });
+      return;
+    }
+
+    // Check 5 minute time limit
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (messageAge > fiveMinutes) {
+      socket.emit("errorMessage", { 
+        message: "Cannot delete for everyone after 5 minutes" 
+      });
+      return;
+    }
+
+    // Mark as deleted for everyone
+    message.deletedForEveryone = true;
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.text = "";
+    message.attachments = [];
+    await message.save();
+
+    // Get group members
+    const group = await Group.findById(groupId).populate("members", "_id");
+    
+    // Emit to all group members
+    for (const member of group.members) {
+      const memberSockets = [...io.sockets.sockets.values()].filter(
+        s => s.user?.id === member._id.toString()
+      );
+      for (const s of memberSockets) {
+        s.emit("groupMessageDeletedForEveryone", {
+          messageId,
+          groupId,
+          deletedForEveryone: true
+        });
+      }
+    }
+
+    console.log("Group message deleted for everyone");
+  } catch (err) {
+    console.error(" Delete group message for everyone error:", err);
+    socket.emit("errorMessage", { message: "Failed to delete message" });
+  }
+});
 
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.user.id}`);

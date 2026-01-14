@@ -4,7 +4,7 @@ import { uploadMessage } from "../config/multer.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { downloadFile, uploadFile } from "../controllers/file.js";
 import { serveProfileImage } from "../controllers/user.js"; 
-
+import { serveGroupImage } from "../controllers/group.js"; 
 const router = express.Router();
 
 // Rate limiters
@@ -29,4 +29,5 @@ router.get("/get/:filename", verifyToken, downloadLimiter, downloadFile);
 // Serve profile image (authenticated)
 router.get("/profile/:filename", verifyToken, serveProfileImage);
 
+router.get("/group/:filename", verifyToken, downloadLimiter, serveGroupImage);
 export default router;

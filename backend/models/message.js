@@ -4,7 +4,7 @@ const messageSchema = new mongoose.Schema({
   conversationId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Conversation", 
-    required: true 
+    required: false
   },
   sender: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -12,11 +12,19 @@ const messageSchema = new mongoose.Schema({
     required: true 
   },
   
-  
+  isGroupMessage: {
+    type: Boolean,
+    default: false
+  },
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Group"
+  },
   text: { 
     type: String,
     default: "" 
   },
+
   attachments: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Attachment"

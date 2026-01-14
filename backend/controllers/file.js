@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "../models/Attachment.js";
 import Conversation from "../models/Conversation.js";
+import Group from "../models/Group.js";
 
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>
@@ -55,36 +56,40 @@ export const downloadFile = async (req, res) => {
       status: "completed"
     });
 
-    if (attachment) {
-      console.log(' Attachment found in database');
-      
-      // Verify conversation access
-      const conversation = await Conversation.findById(attachment.conversationId);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-
-      // Check if user is participant
-      const isParticipant = conversation.participants.some(
-        participantId => participantId.toString() === userId.toString()
+   if (attachment) {
+  console.log(' Attachment found in database');
+  
+  //  Check both Conversation and Group
+  let hasAccess = false;
+  
+  const conversation = await Conversation.findById(attachment.conversationId);
+  
+  if (conversation) {
+    // Regular conversation - check participants
+    hasAccess = conversation.participants.some(
+      participantId => participantId.toString() === userId.toString()
+    );
+  } else {
+    // Try as Group - check members
+    const group = await Group.findById(attachment.conversationId);
+    if (group) {
+      hasAccess = group.members.some(
+        memberId => memberId.toString() === userId.toString()
       );
-
-      if (!isParticipant) {
-        return res.status(403).json({ 
-          message: "Access denied: You don't have permission to access this file" 
-        });
-      }
-
-      // Send file with proper headers
-      res.setHeader('Content-Type', attachment.fileType);
-      res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
-      return res.sendFile(filePath);
-    } else {
-      console.log(' Attachment not in database, serving file anyway (backward compatibility)');
-      // Send file without metadata (for backward compatibility)
-      return res.sendFile(filePath);
     }
+  }
+
+  if (!hasAccess) {
+    return res.status(403).json({ 
+      message: "Access denied: You don't have permission to access this file" 
+    });
+  }
+
+  // Send file
+  res.setHeader('Content-Type', attachment.fileType);
+  res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
+  return res.sendFile(filePath);
+}
 
   } catch (error) {
     console.error(" File download error:", error);
@@ -116,16 +121,30 @@ export const uploadFile = async (req, res) => {
     }
 
     // Verify user is participant in the conversation
-    const conversation = await Conversation.findById(conversationId);
-    
-    if (!conversation) {
-      fs.unlinkSync(req.file.path);
-      return res.status(404).json({ message: "Conversation not found" });
-    }
+    // Check both Conversation and Group
+let conversation = await Conversation.findById(conversationId);
+let isParticipant = false;
 
-    const isParticipant = conversation.participants.some(
-      participantId => participantId.toString() === userId.toString()
-    );
+if (conversation) {
+  // Regular conversation
+  isParticipant = conversation.participants.some(
+    participantId => participantId.toString() === userId.toString()
+  );
+} else {
+  // Try as Group
+  const Group = (await import("../models/Group.js")).default;
+  const group = await Group.findById(conversationId);
+  
+  if (!group) {
+    fs.unlinkSync(req.file.path);
+    return res.status(404).json({ message: "Conversation or group not found" });
+  }
+  
+  // Check if user is group member
+  isParticipant = group.members.some(
+    memberId => memberId.toString() === userId.toString()
+  );
+}
 
     if (!isParticipant) {
       fs.unlinkSync(req.file.path);

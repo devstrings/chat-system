@@ -2,6 +2,7 @@ import Message from "../models/message.js";
 import Conversation from "../models/Conversation.js";
 import Attachment from "../models/Attachment.js";
 import Friendship from "../models/Friendship.js"; 
+import Group from "../models/Group.js";
 
 // Get or create conversation between two users
 export const getOrCreateConversation = async (req, res) => {
@@ -133,10 +134,9 @@ export const getUserConversations = async (req, res) => {
 
     const conversations = await Conversation.find({
       participants: currentUserId,
-      // EXCLUDE ARCHIVED CONVERSATIONS
       "archivedBy.userId": { $ne: currentUserId }
     })
-      .populate("participants", "username email")
+      .populate("participants", "username email profileImage")  
       .populate("lastMessageSender", "username") 
       .sort({ lastMessageTime: -1 });
 
@@ -190,6 +190,74 @@ export const clearChat = async (req, res) => {
   }
 };
 
+// DELETE ENTIRE CONVERSATION 
+
+export const deleteConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const currentUserId = req.user.id;
+    const { otherUserId } = req.body;  
+
+    console.log(" Delete request - conversationId:", conversationId, "user:", currentUserId);
+
+    let conversation;
+
+    //  STEP 1: Try to find by conversationId
+    if (conversationId && conversationId !== 'undefined' && conversationId !== 'null') {
+      conversation = await Conversation.findById(conversationId);
+    }
+
+    //  STEP 2: If not found, try to find by participants
+    if (!conversation && otherUserId) {
+      conversation = await Conversation.findOne({
+        participants: { $all: [currentUserId, otherUserId] }
+      });
+    }
+    
+    if (!conversation) {
+      return res.status(404).json({ 
+        success: false,
+        message: "No conversation found to delete" 
+      });
+    }
+
+    // STEP 3: Check if user is participant
+    const isParticipant = conversation.participants.some(
+      p => p.toString() === currentUserId
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({ 
+        success: false,
+        message: "Not authorized to delete this conversation" 
+      });
+    }
+
+    //  STEP 4: Delete everything (messages, attachments, conversation)
+    await Message.deleteMany({ conversationId: conversation._id });
+    await Attachment.updateMany(
+      { conversationId: conversation._id },
+      { status: 'deleted' }
+    );
+    await Conversation.findByIdAndDelete(conversation._id);
+
+    console.log(" FULLY Deleted conversation:", conversation._id, "All data removed");
+
+    res.json({ 
+      success: true,
+      message: "Conversation permanently deleted",
+      conversationId: conversation._id
+    });
+
+  } catch (err) {
+    console.error(" Delete conversation error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to delete conversation", 
+      error: err.message 
+    });
+  }
+};
 // DELETE MESSAGE FOR ME
 export const deleteMessageForMe = async (req, res) => {
   try {
@@ -565,5 +633,65 @@ export const getArchivedConversations = async (req, res) => {
   } catch (err) {
     console.error(" Get archived conversations error:", err);
     res.status(500).json({ message: "Failed to fetch archived conversations" });
+  }
+};
+// GET GROUP MESSAGES
+
+export const getGroupMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const currentUserId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = parseInt(req.query.skip) || 0;
+
+    // Verify user is group member
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (!group.members.includes(currentUserId)) {
+      return res.status(403).json({ message: "Not a member of this group" });
+    }
+
+    const messages = await Message.find({ 
+      groupId, 
+      isGroupMessage: true,
+      isDeleted: false
+    })
+      .populate("sender", "username email profileImage")
+      .populate({
+        path: "attachments",
+        select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage"
+      })
+      .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Transform attachments
+    const transformedMessages = messages.map(msg => {
+      const messageObj = msg.toObject();
+      
+      if (messageObj.attachments && messageObj.attachments.length > 0) {
+        messageObj.attachments = messageObj.attachments.map(att => ({
+          url: `/api/file/get/${att.serverFileName}`,
+          filename: att.fileName,
+          fileType: att.fileType,
+          fileSize: att.sizeInKilobytes * 1024,
+          attachmentId: att._id,
+          duration: att.duration || 0,
+          isVoiceMessage: att.isVoiceMessage || false
+        }));
+      }
+      
+      return messageObj;
+    });
+
+    console.log(`Fetched ${transformedMessages.length} group messages`);
+    res.json(transformedMessages);
+  } catch (err) {
+    console.error(" Get group messages error:", err);
+    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
   }
 };

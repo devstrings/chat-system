@@ -21,6 +21,9 @@ export default function ChatWindow({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
 
+  // TYPING INDICATOR STATE
+  const [typingUsers, setTypingUsers] = useState(new Set());
+
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
     count: 0,
@@ -170,11 +173,42 @@ export default function ChatWindow({
       }
     };
 
+    //  TYPING HANDLER 
+    const handleTyping = ({ userId, isTyping, conversationId }) => {
+      console.log(" TYPING EVENT RECEIVED:", {
+        userId,
+        isTyping,
+        conversationId,
+        currentConversation: conversationIdRef.current,
+        selectedUser: selectedUser?._id,
+        matches: conversationId === conversationIdRef.current,
+      });
+
+      if (conversationId !== conversationIdRef.current) {
+        console.log(" Wrong conversation, ignoring");
+        return;
+      }
+
+      console.log(` ${isTyping ? "ADDING" : "REMOVING"} userId: ${userId}`);
+
+      setTypingUsers((prev) => {
+        const newSet = new Set(prev);
+        if (isTyping) {
+          newSet.add(userId);
+        } else {
+          newSet.delete(userId);
+        }
+        console.log(" Updated typing users:", Array.from(newSet));
+        return newSet;
+      });
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
     socket.on("messagesMarkedRead", handleMessagesRead);
     socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
+    socket.on("userTyping", handleTyping);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
@@ -182,12 +216,13 @@ export default function ChatWindow({
       socket.off("messagesMarkedRead", handleMessagesRead);
       socket.off("messageDeleted", handleMessageDeleted);
       socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
+      socket.off("userTyping", handleTyping);
     };
-  }, [socket, currentUserId, onUpdateLastMessageStatus]);
+  }, [socket, currentUserId, onUpdateLastMessageStatus, selectedUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typingUsers]);
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode);
@@ -334,6 +369,13 @@ export default function ChatWindow({
     return groups;
   }, {});
 
+  console.log(" Rendering ChatWindow:", {
+    typingUsersSize: typingUsers.size,
+    typingUsersArray: Array.from(typingUsers),
+    hasSelectedUser: !!selectedUser,
+    selectedUserId: selectedUser?._id,
+  });
+
   return (
     <>
       <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
@@ -455,6 +497,35 @@ export default function ChatWindow({
               ))}
             </div>
           ))}
+
+          {/* TYPING INDICATOR  */}
+          {typingUsers.size > 0 && selectedUser && (
+            <div className="flex items-start gap-2 mb-3 px-2 md:px-0">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md">
+                {selectedUser.username.charAt(0).toUpperCase()}
+              </div>
+              <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-md">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div
+                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 ml-1">typing...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>

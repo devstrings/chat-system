@@ -26,7 +26,7 @@ export default function AuthCallback() {
         navigate("/dashboard", { replace: true });
       }, 500);
     } else {
-      console.error("❌ OAuth Login Failed - Missing token/username");
+      console.error(" OAuth Login Failed - Missing token/username");
       navigate("/login", { replace: true });
     }
   }, [searchParams, navigate]);
