@@ -70,6 +70,7 @@ const allowedMimeTypes = [
   "video/quicktime", 
   "video/x-msvideo",
   "audio/webm", 
+    "image/avif",
   "audio/mpeg", 
   "audio/mp3", 
   "audio/ogg", 
@@ -91,6 +92,7 @@ const allowedExtensions = [
   ".mov", 
   ".avi",
   ".webm", 
+  ".avif",
   ".mp3", 
   ".mpeg", 
   ".ogg", 
@@ -132,9 +134,9 @@ const fileFilter = (req, file, cb) => {
 
 // Profile image filter (only images)
 const imageFilter = (req, file, cb) => {
-  const imageTypes = /jpeg|jpg|png|gif|webp|jfif/; 
+  const imageTypes = /jpeg|jpg|png|gif|webp|avif|jfif/; 
   const extname = imageTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = imageTypes.test(file.mimetype) || file.mimetype === 'image/jfif';
+  const mimetype = imageTypes.test(file.mimetype) || file.mimetype === 'image/jfif' || file.mimetype === 'image/avif';
   
   console.log(` Profile image check:`, {
     filename: file.originalname,
