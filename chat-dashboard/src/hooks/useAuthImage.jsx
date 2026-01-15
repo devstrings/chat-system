@@ -48,27 +48,27 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         let filename = cleanUrl;
 
         // Extract filename from various formats
-     // Extract filename from various formats
-if (filename.includes("/uploads/profileImages/")) {
-  filename = filename.split("/uploads/profileImages/").pop();
-} else if (filename.includes("/uploads/groupImages/")) {
-  filename = filename.split("/uploads/groupImages/").pop();
-} else if (filename.includes("/")) {
-  filename = filename.split("/").pop();
-}
+        if (filename.includes("/uploads/profileImages/")) {
+          filename = filename.split("/uploads/profileImages/").pop();
+        } else if (filename.includes("/uploads/groupImages/")) {
+          filename = filename.split("/uploads/groupImages/").pop();
+        } else if (filename.includes("/")) {
+          filename = filename.split("/").pop();
+        }
 
-// REMOQUERY STRING (timestamp cache-busting ke liye)
-if (filename.includes("?")) {
-  filename = filename.split("?")[0];
-}
+        // Remove query string (timestamp cache-busting ke liye)
+        if (filename.includes("?")) {
+          filename = filename.split("?")[0];
+        }
 
-console.log("Extracted filename:", filename);
+        console.log("Extracted filename:", filename);
 
+        // ✅ WITH CACHE BUSTING
         let fullUrl;
         if (type === "group") {
-          fullUrl = `http://localhost:5000/api/file/group/${filename}`;
+          fullUrl = `http://localhost:5000/api/file/group/${filename}?t=${Date.now()}`;
         } else {
-          fullUrl = `http://localhost:5000/api/file/profile/${filename}`;
+          fullUrl = `http://localhost:5000/api/file/profile/${filename}?t=${Date.now()}`;
         }
         console.log(" Full URL:", fullUrl);
 

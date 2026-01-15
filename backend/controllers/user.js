@@ -4,8 +4,6 @@ import fs from "fs";
 import path from "path";
 
 
-// USER CONTROLLERS 
-
 // Get all users except current user
 export const getUsers = async (req, res) => {
   try {
@@ -104,15 +102,22 @@ export const getUserById = async (req, res) => {
 // Get current user profile
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("username email profileImage");
+    // ✅ FIX: Add coverPhoto to select
+    const user = await User.findById(req.user.id).select("username email profileImage coverPhoto");
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
     
+    console.log("✅ Current user loaded:", {
+      username: user.username,
+      profileImage: user.profileImage,
+      coverPhoto: user.coverPhoto  // ✅ This should appear in logs
+    });
+    
     res.json(user);
   } catch (err) {
-    console.error("Get current user error:", err);
+    console.error("❌ Get current user error:", err);
     res.status(500).json({ message: "Failed to get profile", error: err.message });
   }
 };
@@ -225,5 +230,110 @@ export const removeProfileImage = async (req, res) => {
   } catch (err) {
     console.error(" Remove profile image error:", err);
     res.status(500).json({ message: "Failed to remove profile image" });
+  }
+};
+// ✅ ADD THESE TWO NEW FUNCTIONS
+// ✅ FIXED: Upload Cover Photo
+export const uploadCoverPhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // ✅ FIX 1: Correct URL format
+    const coverPhotoUrl = `/uploads/profileImages/${req.file.filename}`;
+
+    // ✅ FIX 2: Use req.user.id (not req.userId)
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { coverPhoto: coverPhotoUrl },
+      { new: true }
+    ).select("username email profileImage coverPhoto");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ Cover photo saved:", coverPhotoUrl);
+
+    res.json({
+      message: "Cover photo uploaded successfully",
+      coverPhotoUrl,
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error("❌ Upload cover photo error:", err);
+    res.status(500).json({ 
+      message: "Failed to upload cover photo",
+      error: err.message 
+    });
+  }
+};
+
+// ✅ FIXED: Remove Cover Photo
+export const removeCoverPhoto = async (req, res) => {
+  try {
+    console.log("🗑️ Remove cover photo request");
+    console.log("User ID:", req.user.id);
+
+    // ✅ FIX 1: Check if user exists
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      console.error("❌ User not found");
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ User found:", user.username);
+    console.log("Current cover photo:", user.coverPhoto);
+
+    // ✅ FIX 2: Delete file if exists
+    if (user.coverPhoto) {
+      const filename = user.coverPhoto.split("/").pop();
+      const filepath = path.join(
+        process.cwd(), 
+        "uploads", 
+        "profileImages", 
+        filename
+      );
+      
+      console.log("🔍 Checking file:", filepath);
+      
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+        console.log("✅ File deleted from server");
+      } else {
+        console.log("⚠️ File not found on server (might be already deleted)");
+      }
+    } else {
+      console.log("⚠️ No cover photo to delete");
+    }
+
+    // ✅ FIX 3: Update database
+    user.coverPhoto = null;
+    await user.save();
+
+    console.log("✅ Cover photo removed from database");
+
+    res.json({ 
+      message: "Cover photo removed successfully",
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        profileImage: user.profileImage,
+        coverPhoto: null
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Remove cover photo error:", err);
+    console.error("Error details:", err.message);
+    console.error("Error stack:", err.stack);
+    
+    res.status(500).json({ 
+      message: "Failed to remove cover photo",
+      error: err.message 
+    });
   }
 };

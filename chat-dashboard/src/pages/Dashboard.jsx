@@ -35,8 +35,10 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false);
   
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
+  const [sharedCoverPhoto, setSharedCoverPhoto] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [isGroupChat, setIsGroupChat] = useState(false);
+  const [currentUserCoverPhoto, setCurrentUserCoverPhoto] = useState(null);
   // Group image hook (add after line 119)
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
@@ -60,29 +62,34 @@ export default function Dashboard() {
   }, [selectedUser]);
 
   //Load current user and set shared state
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
-          "http://localhost:5000/api/users/auth/me",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setCurrentUser(response.data);
-
-        // SET SHARED PROFILE IMAGE
-        if (response.data.profileImage) {
-          setSharedProfileImage(response.data.profileImage);
+useEffect(() => {
+  const loadCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        "http://localhost:5000/api/users/auth/me",
+        {
+          headers: { Authorization: `Bearer ${token}` },
         }
-      } catch (err) {
-        console.error("Failed to load current user:", err);
-      }
-    };
+      );
+      setCurrentUser(response.data);
 
-    loadCurrentUser();
-  }, []);
+      if (response.data.profileImage) {
+        setSharedProfileImage(response.data.profileImage);
+      }
+      
+      // ✅ ADD: Set cover photo state
+      if (response.data.coverPhoto) {
+        setSharedCoverPhoto(response.data.coverPhoto);
+        setCurrentUserCoverPhoto(response.data.coverPhoto);
+      }
+    } catch (err) {
+      console.error("Failed to load current user:", err);
+    }
+  };
+
+  loadCurrentUser();
+}, []);
   
   // Load pinned conversations
   useEffect(() => {
@@ -154,17 +161,22 @@ export default function Dashboard() {
     loadArchivedGroups();
   }, [groups, currentUserId]);
   // Handler to update profile image from ProfileSettings
-  const handleProfileImageUpdate = (newImageUrl) => {
-    console.log("Profile image updated:", newImageUrl);
+const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
+  if (isCoverPhoto) {
+    // ✅ UPDATE BOTH STATES
+    setSharedCoverPhoto(newImageUrl);
+    setCurrentUser((prev) => ({
+      ...prev,
+      coverPhoto: newImageUrl,
+    }));
+  } else {
     setSharedProfileImage(newImageUrl);
-
-    // update currentUser state
     setCurrentUser((prev) => ({
       ...prev,
       profileImage: newImageUrl,
     }));
-  };
-
+  }
+};
   //  Complete handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
@@ -1028,14 +1040,14 @@ export default function Dashboard() {
           onConversationDeleted={handleConversationDeleted}
         />
 
-        {showProfileSettings && (
-          <ProfileSetting
-            currentUser={currentUser}
-            onClose={() => setShowProfileSettings(false)}
-            onProfileImageUpdate={handleProfileImageUpdate}
-          />
-        )}
-
+   {showProfileSettings && (
+  <ProfileSetting
+    currentUser={currentUser}
+    onClose={() => setShowProfileSettings(false)}
+    onProfileImageUpdate={handleProfileImageUpdate}
+    coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto}  // ✅ ADD fallback
+  />
+)}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
           {selectedUser || selectedGroup ? (
             <>
