@@ -218,7 +218,7 @@ export const removeGroupImage = async (req, res) => {
     res.status(500).json({ message: "Failed to remove image" });
   }
 };
-
+//  ADD MEMBERS - ADMINS ONLY
 //  ADD MEMBERS - ADMINS ONLY
 export const addGroupMembers = async (req, res) => {
   try {
@@ -232,12 +232,12 @@ export const addGroupMembers = async (req, res) => {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    //  CHECK IF USER IS ADMIN
     const isAdmin = group.admins.some((a) => a.toString() === userId);
     if (!isAdmin) {
       return res.status(403).json({ message: "Only admins can add members" });
     }
 
+    // ✅ FIX: Simply add new members without checking if they exist
     const newMembers = memberIds.filter(
       (id) => !group.members.some((m) => m.toString() === id)
     );
@@ -246,6 +246,7 @@ export const addGroupMembers = async (req, res) => {
       return res.status(400).json({ message: "All users are already members" });
     }
 
+    // ✅ Add members back (even if previously removed)
     group.members.push(...newMembers);
     await group.save();
     await group.populate(
@@ -260,7 +261,6 @@ export const addGroupMembers = async (req, res) => {
     res.status(500).json({ message: "Failed to add members" });
   }
 };
-
 //  REMOVE MEMBER - ADMINS ONLY
 export const removeGroupMember = async (req, res) => {
   try {
@@ -389,6 +389,49 @@ export const makeAdmin = async (req, res) => {
   } catch (err) {
     console.error(" Make admin error:", err);
     res.status(500).json({ message: "Failed to make admin" });
+  }
+};
+//  REMOVE ADMIN (DEMOTE TO MEMBER) - CREATOR OR OTHER ADMINS
+export const removeAdmin = async (req, res) => {
+  try {
+    const { groupId, memberId } = req.params;
+    const userId = req.user.id;
+
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Only creator or other admins can remove admin
+    const isCreator = group.creator.toString() === userId;
+    const isAdmin = group.admins.some((a) => a.toString() === userId);
+    
+    if (!isCreator && !isAdmin) {
+      return res.status(403).json({ message: "Only creator or admins can demote admins" });
+    }
+
+    // Cannot remove creator as admin
+    if (group.creator.toString() === memberId) {
+      return res.status(400).json({ message: "Cannot demote group creator" });
+    }
+
+    // Check if user is actually an admin
+    if (!group.admins.some((a) => a.toString() === memberId)) {
+      return res.status(400).json({ message: "User is not an admin" });
+    }
+
+    // Remove from admins array (demote to regular member)
+    group.admins = group.admins.filter((a) => a.toString() !== memberId);
+    
+    await group.save();
+    await group.populate("members admins creator", "username email profileImage");
+
+    console.log(`Removed ${memberId} from admin in group ${groupId}`);
+    res.json(group);
+  } catch (err) {
+    console.error(" Remove admin error:", err);
+    res.status(500).json({ message: "Failed to remove admin" });
   }
 };
 
