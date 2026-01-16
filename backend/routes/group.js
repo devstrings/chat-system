@@ -8,6 +8,7 @@ import {
   removeGroupMember,
   leaveGroup,
   makeAdmin,
+removeAdmin, 
   updateGroupImage,
   removeGroupImage,  
   deleteGroup,
@@ -74,7 +75,8 @@ router.post("/:groupId/leave", verifyToken, leaveGroup);
 
 // Make admin (ADMINS ONLY)
 router.post("/:groupId/make-admin/:memberId", verifyToken, makeAdmin);
-
+//  Remove admin (CREATOR/ADMINS ONLY)
+router.delete("/:groupId/remove-admin/:memberId", verifyToken, removeAdmin);
 // DELETE GROUP (CREATOR ONLY)
 router.delete("/:groupId", verifyToken, deleteGroup);
 // PIN/UNPIN GROUP

@@ -766,87 +766,63 @@ export default function Message({
         </div>
       </div>
 
-      {showDeleteModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setShowDeleteModal(false)}
-          ></div>
+  {showDeleteModal && (
+  <>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 z-40"
+      onClick={() => setShowDeleteModal(false)}
+    ></div>
 
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 max-w-sm w-full shadow-2xl">
-              <h3 className="text-base md:text-lg font-semibold text-white mb-4">
-                Delete Message?
-              </h3>
-
-              <div className="space-y-2">
-                <button
-                  onClick={handleDeleteForMe}
-                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
-                >
-                  <svg
-                    className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  <div>
-                    <p className="font-medium text-sm md:text-base">
-                      Delete for Me
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Only you won't see this message
-                    </p>
-                  </div>
-                </button>
-
-                {isOwn && canDeleteForEveryone() && (
-                  <button
-                    onClick={handleDeleteForEveryone}
-                    className="w-full px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
-                  >
-                    <svg
-                      className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                    <div>
-                      <p className="font-medium text-sm md:text-base">
-                        Delete for Everyone
-                      </p>
-                      <p className="text-xs text-red-200">
-                        Everyone won't see this message
-                      </p>
-                    </div>
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-sm md:text-base"
-              >
-                Cancel
-              </button>
+    {/* POSITION BASED ON MESSAGE SIDE */}
+    <div className={`fixed z-50 ${isOwn ? 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2' : 'top-24 right-4 md:right-auto md:left-1/2 md:transform md:-translate-x-1/2'}`}>
+      <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 max-w-sm w-full shadow-2xl">
+        
+        <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">
+          Delete Message?
+        </h3>
+        
+        <div className="space-y-2">
+          {/* DELETE FOR ME BUTTON - FIXED */}
+          <button
+            onClick={handleDeleteForMe}
+            className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
+          >
+            <svg className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <div>
+              <p className="font-medium text-sm md:text-base">Delete for Me</p>
+              <p className="text-xs text-gray-500">Only you won't see this message</p>
             </div>
-          </div>
-        </>
-      )}
+          </button>
+
+          {/* DELETE FOR EVERYONE BUTTON - WITH TIME CHECK */}
+          {isOwn && canDeleteForEveryone() && (
+            <button
+              onClick={handleDeleteForEveryone}
+              className="w-full px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
+            >
+              <svg className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="font-medium text-sm md:text-base">Delete for Everyone</p>
+                <p className="text-xs text-red-200">Everyone won't see this message</p>
+              </div>
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={() => setShowDeleteModal(false)}
+          className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-sm md:text-base"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </>
+)}
     </div>
   );
 }

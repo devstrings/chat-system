@@ -114,14 +114,20 @@ function MemberItem({
   canRemove,
   onRemove,
   onMakeAdmin,
+  onRemoveAdmin,
   currentUserId,
   currentUserIsAdmin,
   currentUserIsCreator,
 }) {
   const { imageSrc: memberImage } = useAuthImage(member.profileImage);
+  const [showMemberMenu, setShowMemberMenu] = useState(false);
+
+  // Check if current user can manage this member
+  const canManage = (currentUserIsAdmin || currentUserIsCreator) && member._id !== currentUserId && !isCreator;
 
   return (
     <div className="flex items-center justify-between p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+      {/* Avatar */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="w-10 h-10 rounded-full overflow-hidden shadow-md flex-shrink-0">
           {memberImage ? (
@@ -136,6 +142,8 @@ function MemberItem({
             </div>
           )}
         </div>
+        
+        {/* Name and Role */}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 truncate">
             {member.username}
@@ -146,39 +154,122 @@ function MemberItem({
         </div>
       </div>
 
-      {/*  BUTTONS SECTION */}
-      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-        {/* Make Admin Button */}
-        {!isAdmin &&
-          !isCreator &&
-          (currentUserIsAdmin || currentUserIsCreator) && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMakeAdmin(member._id);
-              }}
-              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-all"
-              title="Make admin"
-            >
-              Admin
-            </button>
-          )}
-
-        {/* Remove Button */}
-        {canRemove && (
+      {/* ✅ THREE DOTS MENU */}
+      {canManage && (
+        <div className="relative flex-shrink-0">
           <button
-            onClick={onRemove}
-            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-medium transition-all"
-            title="Remove member"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMemberMenu(!showMemberMenu);
+            }}
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            Remove
+            <svg
+              className="w-5 h-5 text-gray-600"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
           </button>
-        )}
-      </div>
+
+          {/* Dropdown Menu */}
+          {showMemberMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowMemberMenu(false)}
+              ></div>
+
+              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
+                {/* Make Admin Option */}
+                {!isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMakeAdmin(member._id);
+                      setShowMemberMenu(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-emerald-50 transition-colors flex items-center gap-2 text-sm"
+                  >
+                    <svg
+                      className="w-4 h-4 text-emerald-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Make Admin
+                  </button>
+                )}
+
+                {/* Demote Admin Option */}
+                {isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveAdmin(member._id);
+                      setShowMemberMenu(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-yellow-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-100"
+                  >
+                    <svg
+                      className="w-4 h-4 text-yellow-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                    Demote Admin
+                  </button>
+                )}
+
+                {/* Remove Member Option */}
+                {canRemove && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove();
+                      setShowMemberMenu(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-100"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                    Remove Member
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
 // Main GroupProfile Component
 export default function GroupProfile({
   group,
@@ -502,7 +593,40 @@ export default function GroupProfile({
       });
     }
   };
+// ✅ NEW: Remove Admin Function
+const handleRemoveAdmin = async (memberId) => {
+  setConfirmDialog({
+    isOpen: true,
+    title: "Remove Admin Status?",
+    message: "Are you sure you want to demote this admin to a regular member?",
+    type: "danger",
+    onConfirm: async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.delete(
+          `http://localhost:5000/api/groups/${group._id}/remove-admin/${memberId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
+        onGroupUpdate(res.data);
+
+        setAlertDialog({
+          isOpen: true,
+          title: "Admin Removed!",
+          message: "Member has been demoted to regular member successfully.",
+          type: "success",
+        });
+      } catch (err) {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: err.response?.data?.message || "Failed to remove admin",
+          type: "error",
+        });
+      }
+    },
+  });
+};
   // Exit group
   const handleExitGroup = () => {
     setConfirmDialog({
@@ -983,18 +1107,19 @@ export default function GroupProfile({
                     isAdmin && !memberIsCreator && member._id !== currentUserId;
 
                   return (
-                    <MemberItem
-                      key={member._id}
-                      member={member}
-                      isAdmin={memberIsAdmin}
-                      isCreator={memberIsCreator}
-                      canRemove={canRemove}
-                      currentUserId={currentUserId}
-                      currentUserIsAdmin={isAdmin}
-                      currentUserIsCreator={isCreator}
-                      onRemove={() => handleRemoveMember(member._id)}
-                      onMakeAdmin={handleMakeAdmin}
-                    />
+                  <MemberItem
+  key={member._id}
+  member={member}
+  isAdmin={memberIsAdmin}
+  isCreator={memberIsCreator}
+  canRemove={canRemove}
+  currentUserId={currentUserId}
+  currentUserIsAdmin={isAdmin}
+  currentUserIsCreator={isCreator}
+  onRemove={() => handleRemoveMember(member._id)}
+  onMakeAdmin={handleMakeAdmin}
+  onRemoveAdmin={handleRemoveAdmin}  // ✅ NEW
+/>
                   );
                 })}
               </div>
