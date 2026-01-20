@@ -1,83 +1,91 @@
-// backend/config/index.js - CENTRALIZED CONFIG
-import dotenv from 'dotenv';
+// backend/config/index.js
+import dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config();
 
-//  Debug logs (temporary)
-console.log(" Loading config...");
+console.log("Loading config...");
 console.log("MONGO_URI exists:", !!process.env.MONGO_URI);
 console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 
-// Validate required environment variables
 const requiredEnvVars = [
-  'MONGO_URI',
-  'JWT_SECRET',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'FACEBOOK_APP_ID',
-  'FACEBOOK_APP_SECRET'
+  "MONGO_URI",
+  "JWT_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "FACEBOOK_APP_ID",
+  "FACEBOOK_APP_SECRET",
 ];
 
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
 if (missingVars.length > 0) {
-  console.error(' Missing required environment variables:', missingVars.join(', '));
-  console.error(' Make sure .env file exists in backend folder');
+  console.error(
+    " Missing required environment variables:",
+    missingVars.join(", "),
+  );
+  console.error(" Make sure .env file exists in backend folder");
   process.exit(1);
 }
 
-// Export centralized config
 const config = {
-  // Server
   port: process.env.PORT || 5000,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  
-  // Database
+  nodeEnv: process.env.NODE_ENV || "development",
+
   mongoUri: process.env.MONGO_URI,
-  
-  // Authentication
+
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  
-  // Redis
-  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
-  
-  // OAuth - Google
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+
+  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback'
+    callbackUrl:
+      process.env.GOOGLE_CALLBACK_URL ||
+      "http://localhost:5000/api/auth/google/callback",
   },
-  
-  // OAuth - Facebook
+
   facebook: {
     appId: process.env.FACEBOOK_APP_ID,
     appSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackUrl: process.env.FACEBOOK_CALLBACK_URL || 'http://localhost:5000/api/auth/facebook/callback'
+    callbackUrl:
+      process.env.FACEBOOK_CALLBACK_URL ||
+      "http://localhost:5000/api/auth/facebook/callback",
   },
-  
-  // Frontend URLs
+
   frontend: {
-    url: process.env.FRONTEND_URL || 'http://localhost:5173',
-    callbackUrl: process.env.FRONTEND_CALLBACK_URL || 'http://localhost:5173/auth/callback',
-    loginUrl: process.env.FRONTEND_LOGIN_URL || 'http://localhost:5173/login'
+    url: process.env.FRONTEND_URL || "http://localhost:5173",
+    callbackUrl:
+      process.env.FRONTEND_CALLBACK_URL ||
+      "http://localhost:5173/auth/callback",
+    loginUrl: process.env.FRONTEND_LOGIN_URL || "http://localhost:5173/login",
   },
-  
-  // File Upload
+
   upload: {
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB
-    maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE) || 5 * 1024 * 1024,  // 5MB
-    maxVoiceSize: parseInt(process.env.MAX_VOICE_SIZE) || 10 * 1024 * 1024  // 10MB
-  }
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024,
+    maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE) || 5 * 1024 * 1024,
+    maxVoiceSize: parseInt(process.env.MAX_VOICE_SIZE) || 10 * 1024 * 1024,
+  },
+
+  // Email Configuration
+  email: {
+    host: process.env.EMAIL_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.EMAIL_PORT) || 587,
+    user: process.env.EMAIL_USER,
+    password: process.env.EMAIL_PASSWORD,
+    from: process.env.EMAIL_FROM || "Chat System <noreply@chatsystem.com>",
+  },
+
+  // Reset Token Configuration
+  resetToken: {
+    expiryMinutes: parseInt(process.env.RESET_TOKEN_EXPIRY) || 15,
+  },
 };
 
-//  Debug log (temporary)
-console.log(" Config loaded successfully");
-console.log(" Port:", config.port);
-console.log(" MongoDB:", config.mongoUri ? "Configured" : "Missing");
+console.log("Config loaded successfully");
+console.log("Email configured:", !!config.email.user);
 
-// Freeze config to prevent accidental modifications
 Object.freeze(config);
 
 export default config;

@@ -1,4 +1,4 @@
-
+// server/models/user.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
@@ -23,16 +23,23 @@ const userSchema = new mongoose.Schema({
     type: String, 
     default: null 
   },
-  
-coverPhoto: {
-  type: String,
-  default: null
-}
+  coverPhoto: {
+    type: String,
+    default: null
+  },
+
+  //  Password Reset Fields
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  }
   
 }, { 
   timestamps: true 
 });
-
-
 
 export default mongoose.model("User", userSchema);

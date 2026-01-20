@@ -7,6 +7,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
   useEffect(() => {
     if (!imageUrl) {
+      console.log("useAuthImage: No image URL provided");
       setImageSrc(null);
       setLoading(false);
       return;
@@ -14,74 +15,111 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
     const loadImage = async () => {
       try {
-        console.log(" Loading image:", imageUrl);
+        console.log(" useAuthImage: Starting load for:", imageUrl);
 
-        // Remove localhost prefix if exists
-        let cleanUrl = imageUrl;
-        if (imageUrl.includes("localhost:5000https://")) {
-          cleanUrl = imageUrl.split("localhost:5000")[1];
-          console.log(" Cleaned URL:", cleanUrl);
-        } else if (imageUrl.includes("localhost:5000http://")) {
-          cleanUrl = imageUrl.split("localhost:5000")[1];
-          console.log(" Cleaned URL:", cleanUrl);
+        // Step 1: Clean the URL
+        let cleanUrl = imageUrl.trim();
+
+        // Remove duplicate localhost prefixes
+        if (cleanUrl.includes("localhost:5000https://")) {
+          cleanUrl = cleanUrl.split("localhost:5000")[1];
+          console.log(" Cleaned duplicate prefix:", cleanUrl);
+        } else if (cleanUrl.includes("localhost:5000http://")) {
+          cleanUrl = cleanUrl.split("localhost:5000")[1];
+          console.log(" Cleaned duplicate prefix:", cleanUrl);
         }
 
-        // PRIORITY 1: Check for external OAuth URLs FIRST
-        const isGoogleUrl = cleanUrl.includes("googleusercontent.com");
-        const isFacebookUrl =
+        // Step 2: Check if it's an external URL (Google/Facebook/etc)
+        const isExternalHttps =
+          cleanUrl.startsWith("https://") && !cleanUrl.includes("localhost");
+        const isExternalHttp =
+          cleanUrl.startsWith("http://") && !cleanUrl.includes("localhost");
+        const isGoogleImage =
+          cleanUrl.includes("googleusercontent.com") ||
+          cleanUrl.includes("ggpht.com");
+        const isFacebookImage =
           cleanUrl.includes("fbsbx.com") ||
           cleanUrl.includes("graph.facebook.com");
-        const isExternalHttps =
-          (cleanUrl.startsWith("https://") || cleanUrl.startsWith("http://")) &&
-          !cleanUrl.includes("localhost");
 
-        if (isGoogleUrl || isFacebookUrl || isExternalHttps) {
-          console.log(" External URL (Google/Facebook):", cleanUrl);
+        console.log(" URL Analysis:", {
+          isExternalHttps,
+          isExternalHttp,
+          isGoogleImage,
+          isFacebookImage,
+          cleanUrl,
+        });
+
+        // Step 3: If external URL, use it directly
+        if (
+          isExternalHttps ||
+          isExternalHttp ||
+          isGoogleImage ||
+          isFacebookImage
+        ) {
+          console.log(" External URL detected - Loading directly:", cleanUrl);
+
+          // ENHANCEMENT: Increase Google image quality
+          if (isGoogleImage) {
+            cleanUrl = cleanUrl.replace(/s\d+-c$/, "s400-c");
+            console.log("🔧 Enhanced Google image size:", cleanUrl);
+          }
+
+          //  ENHANCEMENT: Increase Facebook image size
+          if (isFacebookImage && cleanUrl.includes("type=")) {
+            cleanUrl = cleanUrl.replace(/type=\w+/, "type=large");
+            console.log("🔧 Enhanced Facebook image size:", cleanUrl);
+          }
+
           setImageSrc(cleanUrl);
           setLoading(false);
           return;
         }
 
-        // PRIORITY 2: Local backend images
-        console.log(" Local image detected");
+        // Step 4: Local image - fetch from backend
+        console.log(" Local image detected - Fetching from backend");
 
         let filename = cleanUrl;
 
-        // Extract filename from various formats
+        // Extract filename
         if (filename.includes("/uploads/profileImages/")) {
           filename = filename.split("/uploads/profileImages/").pop();
         } else if (filename.includes("/uploads/groupImages/")) {
           filename = filename.split("/uploads/groupImages/").pop();
+        } else if (filename.includes("/uploads/coverPhotos/")) {
+          filename = filename.split("/uploads/coverPhotos/").pop();
         } else if (filename.includes("/")) {
-          filename = filename.split("/").pop();
+          const parts = filename.split("/");
+          filename = parts[parts.length - 1];
         }
 
-        // Remove query string (timestamp cache-busting ke liye)
+        // Remove query string
         if (filename.includes("?")) {
           filename = filename.split("?")[0];
         }
 
-        console.log("Extracted filename:", filename);
+        console.log(" Extracted filename:", filename);
 
-        // ✅ WITH CACHE BUSTING
-        let fullUrl;
+        // Build API URL
+        let apiUrl;
         if (type === "group") {
-          fullUrl = `http://localhost:5000/api/file/group/${filename}?t=${Date.now()}`;
+          apiUrl = `http://localhost:5000/api/file/group/${filename}?t=${Date.now()}`;
+        } else if (type === "cover") {
+          apiUrl = `http://localhost:5000/api/file/cover/${filename}?t=${Date.now()}`;
         } else {
-          fullUrl = `http://localhost:5000/api/file/profile/${filename}?t=${Date.now()}`;
+          apiUrl = `http://localhost:5000/api/file/profile/${filename}?t=${Date.now()}`;
         }
-        console.log(" Full URL:", fullUrl);
+
+        console.log(" Fetching from:", apiUrl);
 
         const token = localStorage.getItem("token");
-
         if (!token) {
-          console.warn(" No token found");
+          console.warn(" No auth token found");
           setImageSrc(null);
           setLoading(false);
           return;
         }
 
-        const response = await axios.get(fullUrl, {
+        const response = await axios.get(apiUrl, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
         });
@@ -89,12 +127,12 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         const blob = response.data;
         const objectUrl = URL.createObjectURL(blob);
         setImageSrc(objectUrl);
-        console.log(" Local image loaded");
+        console.log(" Local image loaded successfully");
       } catch (err) {
-        console.error(" Image load error:", {
-          status: err.response?.status,
+        console.error("useAuthImage error:", {
           message: err.message,
-          url: imageUrl,
+          status: err.response?.status,
+          originalUrl: imageUrl,
         });
         setImageSrc(null);
       } finally {
@@ -104,6 +142,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
     loadImage();
 
+    // Cleanup
     return () => {
       if (imageSrc && imageSrc.startsWith("blob:")) {
         URL.revokeObjectURL(imageSrc);

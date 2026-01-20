@@ -25,8 +25,20 @@ const UserItem = memo(function UserItem({
   const [showMenu, setShowMenu] = useState(false);
   const [relationshipStatus, setRelationshipStatus] = useState("loading");
   const [requestId, setRequestId] = useState(null);
-  const { imageSrc: userImage } = useAuthImage(user.profileImage);
 
+  //  Check if image is external BEFORE using hook
+  const isExternalImage =
+    user.profileImage &&
+    (user.profileImage.startsWith("https://") ||
+      user.profileImage.startsWith("http://"));
+
+  //  Only use hook for LOCAL images
+  const { imageSrc: localImageSrc, loading: imageLoading } = useAuthImage(
+    !isExternalImage ? user.profileImage : null,
+  );
+
+  //  Use external URL directly OR local processed URL
+  const userImage = isExternalImage ? user.profileImage : localImageSrc;
   // Dialog states
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
@@ -70,7 +82,7 @@ const UserItem = memo(function UserItem({
         const token = localStorage.getItem("token");
         const res = await fetch(
           `http://localhost:5000/api/friends/status/${user._id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         const data = await res.json();
         setRelationshipStatus(data.status);
@@ -165,7 +177,7 @@ const UserItem = memo(function UserItem({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ receiverId: user._id }),
-        }
+        },
       );
 
       if (!res.ok) {
@@ -205,7 +217,7 @@ const UserItem = memo(function UserItem({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!res.ok) {
@@ -242,7 +254,7 @@ const UserItem = memo(function UserItem({
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       if (!res.ok) {
@@ -288,7 +300,7 @@ const UserItem = memo(function UserItem({
             {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
-            }
+            },
           );
 
           if (!res.ok) {
@@ -387,7 +399,7 @@ const UserItem = memo(function UserItem({
             {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
-            }
+            },
           );
 
           if (!res.ok) {
@@ -433,7 +445,7 @@ const UserItem = memo(function UserItem({
           const token = localStorage.getItem("token");
           await axios.delete(
             `http://localhost:5000/api/messages/conversation/${conversationId}/clear`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           setAlertDialog({
@@ -459,20 +471,16 @@ const UserItem = memo(function UserItem({
     setShowMenu(false);
   };
 
-
-
   const handleDeleteConversation = async () => {
-    // First try to get/create conversation to get its ID
     let convId = conversationId;
 
     if (!convId) {
-      //  Fetch conversation ID from backend
       try {
         const token = localStorage.getItem("token");
         const response = await axios.post(
           "http://localhost:5000/api/messages/conversation",
           { otherUserId: user._id },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         convId = response.data._id;
       } catch (err) {
@@ -499,14 +507,12 @@ const UserItem = memo(function UserItem({
         try {
           const token = localStorage.getItem("token");
 
-          console.log(" Deleting conversation:", convId);
-
           await axios.delete(
             `http://localhost:5000/api/messages/conversation/${convId}/delete`,
             {
               headers: { Authorization: `Bearer ${token}` },
-              data: { otherUserId: user._id }, 
-            }
+              data: { otherUserId: user._id },
+            },
           );
 
           setAlertDialog({
@@ -516,14 +522,10 @@ const UserItem = memo(function UserItem({
             type: "success",
           });
 
-         
           if (onConversationDeleted) {
             onConversationDeleted(user._id);
           }
-
-
         } catch (err) {
-          console.error("❌ Delete conversation error:", err);
           setAlertDialog({
             isOpen: true,
             title: "Error",
@@ -537,6 +539,7 @@ const UserItem = memo(function UserItem({
     });
     setShowMenu(false);
   };
+
   const handleShowProfile = () => {
     setShowProfileDialog(true);
   };
@@ -591,18 +594,32 @@ const UserItem = memo(function UserItem({
             }}
             title="View Profile"
           >
-            {userImage ? (
+            {imageLoading && !isExternalImage ? (
+              <div className="w-full h-full bg-gray-300 animate-pulse" />
+            ) : userImage ? (
               <img
                 src={userImage}
                 alt={user.username}
                 className="w-full h-full object-cover"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  console.log(" UserItem image failed:", userImage);
+                  e.target.style.display = "none";
+                  e.target.nextSibling.style.display = "flex";
+                }}
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white font-semibold">
-                {user.username.charAt(0).toUpperCase()}
-              </div>
-            )}
+            ) : null}
+
+            {/* Fallback avatar */}
+            <div
+              className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white font-semibold"
+              style={{ display: userImage ? "none" : "flex" }}
+            >
+              {user.username.charAt(0).toUpperCase()}
+            </div>
           </div>
+
           {/* GREEN DOT FOR ONLINE STATUS */}
           {isOnline && (
             <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-gray-800 rounded-full"></div>
@@ -627,8 +644,8 @@ const UserItem = memo(function UserItem({
                   selected
                     ? "text-white"
                     : unreadCount > 0
-                    ? "text-white"
-                    : "text-gray-900"
+                      ? "text-white"
+                      : "text-gray-900"
                 }`}
               >
                 {user.username}
@@ -654,8 +671,8 @@ const UserItem = memo(function UserItem({
                   selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-blue-600 font-bold"
-                    : "text-gray-700"
+                      ? "text-blue-600 font-bold"
+                      : "text-gray-700"
                 }`}
               >
                 {formatTime(lastMessageTime)}
@@ -672,8 +689,8 @@ const UserItem = memo(function UserItem({
                   selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-gray-900 font-semibold"
-                    : "text-gray-600"
+                      ? "text-gray-900 font-semibold"
+                      : "text-gray-600"
                 }`}
               >
                 {displayMessage}
@@ -714,7 +731,6 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "friends" && conversationId && (
                   <button
                     onClick={(e) => {
-                      
                       e.stopPropagation();
                       handlePinClick(e);
                     }}
@@ -734,7 +750,6 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "friends" && conversationId && (
                   <button
                     onClick={(e) => {
-                      
                       e.stopPropagation();
                       handleArchiveClick(e);
                     }}
@@ -759,7 +774,6 @@ const UserItem = memo(function UserItem({
 
                 <button
                   onClick={(e) => {
-                    
                     e.stopPropagation();
                     handleShowProfile();
                     setShowMenu(false);
@@ -785,7 +799,6 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "none" && (
                   <button
                     onClick={(e) => {
-                      
                       e.stopPropagation();
                       handleSendRequest();
                     }}
@@ -812,7 +825,6 @@ const UserItem = memo(function UserItem({
                   <>
                     <button
                       onClick={(e) => {
-                      
                         e.stopPropagation();
                         handleAcceptRequest();
                       }}
@@ -835,7 +847,6 @@ const UserItem = memo(function UserItem({
                     </button>
                     <button
                       onClick={(e) => {
-                      
                         e.stopPropagation();
                         handleRejectRequest();
                       }}
@@ -863,7 +874,6 @@ const UserItem = memo(function UserItem({
                   <>
                     <button
                       onClick={(e) => {
-                        
                         e.stopPropagation();
                         handleClearChat();
                       }}
@@ -909,7 +919,6 @@ const UserItem = memo(function UserItem({
 
                     <button
                       onClick={(e) => {
-                  
                         e.stopPropagation();
                         handleUnfriend();
                       }}
@@ -937,7 +946,6 @@ const UserItem = memo(function UserItem({
                   relationshipStatus !== "blocked_by" && (
                     <button
                       onClick={(e) => {
-                      
                         e.stopPropagation();
                         handleBlock();
                       }}
@@ -963,7 +971,6 @@ const UserItem = memo(function UserItem({
                 {relationshipStatus === "blocked" && (
                   <button
                     onClick={(e) => {
-                    
                       e.stopPropagation();
                       handleUnblock();
                     }}
@@ -1060,6 +1067,11 @@ const UserItem = memo(function UserItem({
                       src={userImage}
                       alt={user.username}
                       className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        console.log(" Profile dialog image failed:", userImage);
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 text-white text-4xl font-bold">
@@ -1067,7 +1079,6 @@ const UserItem = memo(function UserItem({
                     </div>
                   )}
                 </div>
-
                 {/* Online/Offline Badge */}
                 {isOnline ? (
                   <div className="absolute bottom-0 right-0 flex items-center gap-1.5 bg-green-500 px-3 py-1.5 rounded-full shadow-lg border-2 border-white">
@@ -1231,7 +1242,7 @@ const UserItem = memo(function UserItem({
                   <button
                     onClick={() => {
                       setShowProfileDialog(false);
-                      onClick(); 
+                      onClick();
                     }}
                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
                   >
