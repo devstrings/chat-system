@@ -4,8 +4,15 @@ import {
   register, 
   login, 
   googleCallback, 
-  facebookCallback 
+  facebookCallback,
+  forgotPassword,    
+  resetPassword,     
+  setPassword,
+  changePassword,
+    getCurrentUser     
+
 } from "../controllers/auth.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
 import config from "../config/index.js"; 
 
 const router = express.Router();
@@ -14,6 +21,12 @@ const router = express.Router();
 router.post("/register", register);
 router.post("/login", login);
 
+// PASSWORD RESET ROUTES
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+router.post("/set-password", verifyToken, setPassword);
+router.post("/change-password", verifyToken, changePassword);
+router.get("/me", verifyToken, getCurrentUser);
 // GOOGLE OAUTH ROUTES
 router.get(
   "/google",

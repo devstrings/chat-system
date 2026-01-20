@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 import axios from "axios";
-
+import { useAuthImage } from "../hooks/useAuthImage";
 const DIALOG_THEME = {
   // Overlay (background blur)
   overlay: "bg-black bg-opacity-50 backdrop-blur-sm",
@@ -349,7 +349,49 @@ export function AlertDialog({
     </div>
   );
 }
+function FriendListItem({ friend, isSelected, onToggle }) {
+  const shouldLoadImage = !!friend.profileImage;
+  const { imageSrc, loading } = useAuthImage(
+    shouldLoadImage ? friend.profileImage : null,
+  );
 
+  return (
+    <label className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={() => onToggle(friend._id)}
+        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+      />
+
+      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+        {shouldLoadImage && loading ? (
+          <div className="w-full h-full bg-gray-300 animate-pulse" />
+        ) : shouldLoadImage && imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={friend.username}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              console.log(" Image load failed for:", friend.username);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+            {friend.username?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">
+          {friend.username}
+        </p>
+        <p className="text-xs text-gray-500 truncate">{friend.email}</p>
+      </div>
+    </label>
+  );
+}
 export function CreateGroupDialog({
   friends = [],
   onClose,
@@ -417,7 +459,7 @@ export function CreateGroupDialog({
           description: description.trim(),
           memberIds: selectedMembers,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       console.log(" Group created:", response.data);
@@ -566,40 +608,12 @@ export function CreateGroupDialog({
               ) : (
                 <div className="border border-gray-200 rounded-lg max-h-64 overflow-y-auto">
                   {friends.map((friend) => (
-                    <label
+                    <FriendListItem
                       key={friend._id}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMembers.includes(friend._id)}
-                        onChange={() => handleToggleMember(friend._id)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                      />
-
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                        {friend.profileImage ? (
-                          <img
-                            src={friend.profileImage}
-                            alt={friend.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                            {friend.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {friend.username}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {friend.email}
-                        </p>
-                      </div>
-                    </label>
+                      friend={friend}
+                      isSelected={selectedMembers.includes(friend._id)}
+                      onToggle={handleToggleMember}
+                    />
                   ))}
                 </div>
               )}

@@ -20,7 +20,7 @@ export default function Sidebar({
   profileImageUrl,
   onCloseMobileSidebar = () => {},
   currentUser = null,
-  onOpenProfileSettings = () => {},
+  onOpenProfileSettings = (view = "all") => {},
   pinnedConversations = new Set(),
   onPinConversation = () => {},
   archivedConversations = new Set(),
@@ -42,11 +42,40 @@ export default function Sidebar({
   const [showBlocked, setShowBlocked] = useState(false);
 
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const { imageSrc: profilePreview, loading: imageLoading } =
     useAuthImage(profileImageUrl);
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  function ProfileImageWithAuth({
+    imageUrl,
+    username,
+    size = "w-8 h-8",
+    textSize = "text-sm",
+  }) {
+    const { imageSrc, loading } = useAuthImage(imageUrl);
+
+    return (
+      <div className={`${size} rounded-full overflow-hidden`}>
+        {loading ? (
+          <div className="w-full h-full bg-gray-300 animate-pulse" />
+        ) : imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={username}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className={`w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white ${textSize} font-bold`}
+          >
+            {username?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+        )}
+      </div>
+    );
+  }
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
@@ -74,7 +103,7 @@ export default function Sidebar({
         .filter(
           (user) =>
             user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase())
+            user.email.toLowerCase().includes(searchQuery.toLowerCase()),
         )
         .map((user) => ({ ...user, isGroup: false }));
 
@@ -85,7 +114,7 @@ export default function Sidebar({
             .includes(searchQuery.toLowerCase());
 
           const isArchived = group.archivedBy?.some(
-            (a) => a.userId === currentUserId
+            (a) => a.userId === currentUserId,
           );
 
           if (showArchived) {
@@ -130,7 +159,7 @@ export default function Sidebar({
     const filteredGroups = groups
       .filter((group) => {
         const isArchived = group.archivedBy?.some(
-          (a) => a.userId === currentUserId
+          (a) => a.userId === currentUserId,
         );
 
         if (showArchived) {
@@ -195,12 +224,12 @@ export default function Sidebar({
   ]);
 
   const onlineCount = memoizedItems.filter(
-    (item) => !item.isGroup && onlineUsers.has(item._id)
+    (item) => !item.isGroup && onlineUsers.has(item._id),
   ).length;
 
   const totalUnread = Object.values(unreadCounts).reduce(
     (sum, count) => sum + count,
-    0
+    0,
   );
 
   const archivedCount = users.filter((user) => {
@@ -248,9 +277,9 @@ export default function Sidebar({
       const token = localStorage.getItem("token");
       const res = await axios.get(
         `http://localhost:5000/api/users/search?q=${encodeURIComponent(
-          searchUsers
+          searchUsers,
         )}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setAllUsers(res.data);
     } catch (err) {
@@ -273,7 +302,7 @@ export default function Sidebar({
       await axios.post(
         "http://localhost:5000/api/friends/request/send",
         { receiverId: userId },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       //  Success alert
@@ -307,7 +336,7 @@ export default function Sidebar({
         "http://localhost:5000/api/friends/requests/pending",
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setPendingRequests(res.data);
       setShowRequests(true);
@@ -322,7 +351,7 @@ export default function Sidebar({
       await axios.post(
         `http://localhost:5000/api/friends/request/${requestId}/accept`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       setAlertDialog({
         isOpen: true,
@@ -351,7 +380,7 @@ export default function Sidebar({
         `http://localhost:5000/api/friends/request/${requestId}/reject`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setAlertDialog({
         isOpen: true,
@@ -396,7 +425,7 @@ export default function Sidebar({
         `http://localhost:5000/api/friends/unblock/${userId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setAlertDialog({
         isOpen: true,
@@ -462,6 +491,11 @@ export default function Sidebar({
                       src={profilePreview}
                       alt="profile"
                       className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        console.log(" Sidebar image failed:", profilePreview);
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-semibold">
@@ -608,25 +642,126 @@ export default function Sidebar({
                   <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
                 </svg>
               </button>
-              <button
-                onClick={onLogout}
-                className="p-2 hover:bg-red-500 hover:bg-opacity-20 rounded-lg transition-colors text-red-400 hover:text-red-300"
-                title="Logout"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {/* Three Dots Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200"
+                  title="Settings & More"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                    />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showProfileMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-2xl z-50 overflow-hidden">
+                      <button
+                        onClick={() => {
+                          onOpenProfileSettings("settings");
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
+                      >
+                        <svg
+                          className="w-5 h-5 text-blue-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        <span className="font-medium">Settings</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          onOpenProfileSettings("password");
+                          setShowProfileMenu(false);
+                          // Scroll to password section after opening
+                          setTimeout(() => {
+                            const passwordSection = document.querySelector(
+                              '[data-section="password"]',
+                            );
+                            if (passwordSection) {
+                              passwordSection.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                            }
+                          }, 300);
+                        }}
+                        className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                      >
+                        <svg
+                          className="w-5 h-5 text-purple-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                          />
+                        </svg>
+                        <span className="font-medium">Change Password</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          onLogout();
+                        }}
+                        className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                          />
+                        </svg>
+                        <span className="font-medium">Logout</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -712,19 +847,12 @@ export default function Sidebar({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <div className="w-8 h-8 rounded-full overflow-hidden">
-                          {block.blocked.profileImage ? (
-                            <img
-                              src={block.blocked.profileImage}
-                              alt={block.blocked.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
-                              {block.blocked.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
+                        <ProfileImageWithAuth
+                          imageUrl={block.blocked.profileImage}
+                          username={block.blocked.username}
+                          size="w-8 h-8"
+                          textSize="text-sm"
+                        />
                         <div>
                           <p className="text-sm font-medium text-gray-900">
                             {block.blocked.username}
@@ -784,19 +912,12 @@ export default function Sidebar({
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <div className="w-8 h-8 rounded-full overflow-hidden">
-                          {request.sender.profileImage ? (
-                            <img
-                              src={request.sender.profileImage}
-                              alt={request.sender.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                              {request.sender.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
+                        <ProfileImageWithAuth
+                          imageUrl={request.sender.profileImage}
+                          username={request.sender.username}
+                          size="w-8 h-8"
+                          textSize="text-sm"
+                        />
                         <div>
                           <p className="text-sm font-medium text-gray-900">
                             {request.sender.username}
@@ -894,19 +1015,12 @@ export default function Sidebar({
                   className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-750"
                 >
                   <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <div className="w-8 h-8 rounded-full overflow-hidden">
-                      {user.profileImage ? (
-                        <img
-                          src={user.profileImage}
-                          alt={user.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                          {user.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
+                    <ProfileImageWithAuth
+                      imageUrl={user.profileImage}
+                      username={user.username}
+                      size="w-8 h-8"
+                      textSize="text-sm"
+                    />
                     <div>
                       <p className="text-sm font-medium text-gray-900">
                         {user.username}
@@ -989,8 +1103,8 @@ export default function Sidebar({
                 {showArchived
                   ? "No archived chats"
                   : searchQuery
-                  ? `No friends found for "${searchQuery}"`
-                  : "No contacts yet"}
+                    ? `No friends found for "${searchQuery}"`
+                    : "No contacts yet"}
               </p>
               <p className="text-gray-500 text-xs mt-1">
                 {searchQuery
@@ -1015,10 +1129,10 @@ export default function Sidebar({
                       onPinConversation={onPinConversation}
                       onArchiveConversation={onArchiveConversation}
                       isPinned={item.pinnedBy?.some(
-                        (p) => p.userId === currentUserId
+                        (p) => p.userId === currentUserId,
                       )}
                       isArchived={item.archivedBy?.some(
-                        (a) => a.userId === currentUserId
+                        (a) => a.userId === currentUserId,
                       )}
                       conversationId={item._id}
                       currentUserId={currentUserId}

@@ -3,13 +3,22 @@ import Friendship from "../models/Friendship.js";
 import BlockedUser from "../models/BlockedUser.js";
 import mongoose from "mongoose";
 
-//  HELPER FUNCTION: Format user with full image URL
+//  HELPER FUNCTION TO FORMAT USER WITH FULL IMAGE URL
 const formatUserWithFullImageUrl = (user) => {
   const userObj = user.toObject ? user.toObject() : user;
+  
+  //  Check if already external URL
+  const isExternalUrl = userObj.profileImage && (
+    userObj.profileImage.startsWith('http://') || 
+    userObj.profileImage.startsWith('https://')
+  );
+  
   return {
     ...userObj,
     profileImage: userObj.profileImage 
-      ? `http://localhost:5000${userObj.profileImage}` 
+      ? (isExternalUrl 
+          ? userObj.profileImage  // Use as-is for external URLs
+          : `http://localhost:5000${userObj.profileImage}`)  // Add prefix for local files
       : null
   };
 };

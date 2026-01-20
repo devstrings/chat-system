@@ -33,16 +33,17 @@ export default function Dashboard() {
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
   const [archivedConversations, setArchivedConversations] = useState(new Set());
   const [showArchived, setShowArchived] = useState(false);
-  
+
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
   const [sharedCoverPhoto, setSharedCoverPhoto] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [isGroupChat, setIsGroupChat] = useState(false);
   const [currentUserCoverPhoto, setCurrentUserCoverPhoto] = useState(null);
+  const [profileSettingsView, setProfileSettingsView] = useState("all");
   // Group image hook (add after line 119)
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
-    "group"
+    "group",
   );
   // Clear chat dialog state
   const [clearChatDialog, setClearChatDialog] = useState({
@@ -62,35 +63,35 @@ export default function Dashboard() {
   }, [selectedUser]);
 
   //Load current user and set shared state
-useEffect(() => {
-  const loadCurrentUser = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(
-        "http://localhost:5000/api/users/auth/me",
-        {
-          headers: { Authorization: `Bearer ${token}` },
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(
+          "http://localhost:5000/api/users/auth/me",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        setCurrentUser(response.data);
+
+        if (response.data.profileImage) {
+          setSharedProfileImage(response.data.profileImage);
         }
-      );
-      setCurrentUser(response.data);
 
-      if (response.data.profileImage) {
-        setSharedProfileImage(response.data.profileImage);
+        // ✅ ADD: Set cover photo state
+        if (response.data.coverPhoto) {
+          setSharedCoverPhoto(response.data.coverPhoto);
+          setCurrentUserCoverPhoto(response.data.coverPhoto);
+        }
+      } catch (err) {
+        console.error("Failed to load current user:", err);
       }
-      
-      // ✅ ADD: Set cover photo state
-      if (response.data.coverPhoto) {
-        setSharedCoverPhoto(response.data.coverPhoto);
-        setCurrentUserCoverPhoto(response.data.coverPhoto);
-      }
-    } catch (err) {
-      console.error("Failed to load current user:", err);
-    }
-  };
+    };
 
-  loadCurrentUser();
-}, []);
-  
+    loadCurrentUser();
+  }, []);
+
   // Load pinned conversations
   useEffect(() => {
     const loadPinnedConversations = async () => {
@@ -98,7 +99,7 @@ useEffect(() => {
         const token = localStorage.getItem("token");
         const response = await axios.get(
           "http://localhost:5000/api/messages/pinned",
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const pinnedIds = new Set(response.data.map((conv) => conv._id));
@@ -113,9 +114,8 @@ useEffect(() => {
     }
   }, [currentUserId]);
 
-  
   const { imageSrc: selectedUserImage } = useAuthImage(
-    selectedUser?.profileImage
+    selectedUser?.profileImage,
   );
 
   // Load archived conversations
@@ -125,7 +125,7 @@ useEffect(() => {
         const token = localStorage.getItem("token");
         const response = await axios.get(
           "http://localhost:5000/api/messages/archived",
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const archivedIds = new Set(response.data.map((conv) => conv._id));
@@ -161,29 +161,29 @@ useEffect(() => {
     loadArchivedGroups();
   }, [groups, currentUserId]);
   // Handler to update profile image from ProfileSettings
-const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
-  if (isCoverPhoto) {
-    // ✅ UPDATE BOTH STATES
-    setSharedCoverPhoto(newImageUrl);
-    setCurrentUser((prev) => ({
-      ...prev,
-      coverPhoto: newImageUrl,
-    }));
-  } else {
-    setSharedProfileImage(newImageUrl);
-    setCurrentUser((prev) => ({
-      ...prev,
-      profileImage: newImageUrl,
-    }));
-  }
-};
+  const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
+    if (isCoverPhoto) {
+      // ✅ UPDATE BOTH STATES
+      setSharedCoverPhoto(newImageUrl);
+      setCurrentUser((prev) => ({
+        ...prev,
+        coverPhoto: newImageUrl,
+      }));
+    } else {
+      setSharedProfileImage(newImageUrl);
+      setCurrentUser((prev) => ({
+        ...prev,
+        profileImage: newImageUrl,
+      }));
+    }
+  };
   //  Complete handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
         "http://localhost:5000/api/users/profile/remove-image",
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       // UPDATE SHARED STATE
@@ -243,8 +243,8 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                       g.archivedBy?.filter((a) => a.userId !== currentUserId) ||
                       [],
                   }
-                : g
-            )
+                : g,
+            ),
           );
         }
 
@@ -265,7 +265,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
         await axios.post(
           endpoint,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setArchivedConversations((prev) => new Set([...prev, conversationId]));
@@ -282,8 +282,8 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                       { userId: currentUserId, archivedAt: new Date() },
                     ],
                   }
-                : g
-            )
+                : g,
+            ),
           );
         }
 
@@ -342,8 +342,8 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                       g.pinnedBy?.filter((p) => p.userId !== currentUserId) ||
                       [],
                   }
-                : g
-            )
+                : g,
+            ),
           );
         }
 
@@ -364,7 +364,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
         await axios.post(
           endpoint,
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setPinnedConversations((prev) => new Set([...prev, conversationId]));
@@ -381,8 +381,8 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                       { userId: currentUserId, pinnedAt: new Date() },
                     ],
                   }
-                : g
-            )
+                : g,
+            ),
           );
         }
 
@@ -405,8 +405,6 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
     }
   };
 
-  
-   
   const handleConversationDeleted = (userId) => {
     console.log(" Conversation deleted for user:", userId);
 
@@ -430,7 +428,6 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
       setConversationId(null);
     }
 
-    
     console.log(" User removed from sidebar view");
   };
 
@@ -504,14 +501,13 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
     fetchUsers();
   }, [navigate]);
 
-
   useEffect(() => {
     const loadGroups = async () => {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.get(
           "http://localhost:5000/api/groups/list",
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         setGroups(response.data);
       } catch (err) {
@@ -537,14 +533,14 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           const convRes = await axios.post(
             "http://localhost:5000/api/messages/conversation",
             { otherUserId: user._id },
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           const conversationId = convRes.data._id;
 
           const msgRes = await axios.get(
             `http://localhost:5000/api/messages/${conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           const messages = msgRes.data;
@@ -572,7 +568,8 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
             }));
 
             const unreadCount = messages.filter(
-              (msg) => msg.sender._id !== currentUserId && msg.status !== "read"
+              (msg) =>
+                msg.sender._id !== currentUserId && msg.status !== "read",
             ).length;
 
             if (unreadCount > 0) {
@@ -589,7 +586,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           try {
             const msgRes = await axios.get(
               `http://localhost:5000/api/messages/group/${group._id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             );
 
             const messages = msgRes.data;
@@ -620,7 +617,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           } catch (err) {
             console.error(
               `Error loading messages for group ${group._id}:`,
-              err
+              err,
             );
           }
         }
@@ -737,12 +734,12 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           const token = localStorage.getItem("token");
           const response = await axios.get(
             `http://localhost:5000/api/messages/${data.conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           // Filter out deleted message
           const messages = response.data.filter(
-            (msg) => msg._id !== data.messageId
+            (msg) => msg._id !== data.messageId,
           );
           const previousMessage = messages[messages.length - 1];
 
@@ -799,12 +796,12 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           const token = localStorage.getItem("token");
           const response = await axios.get(
             `http://localhost:5000/api/messages/${data.conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           // Filter out deleted message
           const messages = response.data.filter(
-            (msg) => msg._id !== data.messageId && !msg.deletedForEveryone
+            (msg) => msg._id !== data.messageId && !msg.deletedForEveryone,
           );
           const previousMessage = messages[messages.length - 1];
 
@@ -851,7 +848,6 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
         }
       }
     };
-
 
     //  GROUP MESSAGE LISTENER
     socket.on("receiveGroupMessage", (msg) => {
@@ -904,7 +900,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
         const res = await axios.post(
           "http://localhost:5000/api/messages/conversation",
           { otherUserId: selectedUser._id },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setConversationId(res.data._id);
@@ -937,7 +933,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
       const token = localStorage.getItem("token");
       await axios.delete(
         `http://localhost:5000/api/messages/conversation/${conversationId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setAlertDialog({
@@ -1019,7 +1015,10 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           lastMessages={lastMessages}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-          onOpenProfileSettings={() => setShowProfileSettings(true)}
+          onOpenProfileSettings={(view = "all") => {
+            setProfileSettingsView(view);
+            setShowProfileSettings(true);
+          }}
           profileImageUrl={sharedProfileImage}
           pinnedConversations={pinnedConversations}
           onPinConversation={handlePinConversation}
@@ -1031,7 +1030,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
             console.log(" Dashboard: Group updated:", updatedGroup);
             setGroups((prev) => {
               const updated = prev.map((g) =>
-                g._id === updatedGroup._id ? updatedGroup : g
+                g._id === updatedGroup._id ? updatedGroup : g,
               );
               console.log("Groups after update:", updated);
               return updated;
@@ -1040,14 +1039,15 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
           onConversationDeleted={handleConversationDeleted}
         />
 
-   {showProfileSettings && (
-  <ProfileSetting
-    currentUser={currentUser}
-    onClose={() => setShowProfileSettings(false)}
-    onProfileImageUpdate={handleProfileImageUpdate}
-    coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto}  // ✅ ADD fallback
-  />
-)}
+        {showProfileSettings && (
+          <ProfileSetting
+            currentUser={currentUser}
+            onClose={() => setShowProfileSettings(false)}
+            onProfileImageUpdate={handleProfileImageUpdate}
+            coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto} // fallback
+            initialView={profileSettingsView}
+          />
+        )}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
           {selectedUser || selectedGroup ? (
             <>
@@ -1096,11 +1096,15 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                               </svg>
                             </div>
                           )
-                        ) : selectedUserImage ? (
+                        ) : selectedUserImage || selectedUser?.profileImage ? (
                           <img
-                            src={selectedUserImage}
+                            src={
+                              selectedUserImage || selectedUser?.profileImage
+                            }
                             className="w-full h-full object-cover"
                             alt={selectedUser?.username}
+                            crossOrigin="anonymous"
+                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold">
@@ -1336,7 +1340,7 @@ const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
                         setLastMessages((prev) => {
                           let targetUserId = null;
                           for (const [userId, msgData] of Object.entries(
-                            prev
+                            prev,
                           )) {
                             if (
                               msgData?.conversationId ===
