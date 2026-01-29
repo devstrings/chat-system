@@ -11,13 +11,19 @@ import {
   changePassword,
     getCurrentUser     
 
-} from "../controllers/auth.js";
+} from "../controllers/auth.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import config from "../config/index.js"; 
 
 const router = express.Router();
 
 // LOCAL AUTH ROUTES
+
+/**
+ * @route   POST /api/auth/register
+ * @body   { username, email, password }
+ * @auth  Public
+ */
 router.post("/register", register);
 router.post("/login", login);
 

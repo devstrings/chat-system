@@ -1,25 +1,25 @@
 import express from "express";
 import multer from "multer";
-import { 
-  createGroup, 
-  getUserGroups, 
+import {
+  createGroup,
+  getUserGroups,
   getGroupDetails,
-  addGroupMembers, 
+  addGroupMembers,
   removeGroupMember,
   leaveGroup,
   makeAdmin,
-removeAdmin, 
+  removeAdmin,
   updateGroupImage,
-  removeGroupImage,  
+  removeGroupImage,
   deleteGroup,
   updateGroup,
-    pinGroup,           
-  unpinGroup,         
-  archiveGroup,       
-  unarchiveGroup,     
-  clearGroupChat,      
-  serveGroupImage
-} from "../controllers/group.js";
+  pinGroup,
+  unpinGroup,
+  archiveGroup,
+  unarchiveGroup,
+  clearGroupChat,
+  serveGroupImage,
+} from "../controllers/group.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -31,10 +31,10 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
-  }
+  },
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
@@ -43,7 +43,7 @@ const upload = multer({
     } else {
       cb(new Error("Only images allowed"));
     }
-  }
+  },
 });
 
 // Create group
@@ -59,7 +59,12 @@ router.get("/:groupId", verifyToken, getGroupDetails);
 router.put("/:groupId", verifyToken, updateGroup);
 
 // UPDATE GROUP IMAGE (ADMINS ONLY) - WITH FILE UPLOAD
-router.put("/:groupId/image", verifyToken, upload.single("groupImage"), updateGroupImage);
+router.put(
+  "/:groupId/image",
+  verifyToken,
+  upload.single("groupImage"),
+  updateGroupImage,
+);
 
 // REMOVE GROUP IMAGE (ADMINS ONLY)
 router.delete("/:groupId/image", verifyToken, removeGroupImage);

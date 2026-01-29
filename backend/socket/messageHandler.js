@@ -684,6 +684,86 @@ socket.on("deleteGroupMessageForEveryone", async ({ messageId, groupId }) => {
   }
 });
 
+
+
+  // View status
+  socket.on("viewStatus", async ({ statusId }) => {
+    try {
+      console.log(" View status:", statusId, "by user:", socket.user.id);
+
+      const Status = (await import("../models/Status.js")).default;
+      const status = await Status.findById(statusId);
+
+      if (!status) {
+        console.warn(" Status not found");
+        return;
+      }
+
+      // Check if user can view
+      if (!status.canView(socket.user.id)) {
+        socket.emit("errorMessage", { message: "Cannot view this status" });
+        return;
+      }
+
+      // Don't mark own status as viewed
+      if (status.userId.toString() === socket.user.id) {
+        return;
+      }
+
+      // Mark as viewed
+      await status.markAsViewed(socket.user.id);
+
+      // Emit to status owner
+      const ownerSocket = [...io.sockets.sockets.values()].find(
+        (s) => s.user && s.user.id === status.userId.toString()
+      );
+
+      if (ownerSocket) {
+        ownerSocket.emit("statusViewed", {
+          statusId,
+          viewer: {
+            userId: socket.user.id,
+            viewedAt: new Date()
+          }
+        });
+      }
+
+      console.log(" Status marked as viewed");
+    } catch (err) {
+      console.error(" View status error:", err);
+    }
+  });
+
+  // Delete status
+  socket.on("deleteStatus", async ({ statusId }) => {
+    try {
+      console.log(" Delete status:", statusId);
+
+      const Status = (await import("../models/Status.js")).default;
+      const status = await Status.findById(statusId);
+
+      if (!status) {
+        socket.emit("errorMessage", { message: "Status not found" });
+        return;
+      }
+
+      // Only owner can delete
+      if (status.userId.toString() !== socket.user.id) {
+        socket.emit("errorMessage", { message: "Unauthorized" });
+        return;
+      }
+
+      await Status.findByIdAndDelete(statusId);
+
+      // Broadcast to all users
+      io.emit("statusDeleted", { statusId });
+
+      console.log(" Status deleted successfully");
+    } catch (err) {
+      console.error("Delete status error:", err);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.user.id}`);
   });

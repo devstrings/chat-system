@@ -7,7 +7,8 @@ const createUploadDirs = () => {
   const dirs = [
     "uploads/profileImages",
     "uploads/messages",
-    "uploads/voice"
+    "uploads/voice",
+    "uploads/status"
   ];
   
   dirs.forEach(dir => {
@@ -54,6 +55,16 @@ const voiceStorage = multer.diskStorage({
   }
 });
 
+//  ADD THIS NEW CODE (Status storage)
+const statusStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/status");
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `status_${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
 // Added image/jfif MIME type
 const allowedMimeTypes = [
   "image/jpeg", 
@@ -170,4 +181,21 @@ export const uploadMessage = multer({
 export const uploadVoice = multer({
   storage: voiceStorage,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+//  multer instance for status uploads
+export const uploadStatus = multer({
+  storage: statusStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for videos
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images and videos allowed for status"), false);
+    }
+  }
 });

@@ -3,27 +3,23 @@ import BlockedUser from "../models/BlockedUser.js";
 import fs from "fs";
 import path from "path";
 
-
 // Get all users except current user
 export const getUsers = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
     const blockedRelationships = await BlockedUser.find({
-      $or: [
-        { blocker: currentUserId },
-        { blocked: currentUserId }
-      ]
+      $or: [{ blocker: currentUserId }, { blocked: currentUserId }],
     });
 
-    const blockedUserIds = blockedRelationships.map(block =>
+    const blockedUserIds = blockedRelationships.map((block) =>
       block.blocker.toString() === currentUserId
         ? block.blocked.toString()
-        : block.blocker.toString()
+        : block.blocker.toString(),
     );
 
     const users = await User.find({
-      _id: { $ne: currentUserId, $nin: blockedUserIds }
+      _id: { $ne: currentUserId, $nin: blockedUserIds },
     })
       .select("username email _id profileImage")
       .sort({ username: 1 });
@@ -31,7 +27,9 @@ export const getUsers = async (req, res) => {
     res.json(users);
   } catch (err) {
     console.error("Get users error:", err);
-    res.status(500).json({ message: "Failed to fetch users", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch users", error: err.message });
   }
 };
 
@@ -44,24 +42,21 @@ export const searchUsers = async (req, res) => {
     if (!searchQuery || searchQuery.trim().length === 0) return res.json([]);
 
     const blockedRelationships = await BlockedUser.find({
-      $or: [
-        { blocker: currentUserId },
-        { blocked: currentUserId }
-      ]
+      $or: [{ blocker: currentUserId }, { blocked: currentUserId }],
     });
 
-    const blockedUserIds = blockedRelationships.map(block =>
+    const blockedUserIds = blockedRelationships.map((block) =>
       block.blocker.toString() === currentUserId
         ? block.blocked.toString()
-        : block.blocker.toString()
+        : block.blocker.toString(),
     );
 
     const users = await User.find({
       _id: { $ne: currentUserId, $nin: blockedUserIds },
       $or: [
         { username: { $regex: searchQuery, $options: "i" } },
-        { email: { $regex: searchQuery, $options: "i" } }
-      ]
+        { email: { $regex: searchQuery, $options: "i" } },
+      ],
     })
       .select("username email _id profileImage")
       .limit(20);
@@ -82,63 +77,75 @@ export const getUserById = async (req, res) => {
     const isBlocked = await BlockedUser.findOne({
       $or: [
         { blocker: currentUserId, blocked: id },
-        { blocker: id, blocked: currentUserId }
-      ]
+        { blocker: id, blocked: currentUserId },
+      ],
     });
 
-    if (isBlocked) return res.status(403).json({ message: "User not accessible" });
+    if (isBlocked)
+      return res.status(403).json({ message: "User not accessible" });
 
-    const user = await User.findById(id).select("username email _id profileImage");
+    const user = await User.findById(id).select(
+      "username email _id profileImage",
+    );
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json(user);
   } catch (err) {
     console.error("Get user by ID error:", err);
-    res.status(500).json({ message: "Failed to fetch user", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch user", error: err.message });
   }
 };
 
 // Get current user profile
 export const getCurrentUser = async (req, res) => {
   try {
-    // ✅ FIX: Add coverPhoto to select
-    const user = await User.findById(req.user.id).select("username email profileImage coverPhoto");
-    
+    // Add coverPhoto to select
+    const user = await User.findById(req.user.id).select(
+      "username email profileImage coverPhoto",
+    );
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
-    console.log("✅ Current user loaded:", {
+
+    console.log(" Current user loaded:", {
       username: user.username,
       profileImage: user.profileImage,
-      coverPhoto: user.coverPhoto  // ✅ This should appear in logs
+      coverPhoto: user.coverPhoto,
     });
-    
+
     res.json(user);
   } catch (err) {
-    console.error("❌ Get current user error:", err);
-    res.status(500).json({ message: "Failed to get profile", error: err.message });
+    console.error(" Get current user error:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to get profile", error: err.message });
   }
 };
-
-// PROFILE IMAGE 
 
 // Serve profile image with authentication
 export const serveProfileImage = async (req, res) => {
   try {
     const filename = req.params.filename;
-    const filepath = path.join(process.cwd(), 'uploads', 'profileImages', filename);
-    
-    console.log(' Serving image:', filename);
-    console.log(' File path:', filepath);
-    
+    const filepath = path.join(
+      process.cwd(),
+      "uploads",
+      "profileImages",
+      filename,
+    );
+
+    console.log(" Serving image:", filename);
+    console.log(" File path:", filepath);
+
     if (!fs.existsSync(filepath)) {
-      console.log(' File not found:', filepath);
+      console.log(" File not found:", filepath);
       return res.status(404).json({ message: "Image not found" });
     }
-    
-    console.log(' File found, sending...');
+
+    console.log(" File found, sending...");
     res.sendFile(filepath);
   } catch (err) {
     console.error(" Image serve error:", err);
@@ -153,7 +160,7 @@ export const uploadProfileImage = async (req, res) => {
 
     const imageUrl = `/uploads/profileImages/${req.file.filename}`;
 
-    console.log(' Image uploaded:', imageUrl);
+    console.log(" Image uploaded:", imageUrl);
 
     res.json({
       message: "Image uploaded successfully",
@@ -171,30 +178,33 @@ export const updateProfileImage = async (req, res) => {
     const userId = req.user.id;
     const { profileImage } = req.body;
 
-    if (!profileImage) return res.status(400).json({ message: "Profile image URL is required" });
+    if (!profileImage)
+      return res.status(400).json({ message: "Profile image URL is required" });
 
-    console.log(' Saving profile image:', profileImage);
+    console.log(" Saving profile image:", profileImage);
 
     const user = await User.findByIdAndUpdate(
       userId,
       { profileImage },
-      { new: true }
+      { new: true },
     ).select("username email _id profileImage");
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    console.log(' User profileImage saved:', user.profileImage);
+    console.log(" User profileImage saved:", user.profileImage);
 
-    res.json({ 
-      message: "Profile image updated successfully", 
+    res.json({
+      message: "Profile image updated successfully",
       user: {
         ...user.toObject(),
-        profileImage: user.profileImage
-      }
+        profileImage: user.profileImage,
+      },
     });
   } catch (err) {
     console.error(" Update profile image error:", err);
-    res.status(500).json({ message: "Failed to update profile image", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update profile image", error: err.message });
   }
 };
 
@@ -224,116 +234,111 @@ export const removeProfileImage = async (req, res) => {
         _id: user._id,
         username: user.username,
         email: user.email,
-        profileImage: null
-      }
+        profileImage: null,
+      },
     });
   } catch (err) {
     console.error(" Remove profile image error:", err);
     res.status(500).json({ message: "Failed to remove profile image" });
   }
 };
-// ✅ ADD THESE TWO NEW FUNCTIONS
-// ✅ FIXED: Upload Cover Photo
+//  Upload Cover Photo
 export const uploadCoverPhoto = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // ✅ FIX 1: Correct URL format
+    //  Correct URL format
     const coverPhotoUrl = `/uploads/profileImages/${req.file.filename}`;
 
-    // ✅ FIX 2: Use req.user.id (not req.userId)
+    //  Use req.user.id (not req.userId)
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       { coverPhoto: coverPhotoUrl },
-      { new: true }
+      { new: true },
     ).select("username email profileImage coverPhoto");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("✅ Cover photo saved:", coverPhotoUrl);
+    console.log(" Cover photo saved:", coverPhotoUrl);
 
     res.json({
       message: "Cover photo uploaded successfully",
       coverPhotoUrl,
-      user: updatedUser
+      user: updatedUser,
     });
   } catch (err) {
-    console.error("❌ Upload cover photo error:", err);
-    res.status(500).json({ 
+    console.error(" Upload cover photo error:", err);
+    res.status(500).json({
       message: "Failed to upload cover photo",
-      error: err.message 
+      error: err.message,
     });
   }
 };
 
-// ✅ FIXED: Remove Cover Photo
+//  Remove Cover Photo
 export const removeCoverPhoto = async (req, res) => {
   try {
-    console.log("🗑️ Remove cover photo request");
+    console.log(" Remove cover photo request");
     console.log("User ID:", req.user.id);
 
-    // ✅ FIX 1: Check if user exists
+    //  Check if user exists
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
-      console.error("❌ User not found");
+      console.error(" User not found");
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("✅ User found:", user.username);
+    console.log(" User found:", user.username);
     console.log("Current cover photo:", user.coverPhoto);
 
-    // ✅ FIX 2: Delete file if exists
+    //  Delete file if exists
     if (user.coverPhoto) {
       const filename = user.coverPhoto.split("/").pop();
       const filepath = path.join(
-        process.cwd(), 
-        "uploads", 
-        "profileImages", 
-        filename
+        process.cwd(),
+        "uploads",
+        "profileImages",
+        filename,
       );
-      
-      console.log("🔍 Checking file:", filepath);
-      
+
       if (fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
-        console.log("✅ File deleted from server");
       } else {
-        console.log("⚠️ File not found on server (might be already deleted)");
+        console.log(" File not found on server (might be already deleted)");
       }
     } else {
-      console.log("⚠️ No cover photo to delete");
+      console.log(" No cover photo to delete");
     }
 
-    // ✅ FIX 3: Update database
+    //  Update database
     user.coverPhoto = null;
     await user.save();
 
-    console.log("✅ Cover photo removed from database");
+    console.log(" Cover photo removed from database");
 
-    res.json({ 
+    res.json({
       message: "Cover photo removed successfully",
       user: {
         _id: user._id,
         username: user.username,
         email: user.email,
         profileImage: user.profileImage,
-        coverPhoto: null
-      }
+        coverPhoto: null,
+      },
     });
-
   } catch (err) {
-    console.error("❌ Remove cover photo error:", err);
+    console.error(" Remove cover photo error:", err);
     console.error("Error details:", err.message);
     console.error("Error stack:", err.stack);
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: "Failed to remove cover photo",
-      error: err.message 
+      error: err.message,
     });
   }
 };

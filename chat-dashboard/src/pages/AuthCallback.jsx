@@ -14,7 +14,7 @@ export default function AuthCallback() {
       // Save to localStorage
       localStorage.setItem("token", token);
       localStorage.setItem("username", username);
-      
+
       if (profileImage && profileImage !== "null" && profileImage !== "") {
         localStorage.setItem("profileImage", profileImage);
       }

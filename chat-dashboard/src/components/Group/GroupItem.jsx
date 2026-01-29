@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { useAuthImage } from "../hooks/useAuthImage";
-import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
+import { useAuthImage } from "../../hooks/useAuthImage";
+import ConfirmationDialog, { AlertDialog } from "../ConfirmationDialog";
 import axios from "axios";
 import GroupProfile from "./GroupProfile";
+import API_BASE_URL from "../../config/api";
 export default function GroupItem({
   group,
   selected,
@@ -23,6 +24,8 @@ export default function GroupItem({
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+
+  React.useEffect(() => {}, [showMenu, showProfile]);
 
   const { imageSrc: groupImage } = useAuthImage(group.groupImage, "group");
 
@@ -110,18 +113,19 @@ export default function GroupItem({
     }
   };
 
-  const handlePinClick = (e) => {
-    e.stopPropagation();
-    onPinConversation(group._id, isPinned);
+  const handlePinClick = () => {
     setShowMenu(false);
+    setTimeout(() => {
+      onPinConversation(group._id, isPinned);
+    }, 100);
   };
 
-  const handleArchiveClick = (e) => {
-    e.stopPropagation();
-    onArchiveConversation(group._id, isArchived);
+  const handleArchiveClick = () => {
     setShowMenu(false);
+    setTimeout(() => {
+      onArchiveConversation(group._id, isArchived);
+    }, 100);
   };
-
   const handleClearChat = () => {
     setConfirmDialog({
       isOpen: true,
@@ -135,10 +139,9 @@ export default function GroupItem({
       onConfirm: async () => {
         try {
           const token = localStorage.getItem("token");
-          await axios.delete(
-            `http://localhost:5000/api/groups/${group._id}/clear`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          await axios.delete(`${API_BASE_URL}/api/groups/${group._id}/clear`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
 
           setAlertDialog({
             isOpen: true,
@@ -178,9 +181,9 @@ export default function GroupItem({
           const token = localStorage.getItem("token");
 
           await axios.post(
-            `http://localhost:5000/api/groups/${group._id}/leave`,
+            `${API_BASE_URL}/api/groups/${group._id}/leave`,
             {},
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           setAlertDialog({
@@ -216,7 +219,14 @@ export default function GroupItem({
             ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
             : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
         }`}
-        onClick={onClick}
+        onClick={(e) => {
+          if (showMenu || showProfile) {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+          }
+          onClick(e);
+        }}
       >
         {/* Group Avatar */}
         <div className="relative">
@@ -249,7 +259,6 @@ export default function GroupItem({
             )}
           </div>
 
-          {/* Unread Badge */}
           {unreadCount > 0 && (
             <div className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 rounded-full flex items-center justify-center px-1 border-2 border-gray-800">
               <span className="text-white text-xs font-bold">
@@ -262,28 +271,19 @@ export default function GroupItem({
         {/* Group Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            {/* Left: Group name + badges */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
                 className={`font-semibold truncate ${
                   selected
                     ? "text-white"
                     : unreadCount > 0
-                    ? "text-gray-900"
-                    : "text-gray-900"
+                      ? "text-gray-900"
+                      : "text-gray-900"
                 }`}
               >
                 {group.name}
               </h3>
 
-              {/* Admin Badge */}
-              {/* {isAdmin && (
-                <span className="px-1.5 py-0.5 bg-yellow-500 text-white text-[10px] font-bold rounded flex-shrink-0">
-                  ADMIN
-                </span>
-              )}
-               */}
-              {/* Pin icon */}
               {isPinned && (
                 <svg
                   className="w-3.5 h-3.5 text-blue-400 flex-shrink-0"
@@ -296,15 +296,14 @@ export default function GroupItem({
               )}
             </div>
 
-            {/* Right: timestamp */}
             {lastMessageTime && (
               <span
                 className={`text-xs flex-shrink-0 ml-2 ${
                   selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-blue-600 font-bold"
-                    : "text-gray-700"
+                      ? "text-blue-600 font-bold"
+                      : "text-gray-700"
                 }`}
               >
                 {formatTime(lastMessageTime)}
@@ -312,7 +311,6 @@ export default function GroupItem({
             )}
           </div>
 
-          {/* Message preview or member count */}
           {displayMessage ? (
             <div className="flex items-center">
               {getMessageStatusIcon()}
@@ -321,8 +319,8 @@ export default function GroupItem({
                   selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
-                    ? "text-gray-900 font-semibold"
-                    : "text-gray-600"
+                      ? "text-gray-900 font-semibold"
+                      : "text-gray-600"
                 }`}
               >
                 {displayMessage}
@@ -342,9 +340,10 @@ export default function GroupItem({
         {/* Three Dots Menu */}
         <div className="relative flex-shrink-0">
           <button
-            onClick={(e) => {
+            onClickCapture={(e) => {
               e.stopPropagation();
-              setShowMenu(!showMenu);
+              e.preventDefault();
+              setShowMenu(true);
             }}
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
@@ -356,139 +355,6 @@ export default function GroupItem({
               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
             </svg>
           </button>
-
-          {/* Dropdown Menu */}
-          {showMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowMenu(false)}
-              ></div>
-
-              <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
-                {/* Pin/Unpin */}
-                {conversationId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePinClick(e);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <svg
-                      className="w-4 h-4 text-blue-600"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
-                    </svg>
-                    {isPinned ? "Unpin Group" : "Pin Group"}
-                  </button>
-                )}
-
-                {/* Archive/Unarchive */}
-                {conversationId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleArchiveClick(e);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                  >
-                    <svg
-                      className="w-4 h-4 text-purple-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                      />
-                    </svg>
-                    {isArchived ? "Unarchive Group" : "Archive Group"}
-                  </button>
-                )}
-
-                {/* View Profile */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowProfile(true);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 flex items-center gap-2 text-sm border-t border-gray-300"
-                >
-                  <svg
-                    className="w-4 h-4 text-emerald-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  View Group Info
-                </button>
-
-                {/* Clear Chat */}
-                {conversationId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleClearChat();
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                    Clear Chat
-                  </button>
-                )}
-
-                {/* Leave Group */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleLeaveGroup();
-                  }}
-                  className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Leave Group
-                </button>
-              </div>
-            </>
-          )}
         </div>
 
         {/* Selected indicator arrow */}
@@ -508,6 +374,191 @@ export default function GroupItem({
           </svg>
         )}
       </div>
+
+      {/* Modal OUTSIDE main container */}
+      {showMenu && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              console.log(" Backdrop clicked");
+              setShowMenu(false);
+            }
+          }}
+        >
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log("🟦 Backdrop clicked");
+              setShowMenu(false);
+            }}
+          />
+          <div
+            className="bg-white rounded-xl shadow-2xl w-[85vw] sm:w-[220px] max-h-[80vh] overflow-auto relative z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2.5 flex items-center justify-between">
+              <h3 className="text-xs sm:text-sm font-semibold text-white">
+                Options
+              </h3>
+              <button
+                onClickCapture={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                }}
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <svg
+                  className="w-3.5 h-3.5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-1">
+              {conversationId && (
+                <button
+                  onClickCapture={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setTimeout(() => handlePinClick(), 50);
+                  }}
+                  className="w-full px-2 py-1.5 text-left text-gray-900 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2 text-xs sm:text-sm"
+                >
+                  <svg
+                    className="w-4 h-4 text-blue-600 flex-shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                  </svg>
+                  <span className="font-medium">
+                    {isPinned ? "Unpin" : "Pin"}
+                  </span>
+                </button>
+              )}
+
+              {conversationId && (
+                <button
+                  onClickCapture={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setTimeout(() => handleArchiveClick(), 50);
+                  }}
+                  className="w-full px-2.5 py-1.5 text-left text-gray-900 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <svg
+                    className="w-4 h-4 text-purple-600 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                    />
+                  </svg>
+                  <span className="font-medium">
+                    {isArchived ? "Unarchive" : "Archive"}
+                  </span>
+                </button>
+              )}
+
+              <button
+                onClickCapture={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setTimeout(() => setShowProfile(true), 50);
+                }}
+                className="w-full px-2.5 py-1.5 text-left text-gray-900 hover:bg-green-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <svg
+                  className="w-4 h-4 text-emerald-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="font-medium">Group Info</span>
+              </button>
+
+              {conversationId && (
+                <div className="my-1 border-t border-gray-200" />
+              )}
+
+              {conversationId && (
+                <button
+                  onClickCapture={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    setTimeout(() => handleClearChat(), 50);
+                  }}
+                  className="w-full px-2.5 py-1.5 text-left text-orange-600 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <svg
+                    className="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  <span className="font-medium">Clear Chat</span>
+                </button>
+              )}
+
+              <button
+                onClickCapture={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setTimeout(() => handleLeaveGroup(), 50);
+                }}
+                className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <svg
+                  className="w-4 h-4 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                <span className="font-medium">Leave Group</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Group Profile Modal */}
       {showProfile && (

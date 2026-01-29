@@ -1,4 +1,3 @@
-// server/models/user.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
@@ -36,8 +35,19 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date,
     default: null
-  }
-  
+  },
+   //   STATUS FIELDS
+  statusPrivacy: {
+    type: String,
+    enum: ["contacts", "except", "only"],
+    default: "contacts"
+  },
+  mutedStatuses: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    }
+  ]
 }, { 
   timestamps: true 
 });

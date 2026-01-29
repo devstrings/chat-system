@@ -3,14 +3,12 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
-
+import API_BASE_URL from "../config/api";
 export default function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   // Check if user is already logged in
   useEffect(() => {
@@ -31,12 +29,12 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await axios.post(`${API_BASE}/api/auth/login`, formData);
+      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, formData);
 
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
         localStorage.setItem("username", res.data.username);
-        
+
         if (res.data.profileImage) {
           localStorage.setItem("profileImage", res.data.profileImage);
         }
@@ -53,12 +51,12 @@ export default function Login() {
 
   //  GOOGLE LOGIN
   const handleGoogleLogin = () => {
-    window.location.href = `${API_BASE}/api/auth/google`;
+    window.location.href = `${API_BASE_URL}/api/auth/google`;
   };
 
   //  FACEBOOK LOGIN
   const handleFacebookLogin = () => {
-    window.location.href = `${API_BASE}/api/auth/facebook`;
+    window.location.href = `${API_BASE_URL}/api/auth/facebook`;
   };
 
   return (
@@ -135,7 +133,7 @@ export default function Login() {
               autoComplete="current-password"
               className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            
+
             {/*  FORGOT PASSWORD LINK */}
             <div className="text-right mt-2">
               <span

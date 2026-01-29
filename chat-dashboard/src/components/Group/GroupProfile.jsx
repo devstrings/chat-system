@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import axios from "axios";
-import { useAuthImage } from "../hooks/useAuthImage";
-
+import { useAuthImage } from "../../hooks/useAuthImage";
+import API_BASE_URL from "../../config/api";
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {
   if (!isOpen) return null;
@@ -10,14 +10,14 @@ function AlertDialog({ isOpen, onClose, title, message, type }) {
     type === "error"
       ? "bg-red-50"
       : type === "info"
-      ? "bg-blue-50"
-      : "bg-green-50";
+        ? "bg-blue-50"
+        : "bg-green-50";
   const iconColor =
     type === "error"
       ? "text-red-600"
       : type === "info"
-      ? "text-blue-600"
-      : "text-green-600";
+        ? "text-blue-600"
+        : "text-green-600";
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
@@ -123,7 +123,10 @@ function MemberItem({
   const [showMemberMenu, setShowMemberMenu] = useState(false);
 
   // Check if current user can manage this member
-  const canManage = (currentUserIsAdmin || currentUserIsCreator) && member._id !== currentUserId && !isCreator;
+  const canManage =
+    (currentUserIsAdmin || currentUserIsCreator) &&
+    member._id !== currentUserId &&
+    !isCreator;
 
   return (
     <div className="flex items-center justify-between p-3 bg-white rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
@@ -142,7 +145,7 @@ function MemberItem({
             </div>
           )}
         </div>
-        
+
         {/* Name and Role */}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 truncate">
@@ -154,13 +157,13 @@ function MemberItem({
         </div>
       </div>
 
-      {/* ✅ THREE DOTS MENU */}
+      {/*  THREE DOTS MENU */}
       {canManage && (
         <div className="relative flex-shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowMemberMenu(!showMemberMenu);
+              setShowMemberMenu(true);
             }}
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
           >
@@ -176,92 +179,132 @@ function MemberItem({
           {/* Dropdown Menu */}
           {showMemberMenu && (
             <>
+              {/* Backdrop */}
               <div
-                className="fixed inset-0 z-10"
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
                 onClick={() => setShowMemberMenu(false)}
-              ></div>
+              />
 
-              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
-                {/* Make Admin Option */}
-                {!isAdmin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMakeAdmin(member._id);
-                      setShowMemberMenu(false);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-emerald-50 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <svg
-                      className="w-4 h-4 text-emerald-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+              {/* Modal */}
+              <div className="fixed inset-0 flex items-center justify-center z-[80] p-4 pointer-events-none">
+                <div
+                  className="bg-white rounded-xl shadow-2xl w-[85vw] sm:w-full max-w-[220px] overflow-hidden animate-in zoom-in-95 duration-200 pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-2 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white">
+                      Options
+                    </h3>
+                    <button
+                      onClick={() => setShowMemberMenu(false)}
+                      className="p-1 hover:bg-white/20 rounded-full transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Make Admin
-                  </button>
-                )}
+                      <svg
+                        className="w-3.5 h-3.5 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
 
-                {/* Demote Admin Option */}
-                {isAdmin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveAdmin(member._id);
-                      setShowMemberMenu(false);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-yellow-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-100"
-                  >
-                    <svg
-                      className="w-4 h-4 text-yellow-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                    Demote Admin
-                  </button>
-                )}
+                  {/* Options List */}
+                  <div className="p-1">
+                    {/* Make Admin */}
+                    {!isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMakeAdmin(member._id);
+                          setShowMemberMenu(false);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left text-gray-900 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 text-emerald-600 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <span className="font-medium">Make Admin</span>
+                      </button>
+                    )}
 
-                {/* Remove Member Option */}
-                {canRemove && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove();
-                      setShowMemberMenu(false);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-100"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                    Remove Member
-                  </button>
-                )}
+                    {/* Demote Admin */}
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveAdmin(member._id);
+                          setShowMemberMenu(false);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left text-gray-900 hover:bg-yellow-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 text-yellow-600 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                        <span className="font-medium">Demote Admin</span>
+                      </button>
+                    )}
+
+                    {/* Divider */}
+                    {canRemove && (isAdmin || !isAdmin) && (
+                      <div className="my-1 border-t border-gray-200" />
+                    )}
+
+                    {/* Remove Member */}
+                    {canRemove && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemove();
+                          setShowMemberMenu(false);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                        <span className="font-medium">Remove Member</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -364,17 +407,16 @@ export default function GroupProfile({
       const token = localStorage.getItem("token");
 
       const response = await axios.put(
-        `http://localhost:5000/api/groups/${group._id}/image`,
+        `${API_BASE_URL}/api/groups/${group._id}/image`,
         formData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
-      //  TIMESTAMP TO FORCE IMAGE RELOAD
       const updatedGroup = {
         ...response.data,
         groupImage: response.data.groupImage
@@ -415,8 +457,8 @@ export default function GroupProfile({
         try {
           const token = localStorage.getItem("token");
           const response = await axios.delete(
-            `http://localhost:5000/api/groups/${group._id}/image`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            `${API_BASE_URL}/api/groups/${group._id}/image`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           onGroupUpdate(response.data);
@@ -455,9 +497,9 @@ export default function GroupProfile({
       const token = localStorage.getItem("token");
 
       const response = await axios.put(
-        `http://localhost:5000/api/groups/${group._id}`,
+        `${API_BASE_URL}/api/groups/${group._id}`,
         { name: groupName },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       onGroupUpdate(response.data);
@@ -487,12 +529,12 @@ export default function GroupProfile({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/users/search?q=${searchUsers}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${API_BASE_URL}/api/users/search?q=${searchUsers}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       const filtered = res.data.filter(
-        (u) => !group.members.some((m) => m._id === u._id)
+        (u) => !group.members.some((m) => m._id === u._id),
       );
       setSearchResults(filtered);
     } catch (err) {
@@ -507,9 +549,9 @@ export default function GroupProfile({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        `http://localhost:5000/api/groups/${group._id}/add-members`,
+        `${API_BASE_URL}/api/groups/${group._id}/add-members`,
         { memberIds: [userId] },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       onGroupUpdate(res.data);
@@ -543,8 +585,8 @@ export default function GroupProfile({
         try {
           const token = localStorage.getItem("token");
           await axios.delete(
-            `http://localhost:5000/api/groups/${group._id}/remove/${memberId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            `${API_BASE_URL}/api/groups/${group._id}/remove/${memberId}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           onMemberRemoved(memberId);
@@ -571,9 +613,9 @@ export default function GroupProfile({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        `http://localhost:5000/api/groups/${group._id}/make-admin/${memberId}`,
+        `${API_BASE_URL}/api/groups/${group._id}/make-admin/${memberId}`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       onGroupUpdate(res.data);
@@ -593,40 +635,41 @@ export default function GroupProfile({
       });
     }
   };
-// ✅ NEW: Remove Admin Function
-const handleRemoveAdmin = async (memberId) => {
-  setConfirmDialog({
-    isOpen: true,
-    title: "Remove Admin Status?",
-    message: "Are you sure you want to demote this admin to a regular member?",
-    type: "danger",
-    onConfirm: async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await axios.delete(
-          `http://localhost:5000/api/groups/${group._id}/remove-admin/${memberId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+  // Remove Admin Function
+  const handleRemoveAdmin = async (memberId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Remove Admin Status?",
+      message:
+        "Are you sure you want to demote this admin to a regular member?",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const res = await axios.delete(
+            `${API_BASE_URL}/api/groups/${group._id}/remove-admin/${memberId}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
 
-        onGroupUpdate(res.data);
+          onGroupUpdate(res.data);
 
-        setAlertDialog({
-          isOpen: true,
-          title: "Admin Removed!",
-          message: "Member has been demoted to regular member successfully.",
-          type: "success",
-        });
-      } catch (err) {
-        setAlertDialog({
-          isOpen: true,
-          title: "Error",
-          message: err.response?.data?.message || "Failed to remove admin",
-          type: "error",
-        });
-      }
-    },
-  });
-};
+          setAlertDialog({
+            isOpen: true,
+            title: "Admin Removed!",
+            message: "Member has been demoted to regular member successfully.",
+            type: "success",
+          });
+        } catch (err) {
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.response?.data?.message || "Failed to remove admin",
+            type: "error",
+          });
+        }
+      },
+    });
+  };
   // Exit group
   const handleExitGroup = () => {
     setConfirmDialog({
@@ -638,9 +681,9 @@ const handleRemoveAdmin = async (memberId) => {
         try {
           const token = localStorage.getItem("token");
           await axios.post(
-            `http://localhost:5000/api/groups/${group._id}/leave`,
+            `${API_BASE_URL}/api/groups/${group._id}/leave`,
             {},
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           setAlertDialog({
@@ -709,12 +752,9 @@ const handleRemoveAdmin = async (memberId) => {
             onConfirm: async () => {
               try {
                 const token = localStorage.getItem("token");
-                await axios.delete(
-                  `http://localhost:5000/api/groups/${group._id}`,
-                  {
-                    headers: { Authorization: `Bearer ${token}` },
-                  }
-                );
+                await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
 
                 setAlertDialog({
                   isOpen: true,
@@ -752,12 +792,9 @@ const handleRemoveAdmin = async (memberId) => {
         onConfirm: async () => {
           try {
             const token = localStorage.getItem("token");
-            await axios.delete(
-              `http://localhost:5000/api/groups/${group._id}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
+            await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
             setAlertDialog({
               isOpen: true,
@@ -815,10 +852,10 @@ const handleRemoveAdmin = async (memberId) => {
 
       {/* Modal Container */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
-    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl relative pointer-events-auto overflow-hidden">
-          {/* CONTENT - BINA GRADIENT KE */}
-       <div className="pt-8 pb-6 px-6 overflow-y-auto max-h-[90vh]">
-            <div className="relative w-32 h-32 mx-auto mb-4">
+        <div className="bg-white rounded-2xl w-[95vw] sm:w-full max-w-2xl max-h-[90vh] shadow-2xl relative pointer-events-auto overflow-hidden">
+          {/* CONTENT  */}
+          <div className="pt-8 pb-6 px-6 overflow-y-auto max-h-[90vh]">
+            <div className="relative w-24 sm:w-32 h-24 sm:h-32 mx-auto mb-4">
               {/* Animated gradient ring */}
               <div
                 className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 rounded-full animate-spin"
@@ -964,7 +1001,7 @@ const handleRemoveAdmin = async (memberId) => {
               </div>
             ) : (
               <div className="flex items-center justify-center gap-2 mb-2">
-                <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
                   {groupName}
                 </h2>
                 {isAdmin && (
@@ -1051,7 +1088,7 @@ const handleRemoveAdmin = async (memberId) => {
                         onKeyPress={(e) =>
                           e.key === "Enter" && handleSearchUsers()
                         }
-                        className="flex-1 px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                       <button
                         onClick={handleSearchUsers}
@@ -1098,7 +1135,7 @@ const handleRemoveAdmin = async (memberId) => {
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {group.members?.map((member) => {
                   const memberIsAdmin = group.admins?.some(
-                    (a) => (a._id || a) === (member._id || member)
+                    (a) => (a._id || a) === (member._id || member),
                   );
                   const memberIsCreator =
                     group.creator === member._id ||
@@ -1107,19 +1144,19 @@ const handleRemoveAdmin = async (memberId) => {
                     isAdmin && !memberIsCreator && member._id !== currentUserId;
 
                   return (
-                  <MemberItem
-  key={member._id}
-  member={member}
-  isAdmin={memberIsAdmin}
-  isCreator={memberIsCreator}
-  canRemove={canRemove}
-  currentUserId={currentUserId}
-  currentUserIsAdmin={isAdmin}
-  currentUserIsCreator={isCreator}
-  onRemove={() => handleRemoveMember(member._id)}
-  onMakeAdmin={handleMakeAdmin}
-  onRemoveAdmin={handleRemoveAdmin}  // ✅ NEW
-/>
+                    <MemberItem
+                      key={member._id}
+                      member={member}
+                      isAdmin={memberIsAdmin}
+                      isCreator={memberIsCreator}
+                      canRemove={canRemove}
+                      currentUserId={currentUserId}
+                      currentUserIsAdmin={isAdmin}
+                      currentUserIsCreator={isCreator}
+                      onRemove={() => handleRemoveMember(member._id)}
+                      onMakeAdmin={handleMakeAdmin}
+                      onRemoveAdmin={handleRemoveAdmin}
+                    />
                   );
                 })}
               </div>

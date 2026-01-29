@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import API_BASE_URL from "../config/api";
 
 export const useAuthImage = (imageUrl, type = "profile") => {
   const [imageSrc, setImageSrc] = useState(null);
@@ -7,7 +8,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
   useEffect(() => {
     if (!imageUrl) {
-      console.log("useAuthImage: No image URL provided");
       setImageSrc(null);
       setLoading(false);
       return;
@@ -20,15 +20,10 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         // Step 1: Clean the URL
         let cleanUrl = imageUrl.trim();
 
-        // Remove duplicate localhost prefixes
-        if (cleanUrl.includes("localhost:5000https://")) {
-          cleanUrl = cleanUrl.split("localhost:5000")[1];
-          console.log(" Cleaned duplicate prefix:", cleanUrl);
-        } else if (cleanUrl.includes("localhost:5000http://")) {
-          cleanUrl = cleanUrl.split("localhost:5000")[1];
-          console.log(" Cleaned duplicate prefix:", cleanUrl);
-        }
-
+        // Remove duplicate localhost prefixes more safely
+        cleanUrl = cleanUrl
+          .replace(/localhost:5000https?:\/\//g, "")
+          .replace(/^https?:\/\/localhost:5000\//, "");
         // Step 2: Check if it's an external URL (Google/Facebook/etc)
         const isExternalHttps =
           cleanUrl.startsWith("https://") && !cleanUrl.includes("localhost");
@@ -61,13 +56,11 @@ export const useAuthImage = (imageUrl, type = "profile") => {
           // ENHANCEMENT: Increase Google image quality
           if (isGoogleImage) {
             cleanUrl = cleanUrl.replace(/s\d+-c$/, "s400-c");
-            console.log("🔧 Enhanced Google image size:", cleanUrl);
           }
 
           //  ENHANCEMENT: Increase Facebook image size
           if (isFacebookImage && cleanUrl.includes("type=")) {
             cleanUrl = cleanUrl.replace(/type=\w+/, "type=large");
-            console.log("🔧 Enhanced Facebook image size:", cleanUrl);
           }
 
           setImageSrc(cleanUrl);
@@ -102,11 +95,11 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         // Build API URL
         let apiUrl;
         if (type === "group") {
-          apiUrl = `http://localhost:5000/api/file/group/${filename}?t=${Date.now()}`;
+          apiUrl = `${API_BASE_URL}/api/file/group/${filename}?t=${Date.now()}`;
         } else if (type === "cover") {
-          apiUrl = `http://localhost:5000/api/file/cover/${filename}?t=${Date.now()}`;
+          apiUrl = `${API_BASE_URL}/api/file/cover/${filename}?t=${Date.now()}`;
         } else {
-          apiUrl = `http://localhost:5000/api/file/profile/${filename}?t=${Date.now()}`;
+          apiUrl = `${API_BASE_URL}/api/file/profile/${filename}?t=${Date.now()}`;
         }
 
         console.log(" Fetching from:", apiUrl);

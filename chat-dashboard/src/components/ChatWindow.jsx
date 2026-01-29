@@ -3,6 +3,7 @@ import { useSocket } from "../context/SocketContext";
 import Message from "./Message";
 import axios from "axios";
 import ConfirmationDialog from "./ConfirmationDialog";
+import API_BASE_URL from "../config/api";
 
 export default function ChatWindow({
   conversationId,
@@ -50,8 +51,8 @@ export default function ChatWindow({
         const token = localStorage.getItem("token");
 
         const res = await axios.get(
-          `http://localhost:5000/api/messages/${conversationId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${API_BASE_URL}/api/messages/${conversationId}`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setMessages(res.data);
@@ -118,8 +119,8 @@ export default function ChatWindow({
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === msgId ? { ...msg, status: status } : msg
-        )
+          msg._id === msgId ? { ...msg, status: status } : msg,
+        ),
       );
 
       if (onUpdateLastMessageStatus) {
@@ -142,8 +143,8 @@ export default function ChatWindow({
           prev.map((msg) =>
             msg.sender._id === currentUserId && msg.status !== "read"
               ? { ...msg, status: "read", readAt: new Date() }
-              : msg
-          )
+              : msg,
+          ),
         );
 
         if (onUpdateLastMessageStatus) {
@@ -167,13 +168,13 @@ export default function ChatWindow({
           prev.map((msg) =>
             msg._id === data.messageId
               ? { ...msg, deletedForEveryone: true, text: "", attachments: [] }
-              : msg
-          )
+              : msg,
+          ),
         );
       }
     };
 
-    //  TYPING HANDLER 
+    //  TYPING HANDLER
     const handleTyping = ({ userId, isTyping, conversationId }) => {
       console.log(" TYPING EVENT RECEIVED:", {
         userId,
@@ -267,13 +268,13 @@ export default function ChatWindow({
       const messageIds = Array.from(selectedMessages);
 
       await axios.post(
-        "http://localhost:5000/api/messages/messages/bulk-delete",
+        `${API_BASE_URL}/api/messages/messages/bulk-delete`,
         { messageIds },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setMessages((prev) =>
-        prev.filter((msg) => !selectedMessages.has(msg._id))
+        prev.filter((msg) => !selectedMessages.has(msg._id)),
       );
 
       setIsSelectionMode(false);
@@ -286,7 +287,7 @@ export default function ChatWindow({
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
-        msg.text?.toLowerCase().includes(searchQuery.toLowerCase())
+        msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : messages;
 
@@ -380,7 +381,7 @@ export default function ChatWindow({
     <>
       <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
         {isSelectionMode && (
-          <div className="bg-white border-b border-gray-300 shadow-sm px-3 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
+          <div className="bg-white border-b border-gray-300 shadow-sm px-2 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
               <button
                 onClick={toggleSelectionMode}
@@ -454,7 +455,7 @@ export default function ChatWindow({
             <div className="flex justify-center mb-4 sticky top-0 z-10">
               <button
                 onClick={toggleSelectionMode}
-                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-2 text-xs md:text-sm"
+                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-1.5 text-[11px] md:text-sm"
               >
                 <svg
                   className="w-3.5 h-3.5 md:w-4 md:h-4"
@@ -501,7 +502,7 @@ export default function ChatWindow({
           {/* TYPING INDICATOR  */}
           {typingUsers.size > 0 && selectedUser && (
             <div className="flex items-start gap-2 mb-3 px-2 md:px-0">
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md">
+              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-[10px] md:text-xs font-semibold flex-shrink-0 shadow-md">
                 {selectedUser.username.charAt(0).toUpperCase()}
               </div>
               <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-md">
