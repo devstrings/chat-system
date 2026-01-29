@@ -219,7 +219,6 @@ export const removeGroupImage = async (req, res) => {
   }
 };
 //  ADD MEMBERS - ADMINS ONLY
-//  ADD MEMBERS - ADMINS ONLY
 export const addGroupMembers = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -237,7 +236,7 @@ export const addGroupMembers = async (req, res) => {
       return res.status(403).json({ message: "Only admins can add members" });
     }
 
-    // ✅ FIX: Simply add new members without checking if they exist
+    // Simply add new members without checking if they exist
     const newMembers = memberIds.filter(
       (id) => !group.members.some((m) => m.toString() === id)
     );
@@ -246,7 +245,7 @@ export const addGroupMembers = async (req, res) => {
       return res.status(400).json({ message: "All users are already members" });
     }
 
-    // ✅ Add members back (even if previously removed)
+    // Add members back (even if previously removed)
     group.members.push(...newMembers);
     await group.save();
     await group.populate(
@@ -465,7 +464,7 @@ export const deleteGroup = async (req, res) => {
 
     await Group.findByIdAndDelete(groupId);
 
-    // Optional: Delete all group messages
+    // Delete all group messages
     await Message.deleteMany({ groupId });
 
     console.log(` Deleted group ${groupId}`);

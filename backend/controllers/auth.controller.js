@@ -2,18 +2,16 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 import AuthProvider from "../models/AuthProvider.js";
-import config from "../config/index.js"; 
+import config from "../config/index.js";
 import crypto from "crypto";
 // Helper function
 const generateToken = (userId, username) => {
-  return jwt.sign(
-    { id: userId, username },
-    config.jwtSecret,
-    { expiresIn: config.jwtExpiresIn }
-  );
+  return jwt.sign({ id: userId, username }, config.jwtSecret, {
+    expiresIn: config.jwtExpiresIn,
+  });
 };
 
-//  REGISTER 
+//  REGISTER
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -37,7 +35,7 @@ export const register = async (req, res) => {
 
     await AuthProvider.create({
       userId: newUser._id,
-      provider: "local"
+      provider: "local",
     });
 
     console.log(" User registered:", email);
@@ -48,16 +46,18 @@ export const register = async (req, res) => {
         _id: newUser._id,
         username: newUser.username,
         email: newUser.email,
-        profileImage: newUser.profileImage
-      }
+        profileImage: newUser.profileImage,
+      },
     });
   } catch (err) {
     console.error(" Registration error:", err);
-    res.status(500).json({ message: "Registration failed", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Registration failed", error: err.message });
   }
 };
 
-// LOGIN 
+// LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -73,24 +73,25 @@ export const login = async (req, res) => {
 
     let localProvider = await AuthProvider.findOne({
       userId: user._id,
-      provider: "local"
+      provider: "local",
     });
 
     // Auto-migration fallback
     if (!localProvider && user.password) {
       console.log(" Auto-creating local provider for:", email);
-      
+
       localProvider = await AuthProvider.create({
         userId: user._id,
-        provider: "local"
+        provider: "local",
       });
-      
+
       console.log(" Local provider auto-created");
     }
 
     if (!localProvider) {
       return res.status(400).json({
-        message: "This account was created with Google or Facebook. Please use social login."
+        message:
+          "This account was created with Google or Facebook. Please use social login.",
       });
     }
 
@@ -107,7 +108,7 @@ export const login = async (req, res) => {
       message: "Login successful",
       token,
       username: user.username,
-      profileImage: user.profileImage
+      profileImage: user.profileImage,
     });
   } catch (err) {
     console.error(" Login error:", err);
@@ -120,7 +121,7 @@ export const googleCallback = (req, res) => {
   try {
     const token = generateToken(req.user._id, req.user.username);
     const profileImage = req.user.profileImage || "";
-    
+
     const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
 
     console.log(" Google OAuth success:", req.user.email);
@@ -137,7 +138,7 @@ export const facebookCallback = (req, res) => {
   try {
     const token = generateToken(req.user._id, req.user.username);
     const profileImage = req.user.profileImage || "";
-    
+
     const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
 
     console.log(" Facebook OAuth success:", req.user.email);
@@ -149,11 +150,7 @@ export const facebookCallback = (req, res) => {
   }
 };
 
-
-
-
-
-// FORGOT PASSWORD 
+// FORGOT PASSWORD
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -165,18 +162,23 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       // Security: Don't reveal if email exists
-      return res.json({ 
-        message: "If this email exists, a reset link has been sent" 
+      return res.json({
+        message: "If this email exists, a reset link has been sent",
       });
     }
 
     // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
     // Save hashed token to database
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = new Date(Date.now() + config.resetToken.expiryMinutes * 60 * 1000);
+    user.resetPasswordExpires = new Date(
+      Date.now() + config.resetToken.expiryMinutes * 60 * 1000,
+    );
     await user.save();
 
     // Create reset URL
@@ -193,20 +195,19 @@ export const forgotPassword = async (req, res) => {
     console.log(" Expires in:", config.resetToken.expiryMinutes, "minutes");
     console.log("=".repeat(80) + "\n");
 
-    res.json({ 
+    res.json({
       message: "Password reset link generated successfully",
       //  ONLY FOR DEVELOPMENT - Remove in production
-      ...(config.nodeEnv === 'development' && { 
+      ...(config.nodeEnv === "development" && {
         resetUrl,
-        expiresIn: config.resetToken.expiryMinutes + " minutes"
-      })
+        expiresIn: config.resetToken.expiryMinutes + " minutes",
+      }),
     });
-
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ 
-      message: "Failed to process request", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to process request",
+      error: err.message,
     });
   }
 };
@@ -216,11 +217,15 @@ export const resetPassword = async (req, res) => {
     const { token, newPassword } = req.body;
 
     if (!token || !newPassword) {
-      return res.status(400).json({ message: "Token and new password required" });
+      return res
+        .status(400)
+        .json({ message: "Token and new password required" });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     // Hash the token to compare with database
@@ -230,12 +235,12 @@ export const resetPassword = async (req, res) => {
     // Find user with valid token
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() }
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).json({ 
-        message: "Invalid or expired reset token" 
+      return res.status(400).json({
+        message: "Invalid or expired reset token",
       });
     }
 
@@ -251,31 +256,29 @@ export const resetPassword = async (req, res) => {
     // Ensure local auth provider exists
     let localProvider = await AuthProvider.findOne({
       userId: user._id,
-      provider: "local"
+      provider: "local",
     });
 
     if (!localProvider) {
       await AuthProvider.create({
         userId: user._id,
-        provider: "local"
+        provider: "local",
       });
     }
 
     console.log(" Password reset successful for:", user.email);
 
     res.json({ message: "Password reset successful" });
-
   } catch (err) {
     console.error("Reset password error:", err);
-    res.status(500).json({ 
-      message: "Failed to reset password", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to reset password",
+      error: err.message,
     });
   }
 };
 
-
-// SET PASSWORD 
+// SET PASSWORD
 export const setPassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
@@ -286,7 +289,9 @@ export const setPassword = async (req, res) => {
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     const user = await User.findById(userId);
@@ -296,8 +301,8 @@ export const setPassword = async (req, res) => {
 
     //Check only if password already exists
     if (user.password) {
-      return res.status(400).json({ 
-        message: "You already have a password. Use 'Change Password' instead." 
+      return res.status(400).json({
+        message: "You already have a password. Use 'Change Password' instead.",
       });
     }
 
@@ -309,25 +314,24 @@ export const setPassword = async (req, res) => {
     // Create local auth provider if doesn't exist
     const localProvider = await AuthProvider.findOne({
       userId: user._id,
-      provider: "local"
+      provider: "local",
     });
 
     if (!localProvider) {
       await AuthProvider.create({
         userId: user._id,
-        provider: "local"
+        provider: "local",
       });
     }
 
     console.log(" Password set for SSO user:", user.email);
 
     res.json({ message: "Password set successfully" });
-
   } catch (err) {
     console.error("Set password error:", err);
-    res.status(500).json({ 
-      message: "Failed to set password", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to set password",
+      error: err.message,
     });
   }
 };
@@ -336,8 +340,10 @@ export const getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.id || req.user.userId;
 
-    const user = await User.findById(userId).select('-resetPasswordToken -resetPasswordExpires');
-    
+    const user = await User.findById(userId).select(
+      "-resetPasswordToken -resetPasswordExpires",
+    );
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -347,12 +353,15 @@ export const getCurrentUser = async (req, res) => {
 
     // Check all auth providers for this user
     const authProviders = await AuthProvider.find({ userId: user._id });
-    
-    const hasLocalAuth = authProviders.some(p => p.provider === 'local');
-    const hasGoogleAuth = authProviders.some(p => p.provider === 'google');
-    const hasFacebookAuth = authProviders.some(p => p.provider === 'facebook');
-    
-    const primaryProvider = authProviders.length > 0 ? authProviders[0].provider : 'local';
+
+    const hasLocalAuth = authProviders.some((p) => p.provider === "local");
+    const hasGoogleAuth = authProviders.some((p) => p.provider === "google");
+    const hasFacebookAuth = authProviders.some(
+      (p) => p.provider === "facebook",
+    );
+
+    const primaryProvider =
+      authProviders.length > 0 ? authProviders[0].provider : "local";
 
     // : Console log for debugging
     console.log(" User Check:", {
@@ -360,7 +369,7 @@ export const getCurrentUser = async (req, res) => {
       hasPasswordInDB: hasPassword,
       passwordField: user.password ? "EXISTS" : "NULL",
       hasLocalAuth,
-      primaryProvider
+      primaryProvider,
     });
 
     res.json({
@@ -374,18 +383,16 @@ export const getCurrentUser = async (req, res) => {
       hasGoogleAuth,
       hasFacebookAuth,
       primaryProvider,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
     });
-
   } catch (err) {
     console.error("Get user error:", err);
-    res.status(500).json({ 
-      message: "Failed to fetch user", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to fetch user",
+      error: err.message,
     });
   }
 };
-
 
 export const changePassword = async (req, res) => {
   try {
@@ -394,38 +401,38 @@ export const changePassword = async (req, res) => {
 
     // Validation
     if (!oldPassword || !newPassword) {
-      return res.status(400).json({ 
-        message: "Old and new password required" 
+      return res.status(400).json({
+        message: "Old and new password required",
       });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        message: "Password must be at least 6 characters" 
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
       });
     }
 
     // Get user
     const user = await User.findById(userId);
     if (!user || !user.password) {
-      return res.status(400).json({ 
-        message: "No password set. Use 'Set Password' first." 
+      return res.status(400).json({
+        message: "No password set. Use 'Set Password' first.",
       });
     }
 
     // Verify old password
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ 
-        message: "Current password is incorrect" 
+      return res.status(400).json({
+        message: "Current password is incorrect",
       });
     }
 
     // Check if new password is same as old
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      return res.status(400).json({ 
-        message: "New password must be different from current password" 
+      return res.status(400).json({
+        message: "New password must be different from current password",
       });
     }
 
@@ -437,12 +444,11 @@ export const changePassword = async (req, res) => {
     console.log(" Password changed for:", user.email);
 
     res.json({ message: "Password changed successfully" });
-
   } catch (err) {
     console.error(" Change password error:", err);
-    res.status(500).json({ 
-      message: "Failed to change password", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to change password",
+      error: err.message,
     });
   }
 };

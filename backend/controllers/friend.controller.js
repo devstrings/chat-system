@@ -17,8 +17,8 @@ const formatUserWithFullImageUrl = (user) => {
     ...userObj,
     profileImage: userObj.profileImage 
       ? (isExternalUrl 
-          ? userObj.profileImage  // Use as-is for external URLs
-          : `http://localhost:5000${userObj.profileImage}`)  // Add prefix for local files
+          ? userObj.profileImage  
+          : `http://localhost:5000${userObj.profileImage}`)  
       : null
   };
 };

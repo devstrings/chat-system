@@ -1,8 +1,9 @@
 import React, { useState, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
 import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axios from "axios";
 import { useAuthImage } from "../hooks/useAuthImage";
-
+import API_BASE_URL from "../config/api";
 const UserItem = memo(function UserItem({
   user,
   selected,
@@ -23,6 +24,7 @@ const UserItem = memo(function UserItem({
   onConversationDeleted = () => {},
 }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [relationshipStatus, setRelationshipStatus] = useState("loading");
   const [requestId, setRequestId] = useState(null);
 
@@ -81,7 +83,7 @@ const UserItem = memo(function UserItem({
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(
-          `http://localhost:5000/api/friends/status/${user._id}`,
+          `${API_BASE_URL}/api/friends/status/${user._id}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         const data = await res.json();
@@ -168,17 +170,14 @@ const UserItem = memo(function UserItem({
   const handleSendRequest = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        "http://localhost:5000/api/friends/request/send",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ receiverId: user._id }),
+      const res = await fetch(`${API_BASE_URL}/api/friends/request/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ receiverId: user._id }),
+      });
 
       if (!res.ok) {
         const error = await res.json();
@@ -210,7 +209,7 @@ const UserItem = memo(function UserItem({
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://localhost:5000/api/friends/request/${requestId}/accept`,
+        `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
         {
           method: "POST",
           headers: {
@@ -250,7 +249,7 @@ const UserItem = memo(function UserItem({
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://localhost:5000/api/friends/request/${requestId}/reject`,
+        `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
@@ -296,7 +295,7 @@ const UserItem = memo(function UserItem({
         try {
           const token = localStorage.getItem("token");
           const res = await fetch(
-            `http://localhost:5000/api/friends/unfriend/${user._id}`,
+            `${API_BASE_URL}/api/friends/unfriend/${user._id}`,
             {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
@@ -344,7 +343,7 @@ const UserItem = memo(function UserItem({
       onConfirm: async () => {
         try {
           const token = localStorage.getItem("token");
-          const res = await fetch("http://localhost:5000/api/friends/block", {
+          const res = await fetch(`${API_BASE_URL}/api/friends/block`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -395,7 +394,7 @@ const UserItem = memo(function UserItem({
         try {
           const token = localStorage.getItem("token");
           const res = await fetch(
-            `http://localhost:5000/api/friends/unblock/${user._id}`,
+            `${API_BASE_URL}/api/friends/unblock/${user._id}`,
             {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
@@ -430,55 +429,16 @@ const UserItem = memo(function UserItem({
     setShowMenu(false);
   };
 
-  const handleClearChat = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Clear Chat?",
-      message: `Clear all messages with ${user.username}? This action cannot be undone.`,
-      confirmText: "Clear Chat",
-      cancelText: "Cancel",
-      highlightText: user.username,
-      icon: "delete",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          const token = localStorage.getItem("token");
-          await axios.delete(
-            `http://localhost:5000/api/messages/conversation/${conversationId}/clear`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Chat Cleared!",
-            message: "All messages have been deleted successfully.",
-            type: "success",
-          });
-
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: "Could not clear chat. Please try again.",
-            type: "error",
-          });
-        }
-      },
-    });
-    setShowMenu(false);
-  };
-
-  const handleDeleteConversation = async () => {
+  const handleClearChat = async () => {
+    //  Get or verify conversationId first
     let convId = conversationId;
 
     if (!convId) {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.post(
-          "http://localhost:5000/api/messages/conversation",
+          `${API_BASE_URL}/api/messages/conversation`,
+
           { otherUserId: user._id },
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -487,7 +447,73 @@ const UserItem = memo(function UserItem({
         setAlertDialog({
           isOpen: true,
           title: "Error",
-          message: "No conversation found to delete.",
+          message: "No conversation found.",
+          type: "error",
+        });
+        return;
+      }
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Clear Chat?",
+      message: `Delete all messages with ${user.username}? Chat stays in list.`,
+      confirmText: "Clear Messages",
+      cancelText: "Cancel",
+      highlightText: user.username,
+      icon: "delete",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem("token");
+
+          const response = await axios.patch(
+            `${API_BASE_URL}/api/messages/conversation/${convId}/clear`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+
+          if (response.data.action === "CLEAR") {
+          }
+
+          setAlertDialog({
+            isOpen: true,
+            title: "Chat Cleared!",
+            message: "Messages deleted. Chat still in list.",
+            type: "success",
+          });
+
+          //  Keep conversation visible with empty message
+          setTimeout(() => window.location.reload(), 1000);
+        } catch (err) {
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.response?.data?.message || "Could not clear messages.",
+            type: "error",
+          });
+        }
+      },
+    });
+    setShowMenu(false);
+  };
+  const handleDeleteConversation = async () => {
+    let convId = conversationId;
+
+    if (!convId) {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.post(
+          `${API_BASE_URL}/api/messages/conversation`,
+          { otherUserId: user._id },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        convId = response.data._id;
+      } catch (err) {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: "No conversation found.",
           type: "error",
         });
         return;
@@ -497,7 +523,7 @@ const UserItem = memo(function UserItem({
     setConfirmDialog({
       isOpen: true,
       title: "Delete Conversation?",
-      message: `Delete entire conversation with ${user.username}? This will permanently remove the conversation from your chat list. You can start a new chat by searching for them again.`,
+      message: `Permanently delete this conversation with ${user.username}? It will be removed from your chat list.`,
       confirmText: "Delete Conversation",
       cancelText: "Cancel",
       highlightText: user.username,
@@ -507,8 +533,9 @@ const UserItem = memo(function UserItem({
         try {
           const token = localStorage.getItem("token");
 
-          await axios.delete(
-            `http://localhost:5000/api/messages/conversation/${convId}/delete`,
+          //  DELETE request - removes entire conversation
+          const response = await axios.delete(
+            `${API_BASE_URL}/api/messages/conversation/${convId}/delete`,
             {
               headers: { Authorization: `Bearer ${token}` },
               data: { otherUserId: user._id },
@@ -518,20 +545,21 @@ const UserItem = memo(function UserItem({
           setAlertDialog({
             isOpen: true,
             title: "Conversation Deleted!",
-            message: "The conversation has been permanently deleted.",
+            message: "Conversation permanently removed.",
             type: "success",
           });
 
+          //  Remove from sidebar
           if (onConversationDeleted) {
             onConversationDeleted(user._id);
           }
         } catch (err) {
+          console.error(" Delete error:", err);
           setAlertDialog({
             isOpen: true,
             title: "Error",
             message:
-              err.response?.data?.message ||
-              "Could not delete conversation. Please try again.",
+              err.response?.data?.message || "Could not delete conversation.",
             type: "error",
           });
         }
@@ -622,7 +650,7 @@ const UserItem = memo(function UserItem({
 
           {/* GREEN DOT FOR ONLINE STATUS */}
           {isOnline && (
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-gray-800 rounded-full"></div>
+            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
           )}
           {/* UNREAD BADGE */}
           {unreadCount > 0 && (
@@ -706,296 +734,382 @@ const UserItem = memo(function UserItem({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowMenu(!showMenu);
+              setShowOptionsModal(true);
             }}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${
+              selected
+                ? "hover:bg-white/20 text-white"
+                : "hover:bg-gray-200 text-gray-700"
+            }`}
+            title="Options"
           >
-            <svg
-              className="w-5 h-5 text-gray-700"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
             </svg>
           </button>
-
-          {/* Dropdown Menu */}
-          {showMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowMenu(false)}
-              ></div>
-
-              <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
-                {relationshipStatus === "friends" && conversationId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePinClick(e);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    <svg
-                      className="w-4 h-4 text-blue-600"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
-                    </svg>
-                    {isPinned ? "Unpin Chat" : "Pin Chat"}
-                  </button>
-                )}
-
-                {relationshipStatus === "friends" && conversationId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleArchiveClick(e);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                  >
-                    <svg
-                      className="w-4 h-4 text-purple-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                      />
-                    </svg>
-                    {isArchived ? "Unarchive Chat" : "Archive Chat"}
-                  </button>
-                )}
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleShowProfile();
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2.5 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                >
-                  <svg
-                    className="w-4 h-4 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  View Profile
-                </button>
-
-                {relationshipStatus === "none" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSendRequest();
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                      />
-                    </svg>
-                    Send Friend Request
-                  </button>
-                )}
-
-                {relationshipStatus === "request_received" && (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAcceptRequest();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      Accept Request
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRejectRequest();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                      Reject Request
-                    </button>
-                  </>
-                )}
-
-                {relationshipStatus === "friends" && (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClearChat();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                      Clear Chat
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteConversation();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300 font-semibold"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                      Delete Conversation
-                    </button>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUnfriend();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-yellow-600 hover:bg-yellow-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"
-                        />
-                      </svg>
-                      Unfriend
-                    </button>
-                  </>
-                )}
-
-                {relationshipStatus !== "blocked" &&
-                  relationshipStatus !== "blocked_by" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBlock();
-                      }}
-                      className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                        />
-                      </svg>
-                      Block User
-                    </button>
-                  )}
-
-                {relationshipStatus === "blocked" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUnblock();
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-sm border-t border-gray-300"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Unblock User
-                  </button>
-                )}
-              </div>
-            </>
-          )}
         </div>
+        {showOptionsModal &&
+          createPortal(
+            <>
+              {/*  Backdrop - Rendered at body level */}
+              <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+                onClick={() => setShowOptionsModal(false)}
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              />
+
+              {/* Modal - Rendered at body level */}
+              <div
+                className="fixed inset-0 flex items-center justify-center z-[101] p-4 pointer-events-none"
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              >
+                <div
+                  className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-xs overflow-hidden animate-in zoom-in-95 duration-200 pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2.5 flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-white">
+                      Options
+                    </h3>
+                    <button
+                      onClick={() => setShowOptionsModal(false)}
+                      className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Options List */}
+                  <div className="p-1 max-h-[60vh] overflow-y-auto">
+                    {/* Pin/Unpin */}
+                    {relationshipStatus === "friends" && conversationId && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePinClick(e);
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-2.5 py-2 text-left text-gray-800 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2 text-xs sm:text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 text-blue-600 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+                        </svg>
+                        <span className="font-medium">
+                          {isPinned ? "Unpin Chat" : "Pin Chat"}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Archive/Unarchive */}
+                    {relationshipStatus === "friends" && conversationId && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArchiveClick(e);
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-gray-800 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 text-purple-600 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                          />
+                        </svg>
+                        <span className="font-medium">
+                          {isArchived ? "Unarchive" : "Archive"}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* View Profile */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShowProfile();
+                        setShowOptionsModal(false);
+                      }}
+                      className="w-full px-3 py-2.5 text-left text-gray-800 hover:bg-green-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                    >
+                      <svg
+                        className="w-4 h-4 text-green-600 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
+                      <span className="font-medium">View Profile</span>
+                    </button>
+
+                    {/* Divider */}
+                    {relationshipStatus === "friends" && (
+                      <div className="my-1.5 border-t border-gray-200" />
+                    )}
+
+                    {/* Clear Chat */}
+                    {relationshipStatus === "friends" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearChat();
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-orange-600 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                        <span className="font-medium">Clear Chat</span>
+                      </button>
+                    )}
+
+                    {/* Delete Conversation */}
+                    {relationshipStatus === "friends" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConversation();
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                        <span className="font-medium">Delete Chat</span>
+                      </button>
+                    )}
+
+                    {/* Unfriend */}
+                    {relationshipStatus === "friends" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnfriend();
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6"
+                          />
+                        </svg>
+                        <span className="font-medium">Unfriend</span>
+                      </button>
+                    )}
+
+                    {/* Block User */}
+                    {relationshipStatus !== "blocked" &&
+                      relationshipStatus !== "blocked_by" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBlock();
+                            setShowOptionsModal(false);
+                          }}
+                          className="w-full px-3 py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                        >
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                            />
+                          </svg>
+                          <span className="font-medium">Block User</span>
+                        </button>
+                      )}
+
+                    {/* Unblock */}
+                    {relationshipStatus === "blocked" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnblock();
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-green-600 hover:bg-green-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="font-medium">Unblock User</span>
+                      </button>
+                    )}
+
+                    {/* Send Friend Request */}
+                    {relationshipStatus === "none" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendRequest();
+                          setShowOptionsModal(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                          />
+                        </svg>
+                        <span className="font-medium">Add Friend</span>
+                      </button>
+                    )}
+
+                    {/* Accept/Reject Request */}
+                    {relationshipStatus === "request_received" && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcceptRequest();
+                            setShowOptionsModal(false);
+                          }}
+                          className="w-full px-3 py-2.5 text-left text-green-600 hover:bg-green-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                        >
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          <span className="font-medium">Accept Request</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRejectRequest();
+                            setShowOptionsModal(false);
+                          }}
+                          className="w-full px-3 py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2.5 text-sm"
+                        >
+                          <svg
+                            className="w-4 h-4 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                          <span className="font-medium">Reject Request</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>,
+            document.body,
+          )}
+
+        {/*  PROFILE DIALOG */}
 
         {selected && relationshipStatus === "friends" && (
           <svg
@@ -1014,7 +1128,6 @@ const UserItem = memo(function UserItem({
         )}
       </div>
 
-      {/* MODERN PROFILE DIALOG */}
       {showProfileDialog && (
         <>
           {/* Backdrop with blur */}
@@ -1237,7 +1350,7 @@ const UserItem = memo(function UserItem({
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                {/* Message Button (only for friends) */}
+                {/* Message Button */}
                 {relationshipStatus === "friends" && (
                   <button
                     onClick={() => {

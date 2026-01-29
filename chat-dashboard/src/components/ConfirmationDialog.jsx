@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+import API_BASE_URL from "../config/api";
 import axios from "axios";
 import { useAuthImage } from "../hooks/useAuthImage";
 const DIALOG_THEME = {
@@ -453,7 +453,7 @@ export function CreateGroupDialog({
       const token = localStorage.getItem("token");
 
       const response = await axios.post(
-        "http://localhost:5000/api/groups/create",
+        `${API_BASE_URL}/api/groups/create`,
         {
           name: groupName.trim(),
           description: description.trim(),
@@ -677,5 +677,527 @@ export function CreateGroupDialog({
         type={alertDialog.type}
       />
     </>
+  );
+}
+
+export function FriendRequestsModal({
+  isOpen,
+  onClose,
+  pendingRequests = [],
+  onAccept,
+  onReject,
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              <h2 className="text-xl font-bold text-white">Friend Requests</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 max-h-[60vh] overflow-y-auto">
+            {pendingRequests.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600 font-medium">No pending requests</p>
+                <p className="text-gray-500 text-sm mt-1">
+                  You're all caught up!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingRequests.map((request) => (
+                  <FriendRequestItem
+                    key={request._id}
+                    request={request}
+                    onAccept={onAccept}
+                    onReject={onReject}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function FriendRequestItem({ request, onAccept, onReject }) {
+  const { imageSrc, loading } = useAuthImage(request.sender.profileImage);
+
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+          {loading ? (
+            <div className="w-full h-full bg-gray-300 animate-pulse" />
+          ) : imageSrc ? (
+            <img
+              src={imageSrc}
+              alt={request.sender.username}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+              {request.sender.username?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {request.sender.username}
+          </p>
+          <p className="text-xs text-gray-500 truncate">
+            {request.sender.email}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onAccept(request._id)}
+          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
+        >
+          Accept
+        </button>
+        <button
+          onClick={() => onReject(request._id)}
+          className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 text-sm rounded-lg font-medium transition-colors"
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
+export function BlockedUsersModal({
+  isOpen,
+  onClose,
+  blockedUsers = [],
+  onUnblock,
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-gray-700 to-gray-900 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                />
+              </svg>
+              <h2 className="text-xl font-bold text-white">Blocked Users</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 max-h-[60vh] overflow-y-auto">
+            {blockedUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <svg
+                  className="w-16 h-16 mx-auto mb-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <p className="text-gray-600 font-medium">No blocked users</p>
+                <p className="text-gray-500 text-sm mt-1">
+                  You haven't blocked anyone
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {blockedUsers.map((block) => (
+                  <BlockedUserItem
+                    key={block._id}
+                    block={block}
+                    onUnblock={onUnblock}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BlockedUserItem({ block, onUnblock }) {
+  const { imageSrc, loading } = useAuthImage(block.blocked.profileImage);
+
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+          {loading ? (
+            <div className="w-full h-full bg-gray-300 animate-pulse" />
+          ) : imageSrc ? (
+            <img
+              src={imageSrc}
+              alt={block.blocked.username}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center text-white font-bold">
+              {block.blocked.username?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {block.blocked.username}
+          </p>
+          <p className="text-xs text-gray-500 truncate">
+            {block.blocked.email}
+          </p>
+        </div>
+
+        <button
+          onClick={() => onUnblock(block.blocked._id)}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors flex-shrink-0"
+        >
+          Unblock
+        </button>
+      </div>
+    </div>
+  );
+}
+export function NotificationModal({ isOpen, onClose, notifications = [] }) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              <h2 className="text-xl font-bold text-white">Notifications</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 max-h-[60vh] overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="text-center py-12">
+                <svg
+                  className="w-16 h-16 mx-auto mb-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
+                </svg>
+                <p className="text-gray-600 font-medium">No notifications</p>
+                <p className="text-gray-500 text-sm mt-1">
+                  You're all caught up!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {notifications.map((notif, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                  >
+                    <p className="text-sm text-gray-900">{notif.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+export function AddFriendModal({
+  isOpen,
+  onClose,
+  searchUsers,
+  setSearchUsers,
+  allUsers,
+  loading,
+  onSearch,
+  onSendRequest,
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                />
+              </svg>
+              <h2 className="text-xl font-bold text-white">Add Friend</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6">
+            {/* Search Box */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Search users by username..."
+                value={searchUsers}
+                onChange={(e) => setSearchUsers(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && onSearch()}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 text-sm"
+              />
+              <button
+                onClick={onSearch}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {loading ? "..." : "Search"}
+              </button>
+            </div>
+
+            {/* Results */}
+            <div className="max-h-96 overflow-y-auto">
+              {allUsers.length === 0 && !loading && searchUsers && (
+                <p className="text-gray-500 text-sm text-center py-8">
+                  No users found
+                </p>
+              )}
+
+              {allUsers.length === 0 && !loading && !searchUsers && (
+                <p className="text-gray-500 text-sm text-center py-8">
+                  Search for users to add as friends
+                </p>
+              )}
+
+              <div className="space-y-2">
+                {allUsers.map((user) => (
+                  <AddFriendItem
+                    key={user._id}
+                    user={user}
+                    onSendRequest={onSendRequest}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AddFriendItem({ user, onSendRequest }) {
+  const { imageSrc, loading } = useAuthImage(user.profileImage);
+
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+            {loading ? (
+              <div className="w-full h-full bg-gray-300 animate-pulse" />
+            ) : imageSrc ? (
+              <img
+                src={imageSrc}
+                alt={user.username}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                {user.username?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {user.username}
+            </p>
+            <p className="text-xs text-gray-500">{user.email}</p>
+          </div>
+        </div>
+        <button
+          onClick={() => onSendRequest(user._id)}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
+        >
+          Add
+        </button>
+      </div>
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
-
+import API_BASE_URL from "../config/api";
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -13,8 +13,6 @@ export default function Register() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -34,7 +32,7 @@ export default function Register() {
     setError("");
 
     try {
-      await axios.post(`${API_BASE}/api/auth/register`, formData);
+      await axios.post(`${API_BASE_URL}/api/auth/register`, formData);
       alert("Registration successful! Please login.");
       navigate("/login", { replace: true });
     } catch (err) {
@@ -47,12 +45,12 @@ export default function Register() {
 
   //  GOOGLE SIGNUP
   const handleGoogleSignup = () => {
-    window.location.href = `${API_BASE}/api/auth/google`;
+    window.location.href = `${API_BASE_URL}/api/auth/google`;
   };
 
   //  FACEBOOK SIGNUP
   const handleFacebookSignup = () => {
-    window.location.href = `${API_BASE}/api/auth/facebook`;
+    window.location.href = `${API_BASE_URL}/api/auth/facebook`;
   };
 
   return (

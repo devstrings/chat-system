@@ -2,9 +2,9 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { uploadMessage } from "../config/multer.js"; 
 import { verifyToken } from "../middleware/authMiddleware.js";
-import { downloadFile, uploadFile } from "../controllers/file.js";
-import { serveProfileImage } from "../controllers/user.js"; 
-import { serveGroupImage } from "../controllers/group.js"; 
+import { downloadFile, uploadFile } from "../controllers/file.controller.js";
+import { serveProfileImage } from "../controllers/user.controller.js"; 
+import { serveGroupImage } from "../controllers/group.controller.js"; 
 const router = express.Router();
 
 // Rate limiters

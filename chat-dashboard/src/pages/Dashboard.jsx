@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import API_BASE_URL from "../config/api";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import Sidebar from "../components/SideBar";
@@ -10,7 +11,10 @@ import ConfirmationDialog, {
 } from "../components/ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import ProfileSetting from "../components/ProfileSetting";
-import GroupChatWindow from "../components/GroupChatWindow";
+import GroupChatWindow from "../components/Group/GroupChatWindow";
+import StatusManager from "../components/Status/StatusManager";
+import StatusViewer from "../components/Status/StatusViewer";
+import StatusRingsList from "../components/Status/StatusRingsList";
 export default function Dashboard() {
   const navigate = useNavigate();
   const { socket, onlineUsers } = useSocket();
@@ -40,6 +44,14 @@ export default function Dashboard() {
   const [isGroupChat, setIsGroupChat] = useState(false);
   const [currentUserCoverPhoto, setCurrentUserCoverPhoto] = useState(null);
   const [profileSettingsView, setProfileSettingsView] = useState("all");
+
+  const [showStatusManager, setShowStatusManager] = useState(false);
+  const [statusManagerMode, setStatusManagerMode] = useState("create");
+  const [showStatusViewer, setShowStatusViewer] = useState(false);
+  const [statusViewerIndex, setStatusViewerIndex] = useState(0);
+  const [allStatuses, setAllStatuses] = useState([]);
+  const [showStatusRings, setShowStatusRings] = useState(false);
+
   // Group image hook (add after line 119)
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
@@ -58,6 +70,25 @@ export default function Dashboard() {
     type: "info",
   });
 
+  // Load all statuses
+  useEffect(() => {
+    const loadAllStatuses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${API_BASE_URL}/api/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAllStatuses(response.data);
+      } catch (err) {
+        console.error("Load statuses error:", err);
+      }
+    };
+
+    if (currentUserId) {
+      loadAllStatuses();
+    }
+  }, [currentUserId]);
+
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
@@ -67,19 +98,16 @@ export default function Dashboard() {
     const loadCurrentUser = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await axios.get(
-          "http://localhost:5000/api/users/auth/me",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
+        const response = await axios.get(`${API_BASE_URL}/api/users/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setCurrentUser(response.data);
 
         if (response.data.profileImage) {
           setSharedProfileImage(response.data.profileImage);
         }
 
-        // ✅ ADD: Set cover photo state
+        // Set cover photo state
         if (response.data.coverPhoto) {
           setSharedCoverPhoto(response.data.coverPhoto);
           setCurrentUserCoverPhoto(response.data.coverPhoto);
@@ -98,7 +126,7 @@ export default function Dashboard() {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.get(
-          "http://localhost:5000/api/messages/pinned",
+          `${API_BASE_URL}/api/messages/pinned`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
@@ -124,7 +152,7 @@ export default function Dashboard() {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.get(
-          "http://localhost:5000/api/messages/archived",
+          `${API_BASE_URL}/api/messages/archived`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
@@ -140,7 +168,7 @@ export default function Dashboard() {
     }
   }, [currentUserId]);
 
-  //  ADD THIS NEW useEffect - LOAD ARCHIVED GROUPS
+  //  - LOAD ARCHIVED GROUPS
   useEffect(() => {
     const loadArchivedGroups = () => {
       if (!groups || groups.length === 0) return;
@@ -163,7 +191,7 @@ export default function Dashboard() {
   // Handler to update profile image from ProfileSettings
   const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
     if (isCoverPhoto) {
-      // ✅ UPDATE BOTH STATES
+      //  UPDATE BOTH STATES
       setSharedCoverPhoto(newImageUrl);
       setCurrentUser((prev) => ({
         ...prev,
@@ -177,14 +205,13 @@ export default function Dashboard() {
       }));
     }
   };
-  //  Complete handleRemoveProfileImage function
+  //   handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(
-        "http://localhost:5000/api/users/profile/remove-image",
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      await axios.delete(`${API_BASE_URL}/api/users/profile/remove-image`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       // UPDATE SHARED STATE
       setSharedProfileImage(null);
@@ -218,14 +245,14 @@ export default function Dashboard() {
 
       if (isArchived) {
         // Unarchive
+        // Unarchive endpoint
         const endpoint = isGroup
-          ? `http://localhost:5000/api/groups/${conversationId}/unarchive`
-          : `http://localhost:5000/api/messages/conversation/${conversationId}/unarchive`;
+          ? `${API_BASE_URL}/api/groups/${conversationId}/unarchive`
+          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unarchive`;
 
         await axios.delete(endpoint, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         setArchivedConversations((prev) => {
           const newSet = new Set(prev);
           newSet.delete(conversationId);
@@ -258,9 +285,10 @@ export default function Dashboard() {
         });
       } else {
         // Archive
+        // Archive endpoint
         const endpoint = isGroup
-          ? `http://localhost:5000/api/groups/${conversationId}/archive`
-          : `http://localhost:5000/api/messages/conversation/${conversationId}/archive`;
+          ? `${API_BASE_URL}/api/groups/${conversationId}/archive`
+          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/archive`;
 
         await axios.post(
           endpoint,
@@ -317,9 +345,10 @@ export default function Dashboard() {
 
       if (isPinned) {
         // Unpin
+        // Unpin
         const endpoint = isGroup
-          ? `http://localhost:5000/api/groups/${conversationId}/unpin`
-          : `http://localhost:5000/api/messages/conversation/${conversationId}/unpin`;
+          ? `${API_BASE_URL}/api/groups/${conversationId}/unpin`
+          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unpin`;
 
         await axios.delete(endpoint, {
           headers: { Authorization: `Bearer ${token}` },
@@ -357,9 +386,10 @@ export default function Dashboard() {
         });
       } else {
         // Pin
+        // Pin
         const endpoint = isGroup
-          ? `http://localhost:5000/api/groups/${conversationId}/pin`
-          : `http://localhost:5000/api/messages/conversation/${conversationId}/pin`;
+          ? `${API_BASE_URL}/api/groups/${conversationId}/pin`
+          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/pin`;
 
         await axios.post(
           endpoint,
@@ -406,8 +436,6 @@ export default function Dashboard() {
   };
 
   const handleConversationDeleted = (userId) => {
-    console.log(" Conversation deleted for user:", userId);
-
     //  REMOVE from lastMessages
     setLastMessages((prev) => {
       const updated = { ...prev };
@@ -427,8 +455,6 @@ export default function Dashboard() {
       setSelectedUser(null);
       setConversationId(null);
     }
-
-    console.log(" User removed from sidebar view");
   };
 
   // Add this around line 146
@@ -476,13 +502,10 @@ export default function Dashboard() {
 
     const fetchUsers = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/friends/list", {
+        const res = await axios.get(`${API_BASE_URL}/api/friends/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         //......
-        console.log(" Fetched users from backend:", res.data);
-        console.log(" First user:", res.data[0]);
-        console.log(" First user profile image:", res.data[0]?.profileImage);
         setUsers(res.data);
 
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -505,10 +528,9 @@ export default function Dashboard() {
     const loadGroups = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await axios.get(
-          "http://localhost:5000/api/groups/list",
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const response = await axios.get(`${API_BASE_URL}/api/groups/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setGroups(response.data);
       } catch (err) {
         console.error("Failed to load groups:", err);
@@ -529,9 +551,10 @@ export default function Dashboard() {
         const token = localStorage.getItem("token");
 
         // Users ke liye
+        // Users ke liye
         for (const user of users) {
           const convRes = await axios.post(
-            "http://localhost:5000/api/messages/conversation",
+            `${API_BASE_URL}/api/messages/conversation`,
             { otherUserId: user._id },
             { headers: { Authorization: `Bearer ${token}` } },
           );
@@ -539,11 +562,13 @@ export default function Dashboard() {
           const conversationId = convRes.data._id;
 
           const msgRes = await axios.get(
-            `http://localhost:5000/api/messages/${conversationId}`,
+            `${API_BASE_URL}/api/messages/${conversationId}`,
             { headers: { Authorization: `Bearer ${token}` } },
           );
 
           const messages = msgRes.data;
+
+          //  ALWAYS set lastMessage entry (even if empty)
           if (messages.length > 0) {
             const lastMsg = messages[messages.length - 1];
 
@@ -578,14 +603,28 @@ export default function Dashboard() {
                 [user._id]: unreadCount,
               }));
             }
+          } else {
+            setLastMessages((prev) => ({
+              ...prev,
+              [user._id]: {
+                text: "",
+                time: null,
+                sender: null,
+                status: "sent",
+                lastMessageId: null,
+                conversationId: conversationId,
+                attachments: [],
+                _updated: Date.now(),
+              },
+            }));
           }
         }
 
-        // Groups ke liye (NEW CODE)
+        // Groups
         for (const group of groups) {
           try {
             const msgRes = await axios.get(
-              `http://localhost:5000/api/messages/group/${group._id}`,
+              `${API_BASE_URL}/api/messages/group/${group._id}`,
               { headers: { Authorization: `Bearer ${token}` } },
             );
 
@@ -632,10 +671,6 @@ export default function Dashboard() {
     if (!socket || !currentUserId) return;
 
     const handleNewMessage = (msg) => {
-      console.log(" Full message object:", msg);
-      console.log("Has groupId?", msg.groupId);
-      console.log("Has conversationId?", msg.conversationId);
-      console.log("Sender:", msg.sender);
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
 
@@ -725,68 +760,11 @@ export default function Dashboard() {
         return newState;
       });
     };
+
     const handleMessageDeleted = async (data) => {
-      console.log(" Message deleted:", data);
-
-      if (data.messageId && data.conversationId) {
-        try {
-          //  Fetch all messages to find previous one
-          const token = localStorage.getItem("token");
-          const response = await axios.get(
-            `http://localhost:5000/api/messages/${data.conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          // Filter out deleted message
-          const messages = response.data.filter(
-            (msg) => msg._id !== data.messageId,
-          );
-          const previousMessage = messages[messages.length - 1];
-
-          setLastMessages((prev) => {
-            const updated = { ...prev };
-
-            for (const [userId, msgData] of Object.entries(prev)) {
-              if (msgData?.conversationId === data.conversationId) {
-                if (previousMessage) {
-                  //  Show previous message
-                  const messageText =
-                    previousMessage.text ||
-                    (previousMessage.attachments?.length > 0
-                      ? formatAttachmentText(previousMessage.attachments)
-                      : "");
-
-                  updated[userId] = {
-                    ...msgData,
-                    text: messageText,
-                    lastMessageId: previousMessage._id,
-                    time: previousMessage.createdAt,
-                    sender:
-                      previousMessage.sender._id || previousMessage.sender,
-                    status: previousMessage.status || "sent",
-                    _updated: Date.now(),
-                  };
-                } else {
-                  //  No messages left in conversation
-                  updated[userId] = {
-                    ...msgData,
-                    text: "",
-                    lastMessageId: null,
-                    _updated: Date.now(),
-                  };
-                }
-                break;
-              }
-            }
-
-            return updated;
-          });
-        } catch (err) {
-          console.error(" Error fetching previous message:", err);
-        }
-      }
+      console.log(" Message deleted (ignored for clear chat):", data);
+      // Do nothing - clear chat will reload page, delete conversation uses different flow
     };
-
     const handleMessageDeletedForEveryone = async (data) => {
       console.log("Message deleted for everyone:", data);
 
@@ -795,7 +773,7 @@ export default function Dashboard() {
           // Fetch messages to find previous one
           const token = localStorage.getItem("token");
           const response = await axios.get(
-            `http://localhost:5000/api/messages/${data.conversationId}`,
+            `${API_BASE_URL}/api/messages/${data.conversationId}`,
             { headers: { Authorization: `Bearer ${token}` } },
           );
 
@@ -873,9 +851,53 @@ export default function Dashboard() {
       }
     });
 
+    // Socket listeners for status updates
+    socket.on("newStatus", (data) => {
+      console.log(" New status received:", data);
+
+      // Reload all statuses to get fresh data
+      const loadStatuses = async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await axios.get("http://localhost:5000/api/status", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setAllStatuses(response.data);
+        } catch (err) {
+          console.error("Reload statuses error:", err);
+        }
+      };
+      loadStatuses();
+    });
+
+    // Real-time status view updates
+    socket.on("statusViewed", (data) => {
+      console.log(" Status viewed:", data);
+
+      setAllStatuses((prev) => {
+        return prev.map((userStatus) => ({
+          ...userStatus,
+          statuses: userStatus.statuses.map((status) => {
+            if (status._id === data.statusId) {
+              return {
+                ...status,
+                viewedBy: [
+                  ...status.viewedBy,
+                  {
+                    userId: { _id: data.viewerId },
+                    viewedAt: data.viewedAt,
+                  },
+                ],
+              };
+            }
+            return status;
+          }),
+        }));
+      });
+    });
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
-    socket.on("messageDeleted", handleMessageDeleted);
+    // socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
 
     return () => {
@@ -884,6 +906,9 @@ export default function Dashboard() {
       socket.off("messageStatusUpdate", handleStatusUpdate);
       socket.off("messageDeleted", handleMessageDeleted);
       socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
+      socket.off("newStatus");
+      socket.off("statusDeleted");
+      socket.off("statusViewed");
     };
   }, [socket, currentUserId]);
   // Get conversation
@@ -927,39 +952,58 @@ export default function Dashboard() {
     if (socket) socket.disconnect();
     navigate("/login", { replace: true });
   };
-
   const handleClearChat = async () => {
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(
-        `http://localhost:5000/api/messages/conversation/${conversationId}`,
+
+      if (!conversationId) {
+        console.error(" No conversationId!");
+        return;
+      }
+
+      await axios.patch(
+        `${API_BASE_URL}/api/messages/conversation/${conversationId}/clear`,
+        {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setAlertDialog({
         isOpen: true,
         title: "Chat Cleared!",
-        message: "All messages have been deleted successfully.",
+        message: "Messages deleted. Chat still in list.",
         type: "success",
       });
 
-      setLastMessages((prev) => {
-        const updated = { ...prev };
-        delete updated[selectedUser._id];
-        return updated;
-      });
+      //  Update lastMessages to empty but KEEP conversationId
+      setLastMessages((prev) => ({
+        ...prev,
+        [selectedUser?._id]: {
+          text: "",
+          time: new Date().toISOString(),
+          sender: null,
+          status: "sent",
+          lastMessageId: null,
+          conversationId: conversationId,
+          attachments: [],
+          _updated: Date.now(),
+        },
+      }));
 
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // DON'T reload - just close dialog
+      setClearChatDialog({ isOpen: false, username: "" });
     } catch (err) {
+      console.error(" Clear error:", err);
       setAlertDialog({
         isOpen: true,
         title: "Error",
-        message: "Could not clear chat. Please try again.",
+        message: "Could not clear messages.",
         type: "error",
       });
     }
+  };
+  const handleOpenStatusManager = (mode = "create") => {
+    setStatusManagerMode(mode);
+    setShowStatusManager(true);
   };
 
   if (loading) {
@@ -972,10 +1016,91 @@ export default function Dashboard() {
       </div>
     );
   }
+  const handleOpenStatusViewer = (userStatusOrIndex) => {
+    if (!allStatuses || allStatuses.length === 0) {
+      setAlertDialog({
+        isOpen: true,
+        title: "No Status Available",
+        message: "This user's status is not available right now.",
+        type: "info",
+      });
+      return;
+    }
+
+    let targetIndex = 0;
+
+    //  Handle both object (userStatus) and number (index) inputs
+    if (typeof userStatusOrIndex === "object" && userStatusOrIndex?.user?._id) {
+      // Find index by user ID
+      targetIndex = allStatuses.findIndex(
+        (status) => status.user._id === userStatusOrIndex.user._id,
+      );
+
+      if (targetIndex === -1) {
+        console.error(" User status not found in allStatuses");
+        setAlertDialog({
+          isOpen: true,
+          title: "Status Not Found",
+          message: "Could not find this user's status.",
+          type: "error",
+        });
+        return;
+      }
+    } else if (typeof userStatusOrIndex === "number") {
+      targetIndex = userStatusOrIndex;
+    } else {
+      console.error(" Invalid parameter type:", typeof userStatusOrIndex);
+      return;
+    }
+
+    //validation
+    if (targetIndex < 0 || targetIndex >= allStatuses.length) {
+      console.error(
+        " Index out of bounds:",
+        targetIndex,
+        "Max:",
+        allStatuses.length - 1,
+      );
+      return;
+    }
+
+    setStatusViewerIndex(targetIndex);
+    setShowStatusViewer(true);
+  };
+
+  const handleCreateStatus = () => {
+    setStatusManagerMode("create");
+    setShowStatusManager(true);
+    setShowStatusRings(false);
+  };
+
+  const handleViewMyStatus = () => {
+    setStatusManagerMode("myStatus");
+    setShowStatusManager(true);
+    setShowStatusRings(false);
+  };
+
+  const handleStatusCreated = (newStatus) => {
+    // Reload statuses
+    const loadStatuses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.get("http://localhost:5000/api/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAllStatuses(response.data);
+      } catch (err) {
+        console.error("Reload statuses error:", err);
+      }
+    };
+    loadStatuses();
+  };
 
   return (
     <>
       <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
+        {/* Status Manager Modal */}
+
         {/*  MOBILE OVERLAY */}
         {isMobileSidebarOpen && (
           <div
@@ -990,8 +1115,6 @@ export default function Dashboard() {
           groups={groups}
           selectedUserId={selectedUser?._id}
           onSelectUser={(user) => {
-            console.log(" Selected:", user);
-
             if (user.isGroup) {
               // Group selected
               setSelectedGroup(user);
@@ -1027,16 +1150,20 @@ export default function Dashboard() {
           showArchived={showArchived}
           onToggleArchived={(show) => setShowArchived(show)}
           onGroupUpdate={(updatedGroup) => {
-            console.log(" Dashboard: Group updated:", updatedGroup);
             setGroups((prev) => {
               const updated = prev.map((g) =>
                 g._id === updatedGroup._id ? updatedGroup : g,
               );
-              console.log("Groups after update:", updated);
               return updated;
             });
           }}
           onConversationDeleted={handleConversationDeleted}
+          onOpenStatusManager={handleOpenStatusManager}
+          allStatuses={allStatuses}
+          onOpenStatusViewer={handleOpenStatusViewer}
+          onCreateStatus={handleCreateStatus}
+          onViewMyStatus={handleViewMyStatus}
+          currentUserForStatus={currentUser}
         />
 
         {showProfileSettings && (
@@ -1044,7 +1171,7 @@ export default function Dashboard() {
             currentUser={currentUser}
             onClose={() => setShowProfileSettings(false)}
             onProfileImageUpdate={handleProfileImageUpdate}
-            coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto} // fallback
+            coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto}
             initialView={profileSettingsView}
           />
         )}
@@ -1074,7 +1201,6 @@ export default function Dashboard() {
                       </svg>
                     </button>
 
-                    {/* AVATAR */}
                     {/* AVATAR */}
                     <div className="relative flex-shrink-0">
                       <div className="w-10 h-10 aspect-square rounded-full overflow-hidden shadow-md flex items-center justify-center">
@@ -1427,6 +1553,65 @@ export default function Dashboard() {
         message={alertDialog.message}
         type={alertDialog.type}
       />
+      {/* Status Manager */}
+      {showStatusManager && (
+        <StatusManager
+          currentUser={currentUser}
+          onClose={() => setShowStatusManager(false)}
+          onStatusCreated={handleStatusCreated}
+          mode={statusManagerMode}
+        />
+      )}
+
+      {/* Status Viewer */}
+      {showStatusViewer && allStatuses.length > 0 && (
+        <StatusViewer
+          statuses={allStatuses}
+          currentUserId={currentUserId}
+          onClose={() => setShowStatusViewer(false)}
+          initialUserIndex={statusViewerIndex}
+        />
+      )}
+
+      {/* Status Rings Panel */}
+      {showStatusRings && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowStatusRings(false)}
+          />
+          <div className="fixed right-0 top-0 bottom-0 w-96 bg-white shadow-2xl z-50 overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Status Updates</h2>
+              <button
+                onClick={() => setShowStatusRings(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <StatusRingsList
+              onOpenViewer={handleOpenStatusViewer}
+              currentUserId={currentUserId}
+              onCreateStatus={handleCreateStatus}
+              onViewMyStatus={handleViewMyStatus}
+            />
+          </div>
+        </>
+      )}
     </>
   );
 }

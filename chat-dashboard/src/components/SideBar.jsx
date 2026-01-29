@@ -1,11 +1,20 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import UserItem from "./UserItem";
-import GroupItem from "./GroupItem";
+import GroupItem from "./Group/GroupItem";
 import axios from "axios";
 import { AlertDialog } from "./ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import { useSocket } from "../context/SocketContext";
-import { CreateGroupDialog } from "./ConfirmationDialog";
+import API_BASE_URL from "../config/api";
+import {
+  CreateGroupDialog,
+  BlockedUsersModal,
+  FriendRequestsModal,
+  NotificationModal,
+  AddFriendModal,
+} from "./ConfirmationDialog";
+import StatusRingsList from "./Status/StatusRingsList";
+
 export default function Sidebar({
   users = [],
   groups = [],
@@ -29,6 +38,11 @@ export default function Sidebar({
   onToggleArchived = () => {},
   onGroupUpdate = () => {},
   onConversationDeleted = () => {},
+  onOpenStatusManager = () => {},
+  allStatuses = [],
+  onOpenStatusViewer = () => {},
+  onViewMyStatus = () => {},
+  currentUserForStatus = null,
 }) {
   const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,12 +51,17 @@ export default function Sidebar({
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [showBlocked, setShowBlocked] = useState(false);
-
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState("chats");
   const { imageSrc: profilePreview, loading: imageLoading } =
     useAuthImage(profileImageUrl);
   const profileMenuRef = useRef(null);
@@ -96,7 +115,7 @@ export default function Sidebar({
   };
 
   const memoizedItems = useMemo(() => {
-    // If searching, show ALL friends (even without conversations)
+    // If searching, show ALL friends matching search
     if (searchQuery.trim()) {
       // Search in ALL friends, not just those with conversations
       const allFilteredUsers = users
@@ -139,14 +158,16 @@ export default function Sidebar({
       });
     }
 
-    // When NOT searching, only show users WITH conversations
+    // Show users WITH conversations (even if empty after clear)
     const filteredUsers = users
       .filter((user) => {
-        const convId = lastMessages[user._id]?.conversationId;
-        const isArchived = convId && archivedConversations.has(convId);
+        const lastMsg = lastMessages[user._id];
+        const convId = lastMsg?.conversationId;
 
-        // Only show if has conversation
-        if (!lastMessages[user._id]?.conversationId) return false;
+        //  Show if has conversationId (even if no messages)
+        if (!convId) return false;
+
+        const isArchived = archivedConversations.has(convId);
 
         if (showArchived) {
           return isArchived;
@@ -276,9 +297,7 @@ export default function Sidebar({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/users/search?q=${encodeURIComponent(
-          searchUsers,
-        )}`,
+        `${API_BASE_URL}/api/users/search?q=${encodeURIComponent(searchUsers)}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setAllUsers(res.data);
@@ -300,7 +319,7 @@ export default function Sidebar({
       const token = localStorage.getItem("token");
 
       await axios.post(
-        "http://localhost:5000/api/friends/request/send",
+        `${API_BASE_URL}/api/friends/request/send`,
         { receiverId: userId },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -315,6 +334,12 @@ export default function Sidebar({
 
       //  Remove user from list
       setAllUsers(allUsers.filter((u) => u._id !== userId));
+      //  AUTO-CLOSE modal after 1 seconds
+      setTimeout(() => {
+        setShowAddFriendModal(false);
+        setSearchUsers("");
+        setAllUsers([]);
+      }, 1000);
     } catch (err) {
       //  Show proper error message
       const errorMessage =
@@ -333,7 +358,7 @@ export default function Sidebar({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/friends/requests/pending",
+        `${API_BASE_URL}/api/friends/requests/pending`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -349,7 +374,7 @@ export default function Sidebar({
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/friends/request/${requestId}/accept`,
+        `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -361,8 +386,9 @@ export default function Sidebar({
       });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       setTimeout(() => {
+        setShowRequestsModal(false);
         window.location.reload();
-      }, 1500);
+      }, 1000);
     } catch (err) {
       setAlertDialog({
         isOpen: true,
@@ -377,7 +403,7 @@ export default function Sidebar({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/friends/request/${requestId}/reject`,
+        `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -389,6 +415,9 @@ export default function Sidebar({
         type: "info",
       });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
+      setTimeout(() => {
+        setShowRequestsModal(false);
+      }, 1000);
     } catch (err) {
       setAlertDialog({
         isOpen: true,
@@ -402,7 +431,7 @@ export default function Sidebar({
   const loadBlockedUsers = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/friends/blocked", {
+      const res = await axios.get(`${API_BASE_URL}/api/friends/blocked`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setBlockedUsers(res.data);
@@ -421,12 +450,9 @@ export default function Sidebar({
   const handleUnblockUser = async (userId) => {
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(
-        `http://localhost:5000/api/friends/unblock/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axios.delete(`${API_BASE_URL}/api/friends/unblock/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setAlertDialog({
         isOpen: true,
         title: "User Unblocked!",
@@ -434,6 +460,11 @@ export default function Sidebar({
         type: "success",
       });
       setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
+      if (blockedUsers.length === 1) {
+        setTimeout(() => {
+          setShowBlockedModal(false);
+        }, 1000);
+      }
     } catch (err) {
       setAlertDialog({
         isOpen: true,
@@ -447,11 +478,14 @@ export default function Sidebar({
   const handleProfileClick = () => {
     onOpenProfileSettings();
   };
+  const handleViewMyStatus = () => {
+    onViewMyStatus();
+  };
 
   return (
     <>
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-80 sm:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${
           isMobileSidebarOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
@@ -459,12 +493,13 @@ export default function Sidebar({
       >
         <button
           onClick={onCloseMobileSidebar}
-          className="md:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-white z-10 bg-gray-900 rounded-lg shadow-lg"
+          className="md:hidden absolute top-1 right-1 p-1 text-white hover:text-gray-300 z-[70] bg-black/30 rounded-full backdrop-blur-sm"
         >
           <svg
-            className="w-6 h-6"
+            className="w-3.5 h-3.5"
             fill="none"
             stroke="currentColor"
+            strokeWidth={2.5}
             viewBox="0 0 24 24"
           >
             <path
@@ -476,12 +511,13 @@ export default function Sidebar({
           </svg>
         </button>
 
-        <div className="bg-gradient-to-r from-[#2563EB] to-[#9333EA] border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="bg-gradient-to-r from-[#2563EB] to-[#9333EA] p-3">
+          {/* Top row: Profile + Username + Three Dots */}
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
               <div className="relative flex-shrink-0">
                 <div
-                  className="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border-2 border-gray-700"
+                  className="relative w-9 h-9 rounded-full overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border-2 border-white/30"
                   onClick={handleProfileClick}
                 >
                   {imageLoading ? (
@@ -493,76 +529,28 @@ export default function Sidebar({
                       className="w-full h-full object-cover"
                       crossOrigin="anonymous"
                       referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        console.log(" Sidebar image failed:", profilePreview);
-                      }}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-semibold">
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
                       {currentUsername?.charAt(0)?.toUpperCase() || "U"}
                     </div>
                   )}
                 </div>
               </div>
-
-              <div className="min-w-0 flex-1">
-                <h2 className="text-white font-semibold text-lg truncate">
-                  {showArchived ? "Archived" : "Chats"}
-                </h2>
-                <p className="text-xs text-gray-400 truncate">
-                  {currentUsername}
-                </p>
-              </div>
+              <h2 className="text-white font-semibold text-sm md:text-base truncate flex-1 min-w-0 max-w-[120px] sm:max-w-none">
+                {currentUsername}
+              </h2>
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+            {/* Three dots menu */}
+            <div className="relative flex-shrink-0 ml-auto">
               <button
-                onClick={() => onToggleArchived(!showArchived)}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
-                title={showArchived ? "Back to Chats" : "Archived Chats"}
-              >
-                {showArchived ? (
-                  // Back arrow icon
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                  </svg>
-                ) : (
-                  // Archive box icon
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                    />
-                  </svg>
-                )}
-                {/* Badge for archived count */}
-                {!showArchived && archivedCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full text-white text-xs flex items-center justify-center">
-                    {archivedCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={loadBlockedUsers}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200 relative"
-                title="Blocked Users"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProfileMenu(!showProfileMenu);
+                }}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white flex items-center justify-center"
+                title="Settings & More"
               >
                 <svg
                   className="w-5 h-5"
@@ -574,197 +562,277 @@ export default function Sidebar({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                  />
-                </svg>
-                {blockedUsers.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-600 rounded-full text-white text-xs flex items-center justify-center">
-                    {blockedUsers.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={loadPendingRequests}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-yellow-400 hover:text-yellow-300 relative"
-                title="Friend Requests"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                  />
-                </svg>
-                {pendingRequests.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                    {pendingRequests.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setShowAddFriend(!showAddFriend)}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-blue-400 hover:text-blue-300"
-                title="Add Friend"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
                   />
                 </svg>
               </button>
 
-              <button
-                onClick={() => setShowCreateGroup(true)}
-                className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-green-400 hover:text-green-300"
-                title="Create Group"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-                </svg>
-              </button>
-              {/* Three Dots Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-200"
-                  title="Settings & More"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                    />
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showProfileMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowProfileMenu(false)}
-                    />
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-2xl z-50 overflow-hidden">
-                      <button
-                        onClick={() => {
-                          onOpenProfileSettings("settings");
-                          setShowProfileMenu(false);
-                        }}
-                        className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
+              {showProfileMenu && (
+                <>
+                  {/*  Full-screen backdrop */}
+                  <div
+                    className="fixed inset-0 z-[90] bg-black/20"
+                    onClick={() => setShowProfileMenu(false)}
+                    style={{
+                      position: "fixed",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                    }}
+                  />
+                  {/*  Dropdown menu */}
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-300 rounded-lg shadow-2xl z-[91] overflow-hidden">
+                    <button
+                      onClick={() => {
+                        onOpenProfileSettings("settings");
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
+                    >
+                      <svg
+                        className="w-5 h-5 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg
-                          className="w-5 h-5 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        <span className="font-medium">Settings</span>
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                      <span className="font-medium">Settings</span>
+                    </button>
 
-                      <button
-                        onClick={() => {
-                          onOpenProfileSettings("password");
-                          setShowProfileMenu(false);
-                          // Scroll to password section after opening
-                          setTimeout(() => {
-                            const passwordSection = document.querySelector(
-                              '[data-section="password"]',
-                            );
-                            if (passwordSection) {
-                              passwordSection.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                              });
-                            }
-                          }, 300);
-                        }}
-                        className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                    <button
+                      onClick={() => {
+                        onOpenProfileSettings("password");
+                        setShowProfileMenu(false);
+                        setTimeout(() => {
+                          const passwordSection = document.querySelector(
+                            '[data-section="password"]',
+                          );
+                          if (passwordSection) {
+                            passwordSection.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                          }
+                        }, 300);
+                      }}
+                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                    >
+                      <svg
+                        className="w-5 h-5 text-purple-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg
-                          className="w-5 h-5 text-purple-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                          />
-                        </svg>
-                        <span className="font-medium">Change Password</span>
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                        />
+                      </svg>
+                      <span className="font-medium">Change Password</span>
+                    </button>
 
-                      <button
-                        onClick={() => {
-                          setShowProfileMenu(false);
-                          onLogout();
-                        }}
-                        className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onLogout();
+                      }}
+                      className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                          />
-                        </svg>
-                        <span className="font-medium">Logout</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                        />
+                      </svg>
+                      <span className="font-medium">Logout</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
+          {/* Second row: Action buttons */}
+          <div className="flex items-center justify-between gap-0.5 mb-2 px-0">
+            <button
+              onClick={() => onToggleArchived(!showArchived)}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
+              title={showArchived ? "Back to Chats" : "Archived Chats"}
+            >
+              {showArchived ? (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                  />
+                </svg>
+              )}
+              {!showArchived && archivedCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-600 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
+                  {archivedCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                loadBlockedUsers();
+                setShowBlockedModal(true);
+              }}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
+              title="Blocked Users"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                />
+              </svg>
+              {blockedUsers.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gray-600 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
+                  {blockedUsers.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                loadPendingRequests();
+                setShowRequestsModal(true);
+              }}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-yellow-400 hover:text-yellow-300 relative flex-shrink-0"
+              title="Friend Requests"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowAddFriendModal(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-blue-400 hover:text-blue-300 flex-shrink-0"
+              title="Add Friend"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                />
+              </svg>
+            </button>
+
+            <button
+              onClick={() => setShowCreateGroup(true)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-green-400 hover:text-green-300 flex-shrink-0"
+              title="Create Group"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Tab Buttons  */}
+          <div className="flex gap-1 mb-2">
+            <button
+              onClick={() => setActiveTab("chats")}
+              className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${
+                activeTab === "chats"
+                  ? "bg-white text-blue-600 shadow-md"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
+            >
+              Chats
+            </button>
+            <button
+              onClick={() => setActiveTab("status")}
+              className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${
+                activeTab === "status"
+                  ? "bg-white text-purple-600 shadow-md"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
+            >
+              Status
+            </button>
+          </div>
+
+          {/* Search box */}
           <div className="relative">
             <input
               type="text"
@@ -773,10 +841,10 @@ export default function Sidebar({
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 bg-gray-50 border-gray-300 text-gray-900 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full pl-8 pr-8 py-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs sm:text-sm placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-all rounded-lg"
             />
             <svg
-              className="w-5 h-5 text-gray-500 absolute left-3 top-2.5"
+              className="w-4 h-4 text-white/60 absolute left-3 top-2.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -791,10 +859,10 @@ export default function Sidebar({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-200 transition-colors"
+                className="absolute right-3 top-2.5 text-white/60 hover:text-white transition-colors"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -810,235 +878,6 @@ export default function Sidebar({
             )}
           </div>
         </div>
-
-        {showBlocked && (
-          <div className="p-4 bg-white border-b border-gray-200 max-h-80 overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-gray-900 font-semibold">Blocked Users</h3>
-              <button
-                onClick={() => setShowBlocked(false)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            {blockedUsers.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">
-                No blocked users
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {blockedUsers.map((block) => (
-                  <div
-                    key={block._id}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <ProfileImageWithAuth
-                          imageUrl={block.blocked.profileImage}
-                          username={block.blocked.username}
-                          size="w-8 h-8"
-                          textSize="text-sm"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {block.blocked.username}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {block.blocked.email}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleUnblockUser(block.blocked._id)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md transition-colors"
-                      >
-                        Unblock
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showRequests && (
-          <div className="p-4 bg-white border-b border-gray-200 max-h-80 overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-gray-900 font-semibold">Friend Requests</h3>
-              <button
-                onClick={() => setShowRequests(false)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            {pendingRequests.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">
-                No pending requests
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {pendingRequests.map((request) => (
-                  <div
-                    key={request._id}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-3"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <ProfileImageWithAuth
-                          imageUrl={request.sender.profileImage}
-                          username={request.sender.username}
-                          size="w-8 h-8"
-                          textSize="text-sm"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {request.sender.username}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {request.sender.email}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAcceptRequest(request._id)}
-                        className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md transition-colors"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(request._id)}
-                        className="flex-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-md transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Add Friend Modal */}
-        {showAddFriend && (
-          <div className="p-4 bg-white border-b border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-gray-900 font-semibold">Add Friend</h3>
-              <button
-                onClick={() => {
-                  setShowAddFriend(false);
-                  setAllUsers([]);
-                  setSearchUsers("");
-                }}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1 flex-shrink-0 ml-2 mb-3">
-              <input
-                type="text"
-                placeholder="Search users by username..."
-                value={searchUsers}
-                onChange={(e) => setSearchUsers(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSearchUsers()}
-                className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleSearchUsers}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {loading ? "..." : "Search"}
-              </button>
-            </div>
-
-            <div className="max-h-64 overflow-y-auto space-y-2">
-              {allUsers.length === 0 && !loading && searchUsers && (
-                <p className="text-gray-500 text-sm text-center py-4">
-                  No users found
-                </p>
-              )}
-
-              {allUsers.length === 0 && !loading && !searchUsers && (
-                <p className="text-gray-500 text-sm text-center py-4">
-                  Search for users to add as friends
-                </p>
-              )}
-
-              {allUsers.map((user) => (
-                <div
-                  key={user._id}
-                  className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-750"
-                >
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <ProfileImageWithAuth
-                      imageUrl={user.profileImage}
-                      username={user.username}
-                      size="w-8 h-8"
-                      textSize="text-sm"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.username}
-                      </p>
-                      <p className="text-xs text-gray-400">{user.email}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleSendRequest(user._id)}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md transition-colors"
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Users Count & Stats */}
         <div className="px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
@@ -1064,131 +903,139 @@ export default function Sidebar({
             )}
           </p>
         </div>
-        {/* Users List */}
-        <div className="flex-1 overflow-y-auto">
-          {memoizedItems.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
-                {searchQuery ? (
-                  <svg
-                    className="w-8 h-8 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-8 h-8 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                )}
+        {activeTab === "chats" ? (
+          <div className="flex-1 overflow-y-auto">
+            {memoizedItems.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
+                  {searchQuery ? (
+                    <svg
+                      className="w-8 h-8 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-8 h-8 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <p className="text-gray-400 text-sm">
+                  {showArchived
+                    ? "No archived chats"
+                    : searchQuery
+                      ? `No friends found for "${searchQuery}"`
+                      : "No contacts yet"}
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  {searchQuery
+                    ? "Try searching by username or email"
+                    : "Start by adding some friends!"}
+                </p>
               </div>
-              <p className="text-gray-400 text-sm">
-                {showArchived
-                  ? "No archived chats"
-                  : searchQuery
-                    ? `No friends found for "${searchQuery}"`
-                    : "No contacts yet"}
-              </p>
-              <p className="text-gray-500 text-xs mt-1">
-                {searchQuery
-                  ? "Try searching by username or email"
-                  : "Start by adding some friends!"}
-              </p>
-            </div>
-          ) : (
-            <div className="py-2">
-              {memoizedItems.map((item) => {
-                if (item.isGroup) {
-                  // Render Group
-                  const lastMsg = lastMessages[item._id];
-                  const formattedText = formatLastMessageText(lastMsg);
-
-                  return (
-                    <GroupItem
-                      key={item._id}
-                      group={item}
-                      selected={selectedUserId === item._id}
-                      onClick={() => onSelectUser({ ...item, isGroup: true })}
-                      onPinConversation={onPinConversation}
-                      onArchiveConversation={onArchiveConversation}
-                      isPinned={item.pinnedBy?.some(
-                        (p) => p.userId === currentUserId,
-                      )}
-                      isArchived={item.archivedBy?.some(
-                        (a) => a.userId === currentUserId,
-                      )}
-                      conversationId={item._id}
-                      currentUserId={currentUserId}
-                      unreadCount={unreadCounts[item._id] || 0}
-                      lastMessage={formattedText}
-                      lastMessageTime={lastMsg?.time || null}
-                      lastMessageSender={lastMsg?.sender || null}
-                      lastMessageStatus={lastMsg?.status || "sent"}
-                      onGroupUpdate={(updatedGroup) => {
-                        if (typeof onGroupUpdate === "function") {
-                          onGroupUpdate(updatedGroup);
-                        }
-                      }}
-                      onGroupDeleted={() => {
-                        // Reload to refresh group list
-                        window.location.reload();
-                      }}
-                    />
-                  );
-                } else {
-                  // Render User
-                  const lastMsg = lastMessages[item._id];
-                  const formattedText = formatLastMessageText(lastMsg);
-                  const conversationId = lastMsg?.conversationId;
-                  const isPinned =
-                    conversationId && pinnedConversations.has(conversationId);
-                  const isArchived =
-                    conversationId && archivedConversations.has(conversationId);
-
-                  return (
-                    <UserItem
-                      key={item._id}
-                      user={item}
-                      selected={item._id === selectedUserId}
-                      onClick={() => onSelectUser(item)}
-                      isOnline={onlineUsers.has(item._id)}
-                      unreadCount={unreadCounts[item._id] || 0}
-                      lastMessage={formattedText}
-                      lastMessageTime={lastMsg?.time || null}
-                      lastMessageSender={lastMsg?.sender || null}
-                      lastMessageStatus={lastMsg?.status || "sent"}
-                      currentUserId={currentUserId}
-                      onRelationshipChange={() => window.location.reload()}
-                      isPinned={isPinned}
-                      conversationId={conversationId}
-                      onPinConversation={onPinConversation}
-                      isArchived={isArchived}
-                      onArchiveConversation={onArchiveConversation}
-                      onConversationDeleted={onConversationDeleted}
-                    />
-                  );
-                }
-              })}
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="py-2">
+                {memoizedItems.map((item) => {
+                  if (item.isGroup) {
+                    const lastMsg = lastMessages[item._id];
+                    const formattedText = formatLastMessageText(lastMsg);
+                    return (
+                      <GroupItem
+                        key={item._id}
+                        group={item}
+                        selected={selectedUserId === item._id}
+                        onClick={() => onSelectUser({ ...item, isGroup: true })}
+                        onPinConversation={onPinConversation}
+                        onArchiveConversation={onArchiveConversation}
+                        isPinned={item.pinnedBy?.some(
+                          (p) => p.userId === currentUserId,
+                        )}
+                        isArchived={item.archivedBy?.some(
+                          (a) => a.userId === currentUserId,
+                        )}
+                        conversationId={item._id}
+                        currentUserId={currentUserId}
+                        unreadCount={unreadCounts[item._id] || 0}
+                        lastMessage={formattedText}
+                        lastMessageTime={lastMsg?.time || null}
+                        lastMessageSender={lastMsg?.sender || null}
+                        lastMessageStatus={lastMsg?.status || "sent"}
+                        onGroupUpdate={(updatedGroup) => {
+                          if (typeof onGroupUpdate === "function") {
+                            onGroupUpdate(updatedGroup);
+                          }
+                        }}
+                        onGroupDeleted={() => {
+                          window.location.reload();
+                        }}
+                      />
+                    );
+                  } else {
+                    const lastMsg = lastMessages[item._id];
+                    const formattedText = formatLastMessageText(lastMsg);
+                    const conversationId = lastMsg?.conversationId;
+                    const isPinned =
+                      conversationId && pinnedConversations.has(conversationId);
+                    const isArchived =
+                      conversationId &&
+                      archivedConversations.has(conversationId);
+                    return (
+                      <UserItem
+                        key={item._id}
+                        user={item}
+                        selected={item._id === selectedUserId}
+                        onClick={() => onSelectUser(item)}
+                        isOnline={onlineUsers.has(item._id)}
+                        unreadCount={unreadCounts[item._id] || 0}
+                        lastMessage={formattedText}
+                        lastMessageTime={lastMsg?.time || null}
+                        lastMessageSender={lastMsg?.sender || null}
+                        lastMessageStatus={lastMsg?.status || "sent"}
+                        currentUserId={currentUserId}
+                        onRelationshipChange={() => window.location.reload()}
+                        isPinned={isPinned}
+                        conversationId={conversationId}
+                        onPinConversation={onPinConversation}
+                        isArchived={isArchived}
+                        onArchiveConversation={onArchiveConversation}
+                        onConversationDeleted={onConversationDeleted}
+                      />
+                    );
+                  }
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          // STATUS TAB - Status Rings List
+          <div className="flex-1 overflow-y-auto">
+            <StatusRingsList
+              onOpenViewer={onOpenStatusViewer}
+              currentUserId={currentUserId}
+              onCreateStatus={onOpenStatusManager}
+              onViewMyStatus={onViewMyStatus}
+              currentUserForStatus={currentUserForStatus}
+            />
+          </div>
+        )}
       </div>
 
       {showCreateGroup && (
@@ -1209,6 +1056,39 @@ export default function Sidebar({
         title={alertDialog.title}
         message={alertDialog.message}
         type={alertDialog.type}
+      />
+      <BlockedUsersModal
+        isOpen={showBlockedModal}
+        onClose={() => setShowBlockedModal(false)}
+        blockedUsers={blockedUsers}
+        onUnblock={handleUnblockUser}
+      />
+
+      <FriendRequestsModal
+        isOpen={showRequestsModal}
+        onClose={() => setShowRequestsModal(false)}
+        pendingRequests={pendingRequests}
+        onAccept={handleAcceptRequest}
+        onReject={handleRejectRequest}
+      />
+      <NotificationModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        notifications={notifications}
+      />
+      <AddFriendModal
+        isOpen={showAddFriendModal}
+        onClose={() => {
+          setShowAddFriendModal(false);
+          setAllUsers([]);
+          setSearchUsers("");
+        }}
+        searchUsers={searchUsers}
+        setSearchUsers={setSearchUsers}
+        allUsers={allUsers}
+        loading={loading}
+        onSearch={handleSearchUsers}
+        onSendRequest={handleSendRequest}
       />
     </>
   );

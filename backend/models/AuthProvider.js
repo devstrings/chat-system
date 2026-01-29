@@ -1,4 +1,3 @@
-// backend/models/authProviderModel.js (NEW FILE - Create this)
 import mongoose from "mongoose";
 
 const authProviderSchema = new mongoose.Schema({

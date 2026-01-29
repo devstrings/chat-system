@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import axios from "axios";
-
+import API_BASE_URL from "../config/api";
 export default function Message({
   message,
   isOwn,
@@ -78,8 +78,8 @@ export default function Message({
         // HTTP endpoint for regular messages
         const token = localStorage.getItem("token");
         await axios.delete(
-          `http://localhost:5000/api/messages/message/${message._id}/for-me`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${API_BASE_URL}/api/messages/message/${message._id}/for-me`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (socket) {
@@ -111,8 +111,8 @@ export default function Message({
         // HTTP endpoint for regular messages
         const token = localStorage.getItem("token");
         await axios.delete(
-          `http://localhost:5000/api/messages/message/${message._id}/for-everyone`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${API_BASE_URL}/api/messages/message/${message._id}/for-everyone`,
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (socket) {
@@ -141,7 +141,7 @@ export default function Message({
     const fiveMinutes = 5 * 60 * 1000;
     return messageAge <= fiveMinutes;
   };
-  // Line 127 ke baad - toggleAudio function mein
+  //  toggleAudio function
   const toggleAudio = (index, audioUrl) => {
     const audio = audioRefs.current[index];
 
@@ -151,7 +151,7 @@ export default function Message({
 
       //  Check if URL is external
       if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
-        // External URL - use directly
+        // External URL
         newAudio.src = audioUrl;
         newAudio.play();
 
@@ -177,7 +177,7 @@ export default function Message({
       }
 
       // Local file - fetch from backend with auth
-      fetch(`http://localhost:5000${audioUrl}`, {
+      fetch(`${API_BASE_URL}${audioUrl}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.blob())
@@ -258,14 +258,12 @@ export default function Message({
 
             // Local file - extract filename correctly
             let filename = file.url;
-
-            // If stored as full path like "/uploads/messages/filename.jpg"
             if (filename.includes("/")) {
               filename = filename.split("/").pop();
             }
 
             //  Use correct endpoint matching your backend route
-            const fullUrl = `http://localhost:5000/api/file/get/${filename}`;
+            const fullUrl = `${API_BASE_URL}/api/file/get/${filename}`;
 
             console.log("Fetching local image:", fullUrl);
 
@@ -327,10 +325,10 @@ export default function Message({
         if (filename.includes("/")) {
           filename = filename.split("/").pop();
         }
-        downloadUrl = `http://localhost:5000/api/file/get/${filename}`;
+        downloadUrl = `${API_BASE_URL}/api/file/get/${filename}`;
       }
 
-      console.log("⬇ Downloading:", downloadUrl);
+      console.log(" Downloading:", downloadUrl);
 
       const response = await fetch(downloadUrl, {
         headers: needsAuth
@@ -556,7 +554,7 @@ export default function Message({
                   return (
                     <div
                       key={index}
-                      className={`flex items-center gap-2 p-2 md:p-3 rounded-lg ${
+                      className={`flex items-center gap-1.5 md:gap-2 p-2 rounded-lg ${
                         isOwn
                           ? "bg-white bg-opacity-20"
                           : "bg-blue-50 border border-blue-100"
@@ -621,11 +619,11 @@ export default function Message({
                             </svg>
                             Voice message
                           </span>
-                          {/* Show current/total when playing, else just total */}
+                          {/* Show current*/}
                           <span className="font-mono">
                             {isPlaying && audioDuration[index]
                               ? `${formatAudioTime(
-                                  (progress / 100) * audioDuration[index]
+                                  (progress / 100) * audioDuration[index],
                                 )} / ${formatAudioTime(duration)}`
                               : formatAudioTime(duration || 0)}
                           </span>
@@ -683,7 +681,7 @@ export default function Message({
                   <button
                     key={index}
                     onClick={() => handleFileDownload(file)}
-                    className={`flex items-center gap-2 p-2 md:p-3 rounded-lg transition w-full ${
+                    className={`flex items-center gap-2 p-2 rounded-lg transition w-full ${
                       isOwn
                         ? "bg-white bg-opacity-20 hover:bg-opacity-30"
                         : "bg-blue-50 hover:bg-blue-100 border border-blue-100"
@@ -731,7 +729,7 @@ export default function Message({
           )}
 
           {message.text && (
-            <p className="text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
+            <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
               {message.text}
             </p>
           )}
@@ -766,63 +764,90 @@ export default function Message({
         </div>
       </div>
 
-  {showDeleteModal && (
-  <>
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 z-40"
-      onClick={() => setShowDeleteModal(false)}
-    ></div>
+      {showDeleteModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setShowDeleteModal(false)}
+          ></div>
 
-    {/* POSITION BASED ON MESSAGE SIDE */}
-    <div className={`fixed z-50 ${isOwn ? 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2' : 'top-24 right-4 md:right-auto md:left-1/2 md:transform md:-translate-x-1/2'}`}>
-      <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 max-w-sm w-full shadow-2xl">
-        
-        <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">
-          Delete Message?
-        </h3>
-        
-        <div className="space-y-2">
-          {/* DELETE FOR ME BUTTON - FIXED */}
-          <button
-            onClick={handleDeleteForMe}
-            className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
-          >
-            <svg className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            <div>
-              <p className="font-medium text-sm md:text-base">Delete for Me</p>
-              <p className="text-xs text-gray-500">Only you won't see this message</p>
-            </div>
-          </button>
+          {/* CENTERED ON MOBILE */}
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 w-[90vw] max-w-sm shadow-2xl">
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-4">
+                Delete Message?
+              </h3>
 
-          {/* DELETE FOR EVERYONE BUTTON - WITH TIME CHECK */}
-          {isOwn && canDeleteForEveryone() && (
-            <button
-              onClick={handleDeleteForEveryone}
-              className="w-full px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
-            >
-              <svg className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <p className="font-medium text-sm md:text-base">Delete for Everyone</p>
-                <p className="text-xs text-red-200">Everyone won't see this message</p>
+              <div className="space-y-2">
+                {/* DELETE FOR ME BUTTON  */}
+                <button
+                  onClick={handleDeleteForMe}
+                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
+                >
+                  <svg
+                    className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  <div>
+                    <p className="font-medium text-sm md:text-base">
+                      Delete for Me
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Only you won't see this message
+                    </p>
+                  </div>
+                </button>
+
+                {/* DELETE FOR EVERYONE BUTTON  */}
+                {isOwn && canDeleteForEveryone() && (
+                  <button
+                    onClick={handleDeleteForEveryone}
+                    className="w-full px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
+                  >
+                    <svg
+                      className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-sm md:text-base">
+                        Delete for Everyone
+                      </p>
+                      <p className="text-xs text-red-200">
+                        Everyone won't see this message
+                      </p>
+                    </div>
+                  </button>
+                )}
               </div>
-            </button>
-          )}
-        </div>
 
-        <button
-          onClick={() => setShowDeleteModal(false)}
-          className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-sm md:text-base"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </>
-)}
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="w-full mt-4 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-sm md:text-base"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

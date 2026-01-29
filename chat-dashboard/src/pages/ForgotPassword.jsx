@@ -4,16 +4,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FiMail, FiArrowLeft, FiCopy } from "react-icons/fi";
-
+import API_BASE_URL from "../config/api";
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [resetUrl, setResetUrl] = useState(""); 
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const [resetUrl, setResetUrl] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,13 +19,15 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const res = await axios.post(`${API_BASE}/api/auth/forgot-password`, { email });
-      
+      const res = await axios.post(`${API_BASE_URL}/api/auth/forgot-password`, {
+        email,
+      });
+
       //  Get reset URL from response (development only)
       if (res.data.resetUrl) {
         setResetUrl(res.data.resetUrl);
       }
-      
+
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send reset email");
@@ -49,7 +49,7 @@ export default function ForgotPassword() {
           <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <FiMail className="text-green-500 text-3xl" />
           </div>
-          
+
           <h2 className="text-2xl font-bold mb-2">Reset Link Generated!</h2>
           <p className="text-gray-400 mb-6">
             For <strong className="text-white">{email}</strong>
@@ -59,7 +59,7 @@ export default function ForgotPassword() {
           {resetUrl && (
             <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm text-blue-200 mb-2">
-                🔗 Development Mode: Reset Link
+                Development Mode: Reset Link
               </p>
               <div className="bg-gray-900 p-3 rounded text-xs break-all mb-3">
                 {resetUrl}
@@ -74,7 +74,7 @@ export default function ForgotPassword() {
           )}
 
           <div className="bg-yellow-500/20 border border-yellow-500 text-yellow-200 px-4 py-3 rounded-lg mb-6 text-sm">
-             The link will expire in 15 minutes
+            The link will expire in 15 minutes
           </div>
 
           <button

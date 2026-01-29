@@ -1,7 +1,7 @@
 import Message from "../models/message.js";
 import Conversation from "../models/Conversation.js";
 import Attachment from "../models/Attachment.js";
-import Friendship from "../models/Friendship.js"; 
+import Friendship from "../models/Friendship.js";
 import Group from "../models/Group.js";
 
 // Get or create conversation between two users
@@ -18,8 +18,8 @@ export const getOrCreateConversation = async (req, res) => {
     const friendship = await Friendship.findOne({
       $or: [
         { user1: currentUserId, user2: otherUserId },
-        { user1: otherUserId, user2: currentUserId }
-      ]
+        { user1: otherUserId, user2: currentUserId },
+      ],
     });
 
     if (!friendship) {
@@ -28,20 +28,22 @@ export const getOrCreateConversation = async (req, res) => {
 
     // Find existing conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [currentUserId, otherUserId] }
+      participants: { $all: [currentUserId, otherUserId] },
     });
 
     // Create new if doesn't exist
     if (!conversation) {
       conversation = await Conversation.create({
-        participants: [currentUserId, otherUserId]
+        participants: [currentUserId, otherUserId],
       });
     }
 
     res.json(conversation);
   } catch (err) {
     console.error("Get/Create conversation error:", err);
-    res.status(500).json({ message: "Failed to get conversation", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to get conversation", error: err.message });
   }
 };
 
@@ -55,7 +57,7 @@ export const getMessages = async (req, res) => {
 
     // Verify conversation exists and user is participant
     const conversation = await Conversation.findById(conversationId);
-    
+
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
@@ -66,64 +68,66 @@ export const getMessages = async (req, res) => {
 
     // Check if users are still friends
     const otherUserId = conversation.participants.find(
-      p => p.toString() !== currentUserId
+      (p) => p.toString() !== currentUserId,
     );
 
     const friendship = await Friendship.findOne({
       $or: [
         { user1: currentUserId, user2: otherUserId },
-        { user1: otherUserId, user2: currentUserId }
-      ]
+        { user1: otherUserId, user2: currentUserId },
+      ],
     });
 
     if (!friendship) {
-      return res.status(403).json({ message: "You must be friends to view messages" });
+      return res
+        .status(403)
+        .json({ message: "You must be friends to view messages" });
     }
 
-    const messages = await Message.find({ 
+    const messages = await Message.find({
       conversationId,
       // Filter out messages deleted for current user
-      $or: [
-        { isDeleted: false },
-        { deletedFor: { $ne: currentUserId } }
-      ]
+      $or: [{ isDeleted: false }, { deletedFor: { $ne: currentUserId } }],
     })
       .populate("sender", "username email")
       .populate({
         path: "attachments",
-        select: "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage"
+        select:
+          "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage",
       })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit);
 
     // Transform attachments to match frontend expectations
-    const transformedMessages = messages.map(msg => {
+    const transformedMessages = messages.map((msg) => {
       const messageObj = msg.toObject();
-      
+
       // Add deleted info for frontend
       messageObj.isDeletedForMe = msg.deletedFor.includes(currentUserId);
       messageObj.isDeletedForEveryone = msg.deletedForEveryone;
-      
+
       if (messageObj.attachments && messageObj.attachments.length > 0) {
-        messageObj.attachments = messageObj.attachments.map(att => ({
+        messageObj.attachments = messageObj.attachments.map((att) => ({
           url: `/api/file/get/${att.serverFileName}`,
           filename: att.fileName,
           fileType: att.fileType,
           fileSize: att.sizeInKilobytes * 1024,
           attachmentId: att._id,
-          duration: att.duration || 0,              
-          isVoiceMessage: att.isVoiceMessage || false 
+          duration: att.duration || 0,
+          isVoiceMessage: att.isVoiceMessage || false,
         }));
       }
-      
+
       return messageObj;
     });
 
     res.json(transformedMessages);
   } catch (err) {
     console.error("Get messages error:", err);
-    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch messages", error: err.message });
   }
 };
 
@@ -134,127 +138,158 @@ export const getUserConversations = async (req, res) => {
 
     const conversations = await Conversation.find({
       participants: currentUserId,
-      "archivedBy.userId": { $ne: currentUserId }
+      "archivedBy.userId": { $ne: currentUserId },
     })
-      .populate("participants", "username email profileImage")  
-      .populate("lastMessageSender", "username") 
+      .populate("participants", "username email profileImage")
+      .populate("lastMessageSender", "username")
       .sort({ lastMessageTime: -1 });
 
     res.json(conversations);
   } catch (err) {
     console.error("Get conversations error:", err);
-    res.status(500).json({ message: "Failed to fetch conversations", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch conversations", error: err.message });
   }
 };
 
-// Clear chat (delete all messages in conversation)
+// CLEAR CHAT - Mark messages as deleted for current user ONLY
 export const clearChat = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const currentUserId = req.user.id;
 
-    // Verify user is part of conversation
+    console.log("🧹 CLEAR CHAT START");
+    console.log("conversationId:", conversationId);
+    console.log("userId:", currentUserId);
+
     const conversation = await Conversation.findById(conversationId);
-    
+
     if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+      console.log(" Conversation not found");
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
     }
 
     if (!conversation.participants.includes(currentUserId)) {
-      return res.status(403).json({ message: "Unauthorized" });
+      console.log(" User not participant");
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
     }
 
-    // Delete all messages in this conversation
-    const result = await Message.deleteMany({ conversationId });
-
-    // Mark attachments as deleted instead of actually deleting
-    await Attachment.updateMany(
-      { conversationId },
-      { status: 'deleted' }
+    // ADD USER TO deletedFor ARRAY (Don't actually delete)
+    const result = await Message.updateMany(
+      {
+        conversationId,
+        deletedFor: { $ne: currentUserId }, // Only update if not already added
+      },
+      {
+        $addToSet: { deletedFor: currentUserId }, // Add user to deletedFor array
+      },
     );
 
-    // Update conversation
-    await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: "",
-      lastMessageTime: Date.now(),
-      lastMessageSender: null 
-    });
+    console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
 
-    res.json({ 
-      message: "Chat cleared successfully", 
-      deletedCount: result.deletedCount 
+    // (Other user will still see their last message)
+    conversation.lastMessage = "";
+    conversation.lastMessageTime = new Date();
+    await conversation.save();
+
+    console.log(" Conversation cleared for current user only");
+
+    res.json({
+      success: true,
+      action: "CLEAR",
+      message: "Messages cleared for you only",
+      clearedCount: result.modifiedCount,
+      conversationId: conversationId,
     });
   } catch (err) {
-    console.error("Clear chat error:", err);
-    res.status(500).json({ message: "Failed to clear chat", error: err.message });
+    console.error(" CLEAR CHAT ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear chat",
+      error: err.message,
+    });
   }
 };
-
-// DELETE ENTIRE CONVERSATION 
-
+//  DELETE CONVERSATION - Remove everything
 export const deleteConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const currentUserId = req.user.id;
-    const { otherUserId } = req.body;  
+    const { otherUserId } = req.body;
 
-    console.log(" Delete request - conversationId:", conversationId, "user:", currentUserId);
+    console.log(" DELETE CONVERSATION - conversationId:", conversationId);
 
     let conversation;
 
-    //  STEP 1: Try to find by conversationId
-    if (conversationId && conversationId !== 'undefined' && conversationId !== 'null') {
+    // Find conversation
+    if (
+      conversationId &&
+      conversationId !== "undefined" &&
+      conversationId !== "null"
+    ) {
       conversation = await Conversation.findById(conversationId);
     }
 
-    //  STEP 2: If not found, try to find by participants
     if (!conversation && otherUserId) {
       conversation = await Conversation.findOne({
-        participants: { $all: [currentUserId, otherUserId] }
-      });
-    }
-    
-    if (!conversation) {
-      return res.status(404).json({ 
-        success: false,
-        message: "No conversation found to delete" 
+        participants: { $all: [currentUserId, otherUserId] },
       });
     }
 
-    // STEP 3: Check if user is participant
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "No conversation found to delete",
+      });
+    }
+
+    // Check authorization
     const isParticipant = conversation.participants.some(
-      p => p.toString() === currentUserId
+      (p) => p.toString() === currentUserId,
     );
 
     if (!isParticipant) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: "Not authorized to delete this conversation" 
+        message: "Not authorized",
       });
     }
 
-    //  STEP 4: Delete everything (messages, attachments, conversation)
+    //  Get other user ID for frontend
+    const otherUser = conversation.participants.find(
+      (p) => p.toString() !== currentUserId,
+    );
+
+    //  DELETE EVERYTHING
     await Message.deleteMany({ conversationId: conversation._id });
     await Attachment.updateMany(
       { conversationId: conversation._id },
-      { status: 'deleted' }
+      { status: "deleted" },
     );
     await Conversation.findByIdAndDelete(conversation._id);
 
-    console.log(" FULLY Deleted conversation:", conversation._id, "All data removed");
+    console.log(" Conversation FULLY deleted:", conversation._id);
 
-    res.json({ 
+    res.json({
       success: true,
+      action: "DELETE",
       message: "Conversation permanently deleted",
-      conversationId: conversation._id
+      conversationId: conversation._id,
+      userId: otherUser?.toString(),
     });
-
   } catch (err) {
     console.error(" Delete conversation error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Failed to delete conversation", 
-      error: err.message 
+      message: "Failed to delete conversation",
+      error: err.message,
     });
   }
 };
@@ -267,7 +302,8 @@ export const deleteMessageForMe = async (req, res) => {
     console.log(" Delete for me - Message:", messageId, "User:", currentUserId);
 
     // Populate conversation to get participants
-    const message = await Message.findById(messageId).populate('conversationId');
+    const message =
+      await Message.findById(messageId).populate("conversationId");
 
     if (!message) {
       return res.status(404).json({ message: "Message not found" });
@@ -279,7 +315,7 @@ export const deleteMessageForMe = async (req, res) => {
 
     // Verify user is part of conversation
     const isParticipant = message.conversationId.participants.some(
-      p => p.toString() === currentUserId
+      (p) => p.toString() === currentUserId,
     );
 
     if (!isParticipant) {
@@ -292,8 +328,8 @@ export const deleteMessageForMe = async (req, res) => {
     }
 
     // If ALL participants deleted, mark as fully deleted
-    const allDeleted = message.conversationId.participants.every(
-      p => message.deletedFor.includes(p.toString())
+    const allDeleted = message.conversationId.participants.every((p) =>
+      message.deletedFor.includes(p.toString()),
     );
 
     if (allDeleted) {
@@ -305,14 +341,16 @@ export const deleteMessageForMe = async (req, res) => {
 
     console.log(" Message deleted for user");
 
-    res.json({ 
+    res.json({
       message: "Message deleted for you",
       deletedFor: message.deletedFor,
-      isDeleted: message.isDeleted
+      isDeleted: message.isDeleted,
     });
   } catch (err) {
     console.error("Delete for me error:", err);
-    res.status(500).json({ message: "Failed to delete message", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete message", error: err.message });
   }
 };
 
@@ -322,7 +360,12 @@ export const deleteMessageForEveryone = async (req, res) => {
     const { messageId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log(" Delete for everyone - Message:", messageId, "User:", currentUserId);
+    console.log(
+      " Delete for everyone - Message:",
+      messageId,
+      "User:",
+      currentUserId,
+    );
 
     const message = await Message.findById(messageId);
 
@@ -332,7 +375,9 @@ export const deleteMessageForEveryone = async (req, res) => {
 
     // Only sender can delete for everyone
     if (message.sender.toString() !== currentUserId) {
-      return res.status(403).json({ message: "Only sender can delete for everyone" });
+      return res
+        .status(403)
+        .json({ message: "Only sender can delete for everyone" });
     }
 
     // Check time limit (5 minutes)
@@ -340,8 +385,8 @@ export const deleteMessageForEveryone = async (req, res) => {
     const fiveMinutes = 5 * 60 * 1000;
 
     if (messageAge > fiveMinutes) {
-      return res.status(400).json({ 
-        message: "Cannot delete for everyone after 5 minutes" 
+      return res.status(400).json({
+        message: "Cannot delete for everyone after 5 minutes",
       });
     }
 
@@ -356,13 +401,15 @@ export const deleteMessageForEveryone = async (req, res) => {
 
     console.log(" Message deleted for everyone");
 
-    res.json({ 
+    res.json({
       message: "Message deleted for everyone",
-      deletedForEveryone: true
+      deletedForEveryone: true,
     });
   } catch (err) {
     console.error(" Delete for everyone error:", err);
-    res.status(500).json({ message: "Failed to delete message", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete message", error: err.message });
   }
 };
 
@@ -372,15 +419,21 @@ export const bulkDeleteMessages = async (req, res) => {
     const { messageIds } = req.body;
     const currentUserId = req.user.id;
 
-    console.log(" Bulk delete - Messages:", messageIds.length, "User:", currentUserId);
+    console.log(
+      " Bulk delete - Messages:",
+      messageIds.length,
+      "User:",
+      currentUserId,
+    );
 
     if (!messageIds || messageIds.length === 0) {
       return res.status(400).json({ message: "No messages to delete" });
     }
 
     // Populate conversation for each message
-    const messages = await Message.find({ _id: { $in: messageIds } })
-      .populate('conversationId');
+    const messages = await Message.find({ _id: { $in: messageIds } }).populate(
+      "conversationId",
+    );
 
     let deletedCount = 0;
 
@@ -391,7 +444,7 @@ export const bulkDeleteMessages = async (req, res) => {
 
       // Verify user is participant
       const isParticipant = message.conversationId.participants.some(
-        p => p.toString() === currentUserId
+        (p) => p.toString() === currentUserId,
       );
 
       if (isParticipant) {
@@ -400,8 +453,8 @@ export const bulkDeleteMessages = async (req, res) => {
         }
 
         // If all participants deleted, mark as fully deleted
-        const allDeleted = message.conversationId.participants.every(
-          p => message.deletedFor.includes(p.toString())
+        const allDeleted = message.conversationId.participants.every((p) =>
+          message.deletedFor.includes(p.toString()),
         );
 
         if (allDeleted) {
@@ -416,17 +469,19 @@ export const bulkDeleteMessages = async (req, res) => {
 
     console.log(" Bulk delete completed:", deletedCount, "messages");
 
-    res.json({ 
+    res.json({
       message: `${deletedCount} messages deleted`,
-      deletedCount
+      deletedCount,
     });
   } catch (err) {
     console.error(" Bulk delete error:", err);
-    res.status(500).json({ message: "Failed to delete messages", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete messages", error: err.message });
   }
 };
 
-// PIN CONVERSATION 
+// PIN CONVERSATION
 export const pinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -440,7 +495,7 @@ export const pinConversation = async (req, res) => {
 
     // Check if user is participant
     const isParticipant = conversation.participants.some(
-      (p) => p.toString() === userId
+      (p) => p.toString() === userId,
     );
 
     if (!isParticipant) {
@@ -449,7 +504,7 @@ export const pinConversation = async (req, res) => {
 
     // Check if already pinned
     const alreadyPinned = conversation.pinnedBy.some(
-      (pin) => pin.userId.toString() === userId
+      (pin) => pin.userId.toString() === userId,
     );
 
     if (alreadyPinned) {
@@ -462,8 +517,8 @@ export const pinConversation = async (req, res) => {
     });
 
     if (userPinnedCount >= 3) {
-      return res.status(400).json({ 
-        message: "Maximum 3 chats can be pinned. Unpin a chat first." 
+      return res.status(400).json({
+        message: "Maximum 3 chats can be pinned. Unpin a chat first.",
       });
     }
 
@@ -487,7 +542,7 @@ export const pinConversation = async (req, res) => {
   }
 };
 
-//  UNPIN CONVERSATION 
+//  UNPIN CONVERSATION
 export const unpinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -501,7 +556,7 @@ export const unpinConversation = async (req, res) => {
 
     // Remove pin
     conversation.pinnedBy = conversation.pinnedBy.filter(
-      (pin) => pin.userId.toString() !== userId
+      (pin) => pin.userId.toString() !== userId,
     );
 
     await conversation.save();
@@ -518,7 +573,7 @@ export const unpinConversation = async (req, res) => {
   }
 };
 
-// GET PINNED CONVERSATIONS 
+// GET PINNED CONVERSATIONS
 export const getPinnedConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -536,7 +591,7 @@ export const getPinnedConversations = async (req, res) => {
   }
 };
 
-// ARCHIVE CONVERSATION 
+// ARCHIVE CONVERSATION
 export const archiveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -550,7 +605,7 @@ export const archiveConversation = async (req, res) => {
 
     // Check if user is participant
     const isParticipant = conversation.participants.some(
-      (p) => p.toString() === userId
+      (p) => p.toString() === userId,
     );
 
     if (!isParticipant) {
@@ -559,7 +614,7 @@ export const archiveConversation = async (req, res) => {
 
     // Check if already archived
     const alreadyArchived = conversation.archivedBy.some(
-      (archive) => archive.userId.toString() === userId
+      (archive) => archive.userId.toString() === userId,
     );
 
     if (alreadyArchived) {
@@ -586,7 +641,7 @@ export const archiveConversation = async (req, res) => {
   }
 };
 
-// UNARCHIVE CONVERSATION 
+// UNARCHIVE CONVERSATION
 export const unarchiveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -600,7 +655,7 @@ export const unarchiveConversation = async (req, res) => {
 
     // Remove from archive
     conversation.archivedBy = conversation.archivedBy.filter(
-      (archive) => archive.userId.toString() !== userId
+      (archive) => archive.userId.toString() !== userId,
     );
 
     await conversation.save();
@@ -646,7 +701,7 @@ export const getGroupMessages = async (req, res) => {
 
     // Verify user is group member
     const group = await Group.findById(groupId);
-    
+
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
@@ -655,36 +710,37 @@ export const getGroupMessages = async (req, res) => {
       return res.status(403).json({ message: "Not a member of this group" });
     }
 
-    const messages = await Message.find({ 
-      groupId, 
+    const messages = await Message.find({
+      groupId,
       isGroupMessage: true,
-      isDeleted: false
+      isDeleted: false,
     })
       .populate("sender", "username email profileImage")
       .populate({
         path: "attachments",
-        select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage"
+        select:
+          "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
       })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit);
 
     // Transform attachments
-    const transformedMessages = messages.map(msg => {
+    const transformedMessages = messages.map((msg) => {
       const messageObj = msg.toObject();
-      
+
       if (messageObj.attachments && messageObj.attachments.length > 0) {
-        messageObj.attachments = messageObj.attachments.map(att => ({
+        messageObj.attachments = messageObj.attachments.map((att) => ({
           url: `/api/file/get/${att.serverFileName}`,
           filename: att.fileName,
           fileType: att.fileType,
           fileSize: att.sizeInKilobytes * 1024,
           attachmentId: att._id,
           duration: att.duration || 0,
-          isVoiceMessage: att.isVoiceMessage || false
+          isVoiceMessage: att.isVoiceMessage || false,
         }));
       }
-      
+
       return messageObj;
     });
 
@@ -692,6 +748,8 @@ export const getGroupMessages = async (req, res) => {
     res.json(transformedMessages);
   } catch (err) {
     console.error(" Get group messages error:", err);
-    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch messages", error: err.message });
   }
 };

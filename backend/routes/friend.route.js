@@ -10,8 +10,8 @@ import {
   unblockUser,
   getBlockedUsers,
   getRelationshipStatus,
-  getFriends  
-} from "../controllers/friend.js";
+  getFriends,
+} from "../controllers/friend.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();

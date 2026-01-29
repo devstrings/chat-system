@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import axios from "axios";
-
+import API_BASE_URL from "../config/api";
 export default function MessageInput({
   conversationId,
   groupId,
@@ -211,7 +211,7 @@ export default function MessageInput({
       alert(
         isGroup
           ? "Please select a group first"
-          : "Please select a conversation first"
+          : "Please select a conversation first",
       );
       e.target.value = "";
       return;
@@ -237,20 +237,20 @@ export default function MessageInput({
       console.log(
         "Uploading file:",
         uploadConversationId,
-        isGroup ? "(group)" : "(DM)"
+        isGroup ? "(group)" : "(DM)",
       );
 
       const token = localStorage.getItem("token");
 
       const response = await axios.post(
-        "http://localhost:5000/api/file/upload",
+        `${API_BASE_URL}/api/file/upload`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       console.log(" File uploaded:", response.data);
@@ -258,7 +258,7 @@ export default function MessageInput({
     } catch (error) {
       console.error(" Upload error:", error);
       alert(
-        `Upload failed!\n\n${error.response?.data?.message || error.message}`
+        `Upload failed!\n\n${error.response?.data?.message || error.message}`,
       );
     } finally {
       setUploading(false);
@@ -359,14 +359,14 @@ export default function MessageInput({
       const token = localStorage.getItem("token");
 
       const response = await axios.post(
-        "http://localhost:5000/api/file/upload",
+        `${API_BASE_URL}/api/file/upload`,
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       sendMessage([{ ...response.data, duration }]);
@@ -375,7 +375,7 @@ export default function MessageInput({
       alert(
         `Voice upload failed!\n\n${
           error.response?.data?.message || error.message
-        }`
+        }`,
       );
     } finally {
       setUploading(false);

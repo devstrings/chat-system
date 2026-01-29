@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { FiLock, FiEye, FiEyeOff } from "react-icons/fi";
-
+import API_BASE_URL from "../config/api";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { token } = useParams();
@@ -12,8 +12,6 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +30,7 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      await axios.post(`${API_BASE}/api/auth/reset-password`, {
+      await axios.post(`${API_BASE_URL}/api/auth/reset-password`, {
         token,
         newPassword,
       });
@@ -54,7 +52,9 @@ export default function ResetPassword() {
             <FiLock className="text-green-500 text-3xl" />
           </div>
 
-          <h2 className="text-2xl font-bold mb-2">Password Reset Successful!</h2>
+          <h2 className="text-2xl font-bold mb-2">
+            Password Reset Successful!
+          </h2>
           <p className="text-gray-400 mb-6">
             Your password has been reset. Redirecting to login...
           </p>

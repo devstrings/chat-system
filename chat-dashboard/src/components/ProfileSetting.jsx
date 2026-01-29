@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "../hooks/useAuthImage";
 import axios from "axios";
-
+import API_BASE_URL from "../config/api";
 export default function ProfileSettings({
   currentUser,
   onClose,
@@ -55,7 +55,7 @@ export default function ProfileSettings({
   const checkLocalAuth = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get("http://localhost:5000/api/auth/me", {
+      const response = await axios.get(`${API_BASE_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -96,13 +96,12 @@ export default function ProfileSettings({
   const loadBlockedUsers = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/friends/blocked", {
+      const res = await fetch(`${API_BASE_URL}/api/friends/blocked`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setBlockedUsers(data);
     } catch (err) {
-      console.error("Load blocked users error:", err);
     }
   };
 
@@ -110,7 +109,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        "http://localhost:5000/api/friends/requests/pending",
+   `${API_BASE_URL}/api/friends/requests/pending`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -118,7 +117,6 @@ export default function ProfileSettings({
       const data = await res.json();
       setPendingRequests(data);
     } catch (err) {
-      console.error("Load requests error:", err);
     }
   };
 
@@ -137,7 +135,7 @@ export default function ProfileSettings({
       formData.append("image", file);
 
       const uploadRes = await fetch(
-        "http://localhost:5000/api/users/profile/upload",
+     `${API_BASE_URL}/api/users/profile/upload`,
         {
           method: "POST",
           headers: {
@@ -149,7 +147,7 @@ export default function ProfileSettings({
       const uploadData = await uploadRes.json();
       const imageUrl = uploadData.imageUrl;
 
-      await fetch("http://localhost:5000/api/users/profile/update-image", {
+      await fetch(`${API_BASE_URL}/api/users/profile/update-image`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -179,7 +177,7 @@ export default function ProfileSettings({
       formData.append("coverPhoto", file);
 
       const uploadRes = await fetch(
-        "http://localhost:5000/api/users/profile/upload-cover",
+       `${API_BASE_URL}/api/users/profile/upload-cover`,
         {
           method: "POST",
           headers: {
@@ -213,7 +211,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        "http://localhost:5000/api/users/profile/remove-cover",
+        `${API_BASE_URL}/api/users/profile/remove-cover`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
@@ -240,7 +238,7 @@ export default function ProfileSettings({
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await fetch("http://localhost:5000/api/users/profile/remove-image", {
+      await fetch(`${API_BASE_URL}/api/users/profile/remove-image`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -277,7 +275,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/auth/set-password",
+       `${API_BASE_URL}/api/auth/set-password`,
         { newPassword },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -334,7 +332,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/auth/change-password",
+       `${API_BASE_URL}/api/auth/change-password`,
         { oldPassword, newPassword },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -361,7 +359,7 @@ export default function ProfileSettings({
   const handleUnblockUser = async (userId) => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(`http://localhost:5000/api/friends/unblock/${userId}`, {
+      await fetch(`${API_BASE_URL}/api/friends/unblock/${userId}`,{
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -377,7 +375,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       await fetch(
-        `http://localhost:5000/api/friends/request/${requestId}/accept`,
+     `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -396,7 +394,7 @@ export default function ProfileSettings({
     try {
       const token = localStorage.getItem("token");
       await fetch(
-        `http://localhost:5000/api/friends/request/${requestId}/reject`,
+       `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
@@ -411,12 +409,12 @@ export default function ProfileSettings({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+ <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-0 md:p-4">
+  <div className="bg-white rounded-none md:rounded-lg shadow-2xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
-            Profile Settings
+            Profile 
           </h2>
           <button
             onClick={onClose}
@@ -446,7 +444,7 @@ export default function ProfileSettings({
             initialView === "settings") && (
             <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
               {/* Cover Photo Section */}
-              <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600">
+         <div className="relative h-24 sm:h-32 bg-gradient-to-r from-blue-500 to-purple-600">
                 {coverImageLoading ? (
                   <div className="w-full h-full bg-gray-700 animate-pulse" />
                 ) : coverPreview ? (
@@ -512,32 +510,23 @@ export default function ProfileSettings({
               <div className="px-6 pb-6">
                 <div className="flex items-end gap-4 -mt-6 pt-2">
                   <div className="relative flex-shrink-0">
-                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                      <img
-                        src={profilePreview}
-                        alt="profile"
-                        className="w-full h-full object-cover"
-                        crossOrigin="anonymous"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          console.log(" Image failed to load:", profilePreview);
-                          // Fallback to original size if s400-c fails
-                          if (profilePreview.includes("s400-c")) {
-                            const originalUrl = profilePreview.replace(
-                              "s400-c",
-                              "s96-c",
-                            );
-                            console.log(" Trying original size:", originalUrl);
-                            e.target.src = originalUrl;
-                          }
-                        }}
-                        onLoad={() => console.log(" Image loaded successfully")}
-                      />
-
-                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-semibold">
-                        {currentUser?.username?.charAt(0)?.toUpperCase() || "U"}
-                      </div>
-                    </div>
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+  {imageLoading ? (
+    <div className="w-full h-full bg-gray-300 animate-pulse" />
+  ) : profilePreview ? (
+    <img
+      src={profilePreview}
+      alt="profile"
+      className="w-full h-full object-cover"
+      crossOrigin="anonymous"
+      referrerPolicy="no-referrer"
+    />
+  ) : (
+    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-semibold">
+      {currentUser?.username?.charAt(0)?.toUpperCase() || "U"}
+    </div>
+  )}
+</div>
                   </div>
 
                   <div className="flex-1 pt-4">
@@ -656,7 +645,7 @@ export default function ProfileSettings({
           })}
           {/* Set Password Section (Only for SSO users) */}
 
-          {(initialView === "all" || initialView === "password") &&
+       {initialView === "password" &&
             authProvider &&
             authProvider !== "local" &&
             !hasPassword && (
@@ -765,7 +754,7 @@ export default function ProfileSettings({
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="w-full p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+className="w-full p-2.5 sm:p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 text-sm"
                     />
                   </div>
 
@@ -787,8 +776,8 @@ export default function ProfileSettings({
               </div>
             )}
 
-          {/*  CHANGE PASSWORD SECTION - Add this */}
-          {(initialView === "all" || initialView === "password") &&
+          {/*  CHANGE PASSWORD SECTION  */}
+       {initialView === "password" &&
             hasPassword && (
               <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                 <h3 className="text-gray-900 font-semibold mb-2 text-lg flex items-center gap-2">

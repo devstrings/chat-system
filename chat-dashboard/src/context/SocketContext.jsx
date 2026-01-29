@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import API_BASE_URL from "../config/api";
 
 const SocketContext = createContext();
 
@@ -18,7 +19,7 @@ export function SocketProvider({ children }) {
 
     console.log(" Connecting socket with token");
 
-    const newSocket = io("http://localhost:5000", {
+    const newSocket = io(API_BASE_URL, {
       auth: { token },
       transports: ["websocket"],
       reconnection: true,
@@ -47,7 +48,7 @@ export function SocketProvider({ children }) {
     newSocket.on("onlineUsersList", (data) => {
       console.log(" Initial online users list:", data.onlineUsers);
       if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
-        const userIds = data.onlineUsers.map(u => u._id);
+        const userIds = data.onlineUsers.map((u) => u._id);
         setOnlineUsers(new Set(userIds));
         console.log(" Set online users:", userIds);
       }
@@ -55,7 +56,7 @@ export function SocketProvider({ children }) {
 
     newSocket.on("userOnline", (data) => {
       console.log(" User came online:", data.user?.username, data.userId);
-      setOnlineUsers(prev => {
+      setOnlineUsers((prev) => {
         const updated = new Set(prev);
         updated.add(data.userId);
         console.log(" Online count:", updated.size);
@@ -65,7 +66,7 @@ export function SocketProvider({ children }) {
 
     newSocket.on("userOffline", (data) => {
       console.log(" User went offline:", data.userId);
-      setOnlineUsers(prev => {
+      setOnlineUsers((prev) => {
         const updated = new Set(prev);
         updated.delete(data.userId);
         console.log(" Online count:", updated.size);
@@ -74,21 +75,21 @@ export function SocketProvider({ children }) {
     });
 
     // DELETE MESSAGE EVENTS
-    newSocket.on("messageDeleted", (data) => {
-      console.log(" Message deleted:", data);
-    });
+    newSocket.on("messageDeleted", (data) => {});
 
-    newSocket.on("messageDeletedForEveryone", (data) => {
-      console.log(" Message deleted for everyone:", data);
-    });
+    newSocket.on("messageDeletedForEveryone", (data) => {});
 
     newSocket.on("errorMessage", (data) => {
       console.error(" Socket error:", data);
       alert(data.message);
     });
+    // Status events
+    newSocket.on("newStatus", (data) => {});
 
+    newSocket.on("statusDeleted", (data) => {});
+
+    newSocket.on("statusViewed", (data) => {});
     return () => {
-      console.log(" Cleaning up socket...");
       newSocket.removeAllListeners();
       newSocket.disconnect();
     };
