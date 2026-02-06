@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import API_BASE_URL from "../config/api";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { useAuthImage } from "../hooks/useAuthImage";
 const DIALOG_THEME = {
   // Overlay (background blur)
@@ -450,16 +450,15 @@ export function CreateGroupDialog({
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `${API_BASE_URL}/api/groups/create`,
         {
           name: groupName.trim(),
           description: description.trim(),
           memberIds: selectedMembers,
         },
-        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       console.log(" Group created:", response.data);

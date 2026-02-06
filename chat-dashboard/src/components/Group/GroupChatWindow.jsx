@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import { useSocket } from "../../context/SocketContext";
 import Message from "../Message";
 import { useAuthImage } from "../../hooks/useAuthImage";
 import API_BASE_URL from "../../config/api";
+import axiosInstance from "../../utils/axiosInstance";
 export default function GroupChatWindow({
   group,
   currentUserId,
@@ -26,11 +26,10 @@ export default function GroupChatWindow({
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
 
-        const res = await axios.get(
+        const res = await axiosInstance.get(
           `${API_BASE_URL}/api/messages/group/${group._id}`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         console.log(" Loaded", res.data.length, "group messages");
@@ -89,7 +88,17 @@ export default function GroupChatWindow({
         setMessages((prev) => prev.filter((m) => m._id !== messageId));
       }
     };
-
+ const handleGroupChatCleared = (data) => {
+    console.log(" [GROUP] Chat cleared event:", data);
+    
+    //  Check if this is for current user AND this group
+    if (data.groupId === group._id && data.clearedFor === currentUserId) {
+      console.log(" Clearing group chat from UI");
+      setMessages([]);
+    } else {
+      console.log(" Not my group chat clear event, ignoring");
+    }
+  };
     //  Register all listeners
     socket.on("receiveGroupMessage", handleReceiveGroupMessage);
     socket.on("groupUserTyping", handleGroupTyping);
@@ -98,6 +107,7 @@ export default function GroupChatWindow({
       "groupMessageDeletedForEveryone",
       handleGroupMessageDeletedForEveryone,
     );
+    socket.on("groupChatCleared", handleGroupChatCleared);
 
     return () => {
       socket.off("receiveGroupMessage", handleReceiveGroupMessage);
@@ -107,6 +117,7 @@ export default function GroupChatWindow({
         "groupMessageDeletedForEveryone",
         handleGroupMessageDeletedForEveryone,
       );
+         socket.off("groupChatCleared", handleGroupChatCleared); 
     };
   }, [socket, group?._id, currentUserId]);
 

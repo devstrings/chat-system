@@ -13,6 +13,7 @@ import { connectRedis } from "./config/redis.js";
 import routes from "./routes/index.route.js";
 import config from "./config/index.js";
 import { setupSocket } from "./socket/index.js";
+import swaggerSpec from "./swagger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,7 +44,9 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+//  Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+console.log(`Swagger docs available at http://localhost:${config.port}/api-docs`);
 // Session middleware
 app.use(
   session({
@@ -65,19 +68,6 @@ app.use(passport.session());
 // Static files
 app.use("/uploads", express.static("uploads"));
 
-// Swagger UI (optional)
-const swaggerFilePath = path.join(__dirname, "openapi.json");
-if (fs.existsSync(swaggerFilePath)) {
-  try {
-    const swaggerDocument = JSON.parse(
-      fs.readFileSync(swaggerFilePath, "utf-8"),
-    );
-    app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-    console.log(` Swagger docs: http://localhost:${config.port}/api-docs`);
-  } catch (err) {
-    console.error(" Swagger setup failed:", err.message);
-  }
-}
 
 // API routes
 routes(app);

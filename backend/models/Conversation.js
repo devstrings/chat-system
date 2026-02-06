@@ -48,6 +48,22 @@ const conversationSchema = new mongoose.Schema({
       },
     },
   ],
+  deletedBy: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      deletedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 
@@ -59,5 +75,7 @@ conversationSchema.index({ participants: 1 });
 conversationSchema.index({ lastMessageTime: -1 }); 
 conversationSchema.index({ "pinnedBy.userId": 1 });
 conversationSchema.index({ "archivedBy.userId": 1 });
+conversationSchema.index({ "deletedBy.userId": 1 }); 
+conversationSchema.index({ deletedAt: 1 });
 
 export default mongoose.model("Conversation", conversationSchema);

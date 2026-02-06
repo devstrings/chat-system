@@ -70,50 +70,53 @@ const statusSchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
       required: true,
-      index: { expires: 0 },
     },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-// Index for faster queries
-statusSchema.index({ userId: 1, expiresAt: 1 });
-statusSchema.index({ expiresAt: 1 });
+// TTL index: auto delete expired statuses
+statusSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0 }
+);
 
-// Virtual for checking if expired
+// Query optimization
+statusSchema.index({ userId: 1, expiresAt: 1 });
+
+// Virtual: check if expired
 statusSchema.virtual("isExpired").get(function () {
   return this.expiresAt < new Date();
 });
 
-// Method to check if user can view this status
+// Method: check if user can view status
 statusSchema.methods.canView = function (viewerUserId) {
   const viewerId = viewerUserId.toString();
   const ownerId = this.userId.toString();
 
-  // Owner can always view
   if (viewerId === ownerId) return true;
 
-  // Check privacy settings
   if (this.privacy === "contacts") {
-    // All contacts can view except hidden
     return !this.hiddenFrom.some((id) => id.toString() === viewerId);
-  } else if (this.privacy === "except") {
-    // All contacts except specified
+  }
+
+  if (this.privacy === "except") {
     return !this.hiddenFrom.some((id) => id.toString() === viewerId);
-  } else if (this.privacy === "only") {
-    // Only specified users
+  }
+
+  if (this.privacy === "only") {
     return this.sharedWith.some((id) => id.toString() === viewerId);
   }
 
   return false;
 };
 
-// Method to mark as viewed
+// Method: mark status as viewed
 statusSchema.methods.markAsViewed = async function (viewerUserId) {
   const alreadyViewed = this.viewedBy.some(
-    (view) => view.userId.toString() === viewerUserId.toString(),
+    (view) => view.userId.toString() === viewerUserId.toString()
   );
 
   if (!alreadyViewed) {

@@ -1,28 +1,33 @@
 import jwt from "jsonwebtoken";
+import config from "../config/index.js";
 
 export const verifyToken = (req, res, next) => {
-  const token = req.header("Authorization")?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Access denied" });
+  const authHeader = req.header("Authorization");
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token required" });
+  }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret);
 
-    // Check for BOTH id and userId (for flexibility)
-    if (!decoded.userId && !decoded.id) {
-      return res.status(400).json({ message: "Token does not contain user ID" });
+    if (!decoded.id) {
+      return res.status(400).json({ message: "Invalid token structure" });
     }
 
-    console.log("Decoded token:", decoded);
-
-    // Set BOTH id and userId
     req.user = {
-      id: decoded.userId || decoded.id,      
-      userId: decoded.userId || decoded.id,
-      username: decoded.username
+      id: decoded.id,
+      userId: decoded.id,
+      username: decoded.username,
     };
-    
+
     next();
   } catch (err) {
-    res.status(403).json({ message: "Invalid token" });
+    // Token expired ya invalid
+    if (err.name === "TokenExpiredError") {
+      return res.status(403).json({ message: "Token expired" });
+    }
+    return res.status(403).json({ message: "Invalid token" });
   }
 };

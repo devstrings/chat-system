@@ -2,41 +2,33 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function AuthCallback() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
+    const accessToken = searchParams.get("accessToken");
+    const refreshToken = searchParams.get("refreshToken");
     const username = searchParams.get("username");
     const profileImage = searchParams.get("profileImage");
 
-    if (token && username) {
-      // Save to localStorage
-      localStorage.setItem("token", token);
+    if (accessToken && refreshToken) {
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("username", username);
-
-      if (profileImage && profileImage !== "null" && profileImage !== "") {
+      
+      if (profileImage) {
         localStorage.setItem("profileImage", profileImage);
       }
 
-      console.log("OAuth Login Success:", { token, username, profileImage });
-
-      // Redirect to dashboard
-      setTimeout(() => {
-        navigate("/dashboard", { replace: true });
-      }, 500);
+      navigate("/dashboard", { replace: true });
     } else {
-      console.error(" OAuth Login Failed - Missing token/username");
-      navigate("/login", { replace: true });
+      navigate("/login?error=auth_failed", { replace: true });
     }
-  }, [searchParams, navigate]);
+  }, [navigate, searchParams]);
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mx-auto mb-4"></div>
-        <p className="text-lg">Logging you in...</p>
-      </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="text-white text-xl">Logging you in...</div>
     </div>
   );
 }

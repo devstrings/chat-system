@@ -1,34 +1,22 @@
-import Group from "../models/Group.js";
-import user from "../models/user.js";
-import Message from "../models/message.js";
-import fs from "fs";
-import path from "path";
 
-// CREATE GROUP
+import * as groupService from "../services/group.service.js";
+import * as groupValidation from "../validations/group.validation.js";
+
+// CREATE GROUP CONTROLLER
 export const createGroup = async (req, res) => {
   try {
     const { name, description, memberIds } = req.body;
     const creatorId = req.user.id;
 
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: "Group name is required" });
+    // Validation
+    const validation = groupValidation.validateCreateGroup(name, memberIds);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    if (!memberIds || memberIds.length === 0) {
-      return res.status(400).json({ message: "At least one member required" });
-    }
+    // Service call
+    const group = await groupService.processCreateGroup(name, description, memberIds, creatorId);
 
-    const group = await Group.create({
-      name: name.trim(),
-      description: description?.trim() || "",
-      creator: creatorId,
-      admins: [creatorId],
-      members: [creatorId, ...memberIds],
-    });
-
-    await group.populate("members", "username email profileImage");
-
-    console.log(" Group created:", group._id);
     res.status(201).json(group);
   } catch (err) {
     console.error("Create group error:", err);
@@ -36,18 +24,14 @@ export const createGroup = async (req, res) => {
   }
 };
 
-//  GET USER'S GROUPS
+//  GET USER'S GROUPS CONTROLLER
 export const getUserGroups = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const groups = await Group.find({ members: userId })
-      .populate("members", "username email profileImage")
-      .populate("lastMessageSender", "username")
-      .populate("creator", "username")
-      .sort({ lastMessageTime: -1 });
+    // Service call
+    const groups = await groupService.fetchUserGroups(userId);
 
-    console.log(` Found ${groups.length} groups for user ${userId}`);
     res.json(groups);
   } catch (err) {
     console.error(" Get groups error:", err);
@@ -55,23 +39,24 @@ export const getUserGroups = async (req, res) => {
   }
 };
 
-// GET GROUP DETAILS
+// GET GROUP DETAILS CONTROLLER
 export const getGroupDetails = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId)
-      .populate("members", "username email profileImage")
-      .populate("admins", "username email")
-      .populate("creator", "username email");
+    // Service call
+    const group = await groupService.fetchGroupDetails(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    if (!group.members.some((m) => m._id.toString() === userId)) {
-      return res.status(403).json({ message: "Not a member" });
+    const memberValidation = groupValidation.validateIsMember(group, userId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
     }
 
     res.json(group);
@@ -81,325 +66,243 @@ export const getGroupDetails = async (req, res) => {
   }
 };
 
-//  UPDATE GROUP (NAME/DESCRIPTION) - ADMINS ONLY
+//  UPDATE GROUP (NAME/DESCRIPTION) CONTROLLER
 export const updateGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { name, description } = req.body;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    //  CHECK IF USER IS ADMIN
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res.status(403).json({ message: "Only admins can update group" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can update group" });
     }
 
-    if (name && name.trim()) {
-      group.name = name.trim();
-    }
+    // Service call
+    const updatedGroup = await groupService.processUpdateGroup(groupId, name, description);
 
-    if (description !== undefined) {
-      group.description = description.trim();
-    }
-
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
-
-    console.log(` Updated group ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Update group error:", err);
     res.status(500).json({ message: "Failed to update group" });
   }
 };
 
-//  UPDATE GROUP IMAGE - ADMINS ONLY (WITH FILE UPLOAD)
+//  UPDATE GROUP IMAGE CONTROLLER
 export const updateGroupImage = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No image file provided" });
+    // Validation
+    const fileValidation = groupValidation.validateUpdateGroupImage(req.file);
+    if (!fileValidation.isValid) {
+      return res.status(400).json({ message: fileValidation.message });
     }
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    // CHECK IF USER IS ADMIN
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can change group picture" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can change group picture" });
     }
 
-    // Delete old image if exists
-    if (group.groupImage) {
-      const oldImagePath = path.join(
-        "uploads/groupImages/",
-        path.basename(group.groupImage)
-      );
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
-      }
-    }
+    // Service call
+    const updatedGroup = await groupService.processUpdateGroupImage(groupId, req.file);
 
-    // Save new image path
-    group.groupImage = `/uploads/groupImages/${req.file.filename}`;
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
-
-    console.log(` Updated group image ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Update group image error:", err);
     res.status(500).json({ message: "Failed to update image" });
   }
 };
 
-// REMOVE GROUP IMAGE - ADMINS ONLY
+// REMOVE GROUP IMAGE CONTROLLER
 export const removeGroupImage = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    //  CHECK IF USER IS ADMIN
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can remove group picture" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can remove group picture" });
     }
 
-    // Delete image file
-    if (group.groupImage) {
-      const imagePath = path.join(
-        "uploads/groupImages/",
-        path.basename(group.groupImage)
-      );
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
+    // Service call
+    const updatedGroup = await groupService.processRemoveGroupImage(groupId);
 
-    group.groupImage = null;
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
-
-    console.log(` Removed group image ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Remove group image error:", err);
     res.status(500).json({ message: "Failed to remove image" });
   }
 };
-//  ADD MEMBERS - ADMINS ONLY
+
+//  ADD MEMBERS CONTROLLER
 export const addGroupMembers = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { memberIds } = req.body;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res.status(403).json({ message: "Only admins can add members" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can add members" });
     }
 
-    // Simply add new members without checking if they exist
-    const newMembers = memberIds.filter(
-      (id) => !group.members.some((m) => m.toString() === id)
-    );
+    // Service call
+    const updatedGroup = await groupService.processAddGroupMembers(groupId, memberIds);
 
-    if (newMembers.length === 0) {
-      return res.status(400).json({ message: "All users are already members" });
-    }
-
-    // Add members back (even if previously removed)
-    group.members.push(...newMembers);
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
-
-    console.log(` Added ${newMembers.length} members to group ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Add members error:", err);
+    
+    if (err.message === "All users are already members") {
+      return res.status(400).json({ message: err.message });
+    }
+    
     res.status(500).json({ message: "Failed to add members" });
   }
 };
-//  REMOVE MEMBER - ADMINS ONLY
+
+//  REMOVE MEMBER CONTROLLER
 export const removeGroupMember = async (req, res) => {
   try {
     const { groupId, memberId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    //  CHECK IF USER IS ADMIN
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can remove members" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can remove members" });
     }
 
-    //  CANNOT REMOVE CREATOR
-    if (group.creator.toString() === memberId) {
-      return res.status(403).json({ message: "Cannot remove group creator" });
+    const creatorValidation = groupValidation.validateCannotRemoveCreator(group, memberId);
+    if (!creatorValidation.isValid) {
+      return res.status(creatorValidation.statusCode).json({ message: creatorValidation.message });
     }
 
-    group.members = group.members.filter((m) => m.toString() !== memberId);
-    group.admins = group.admins.filter((a) => a.toString() !== memberId);
+    // Service call
+    const updatedGroup = await groupService.processRemoveGroupMember(groupId, memberId);
 
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
-
-    console.log(` Removed member ${memberId} from group ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Remove member error:", err);
     res.status(500).json({ message: "Failed to remove member" });
   }
 };
 
-// LEAVE GROUP - ANY MEMBER CAN LEAVE
+// LEAVE GROUP CONTROLLER
 export const leaveGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    // IF CREATOR LEAVES, TRANSFER OWNERSHIP OR DELETE GROUP
-    if (group.creator.toString() === userId) {
-      if (group.members.length === 1) {
-        // Last member leaving, delete group
-        await Group.findByIdAndDelete(groupId);
-        console.log(` Deleted empty group ${groupId}`);
-        return res.json({ message: "Group deleted", deleted: true });
-      } else {
-        // Transfer ownership to first admin or first member
-        const newCreator =
-          group.admins.find((a) => a.toString() !== userId) ||
-          group.members.find((m) => m.toString() !== userId);
-        group.creator = newCreator;
+    // Service call
+    const result = await groupService.processLeaveGroup(groupId, userId);
 
-        if (!group.admins.some((a) => a.toString() === newCreator.toString())) {
-          group.admins.push(newCreator);
-        }
-      }
-    }
-
-    // Remove from members and admins
-    group.members = group.members.filter((m) => m.toString() !== userId);
-    group.admins = group.admins.filter((a) => a.toString() !== userId);
-
-    await group.save();
-
-    console.log(` User ${userId} left group ${groupId}`);
-    res.json({ message: "Left group successfully" });
+    res.json(result);
   } catch (err) {
     console.error(" Leave group error:", err);
     res.status(500).json({ message: "Failed to leave group" });
   }
 };
 
-//  MAKE ADMIN - ADMINS ONLY
+//  MAKE ADMIN CONTROLLER
 export const makeAdmin = async (req, res) => {
   try {
     const { groupId, memberId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    //  CHECK IF USER IS ADMIN
-    const isAdmin = group.admins.some((a) => a.toString() === userId);
-    if (!isAdmin) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can promote members" });
+    const adminValidation = groupValidation.validateIsAdmin(group, userId);
+    if (!adminValidation.isValid) {
+      return res.status(adminValidation.statusCode).json({ message: "Only admins can promote members" });
     }
 
-    if (!group.members.some((m) => m.toString() === memberId)) {
-      return res.status(400).json({ message: "User is not a member" });
+    const memberValidation = groupValidation.validateIsMemberOfGroup(group, memberId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
     }
 
-    if (group.admins.some((a) => a.toString() === memberId)) {
-      return res.status(400).json({ message: "User is already an admin" });
+    const notAdminValidation = groupValidation.validateIsNotAlreadyAdmin(group, memberId);
+    if (!notAdminValidation.isValid) {
+      return res.status(notAdminValidation.statusCode).json({ message: notAdminValidation.message });
     }
 
-    group.admins.push(memberId);
-    await group.save();
-    await group.populate(
-      "members admins creator",
-      "username email profileImage"
-    );
+    // Service call
+    const updatedGroup = await groupService.processMakeAdmin(groupId, memberId);
 
-    console.log(`Made ${memberId} admin in group ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Make admin error:", err);
     res.status(500).json({ message: "Failed to make admin" });
   }
 };
-//  REMOVE ADMIN (DEMOTE TO MEMBER) - CREATOR OR OTHER ADMINS
+
+//  REMOVE ADMIN CONTROLLER
 export const removeAdmin = async (req, res) => {
   try {
     const { groupId, memberId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
     // Only creator or other admins can remove admin
@@ -410,212 +313,225 @@ export const removeAdmin = async (req, res) => {
       return res.status(403).json({ message: "Only creator or admins can demote admins" });
     }
 
-    // Cannot remove creator as admin
-    if (group.creator.toString() === memberId) {
-      return res.status(400).json({ message: "Cannot demote group creator" });
+    const creatorValidation = groupValidation.validateCannotDemoteCreator(group, memberId);
+    if (!creatorValidation.isValid) {
+      return res.status(creatorValidation.statusCode).json({ message: creatorValidation.message });
     }
 
-    // Check if user is actually an admin
-    if (!group.admins.some((a) => a.toString() === memberId)) {
-      return res.status(400).json({ message: "User is not an admin" });
+    const isActuallyAdminValidation = groupValidation.validateIsActuallyAdmin(group, memberId);
+    if (!isActuallyAdminValidation.isValid) {
+      return res.status(isActuallyAdminValidation.statusCode).json({ message: isActuallyAdminValidation.message });
     }
 
-    // Remove from admins array (demote to regular member)
-    group.admins = group.admins.filter((a) => a.toString() !== memberId);
-    
-    await group.save();
-    await group.populate("members admins creator", "username email profileImage");
+    // Service call
+    const updatedGroup = await groupService.processRemoveAdmin(groupId, memberId);
 
-    console.log(`Removed ${memberId} from admin in group ${groupId}`);
-    res.json(group);
+    res.json(updatedGroup);
   } catch (err) {
     console.error(" Remove admin error:", err);
     res.status(500).json({ message: "Failed to remove admin" });
   }
 };
 
-//  DELETE GROUP - CREATOR ONLY
+//  DELETE GROUP CONTROLLER
 export const deleteGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    //  ONLY CREATOR CAN DELETE
-    if (group.creator.toString() !== userId) {
-      return res.status(403).json({ message: "Only creator can delete group" });
+    const creatorValidation = groupValidation.validateIsCreator(group, userId);
+    if (!creatorValidation.isValid) {
+      return res.status(creatorValidation.statusCode).json({ message: "Only creator can delete group" });
     }
 
-    // Delete group image if exists
-    if (group.groupImage) {
-      const imagePath = path.join(
-        "uploads/groupImages/",
-        path.basename(group.groupImage)
-      );
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
+    // Service call
+    const result = await groupService.processDeleteGroup(groupId);
 
-    await Group.findByIdAndDelete(groupId);
-
-    // Delete all group messages
-    await Message.deleteMany({ groupId });
-
-    console.log(` Deleted group ${groupId}`);
-    res.json({ message: "Group deleted successfully" });
+    res.json(result);
   } catch (err) {
     console.error(" Delete group error:", err);
     res.status(500).json({ message: "Failed to delete group" });
   }
 };
-// PIN GROUP
+
+// PIN GROUP CONTROLLER
 export const pinGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group.members.includes(userId)) {
-      return res.status(403).json({ message: "Not a member" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    const alreadyPinned = group.pinnedBy.some(
-      (p) => p.userId.toString() === userId
-    );
-    if (alreadyPinned) {
-      return res.status(400).json({ message: "Already pinned" });
+    const memberValidation = groupValidation.validateIsMember(group, userId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
+    }
+
+    const pinnedValidation = groupValidation.validateNotAlreadyPinned(group, userId);
+    if (!pinnedValidation.isValid) {
+      return res.status(pinnedValidation.statusCode).json({ message: pinnedValidation.message });
     }
 
     // Check pin limit (max 3)
-    const userPinnedCount = await Group.countDocuments({
-      "pinnedBy.userId": userId,
-    });
-    if (userPinnedCount >= 3) {
-      return res
-        .status(400)
-        .json({ message: "Maximum 3 groups can be pinned" });
+    const userPinnedCount = await groupService.checkUserPinCount(userId);
+    const pinLimitValidation = groupValidation.validatePinLimit(userPinnedCount);
+    if (!pinLimitValidation.isValid) {
+      return res.status(pinLimitValidation.statusCode).json({ message: pinLimitValidation.message });
     }
 
-    group.pinnedBy.push({ userId, pinnedAt: new Date() });
-    await group.save();
+    // Service call
+    const result = await groupService.processPinGroup(groupId, userId);
 
-    console.log(` Group pinned: ${groupId} by ${userId}`);
-    res.json({ message: "Group pinned successfully", group });
+    res.json(result);
   } catch (err) {
     console.error(" Pin group error:", err);
     res.status(500).json({ message: "Failed to pin group" });
   }
 };
 
-// UNPIN GROUP
+// UNPIN GROUP CONTROLLER
 export const unpinGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const group = await groupService.fetchGroupById(groupId);
 
-    group.pinnedBy = group.pinnedBy.filter(
-      (p) => p.userId.toString() !== userId
-    );
-    await group.save();
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
+    }
 
-    console.log(` Group unpinned: ${groupId} by ${userId}`);
-    res.json({ message: "Group unpinned successfully", group });
+    // Service call
+    const result = await groupService.processUnpinGroup(groupId, userId);
+
+    res.json(result);
   } catch (err) {
     console.error(" Unpin group error:", err);
     res.status(500).json({ message: "Failed to unpin group" });
   }
 };
 
-// ARCHIVE GROUP
+// ARCHIVE GROUP CONTROLLER
 export const archiveGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group.members.includes(userId)) {
-      return res.status(403).json({ message: "Not a member" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    const alreadyArchived = group.archivedBy.some(
-      (a) => a.userId.toString() === userId
-    );
-    if (alreadyArchived) {
-      return res.status(400).json({ message: "Already archived" });
+    const memberValidation = groupValidation.validateIsMember(group, userId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
     }
 
-    group.archivedBy.push({ userId, archivedAt: new Date() });
-    await group.save();
+    const archivedValidation = groupValidation.validateNotAlreadyArchived(group, userId);
+    if (!archivedValidation.isValid) {
+      return res.status(archivedValidation.statusCode).json({ message: archivedValidation.message });
+    }
 
-    console.log(` Group archived: ${groupId} by ${userId}`);
-    res.json({ message: "Group archived successfully", group });
+    // Service call
+    const result = await groupService.processArchiveGroup(groupId, userId);
+
+    res.json(result);
   } catch (err) {
     console.error(" Archive group error:", err);
     res.status(500).json({ message: "Failed to archive group" });
   }
 };
 
-// UNARCHIVE GROUP
+// UNARCHIVE GROUP CONTROLLER
 export const unarchiveGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const group = await groupService.fetchGroupById(groupId);
 
-    group.archivedBy = group.archivedBy.filter(
-      (a) => a.userId.toString() !== userId
-    );
-    await group.save();
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
+    }
 
-    console.log(` Group unarchived: ${groupId} by ${userId}`);
-    res.json({ message: "Group unarchived successfully", group });
+    // Service call
+    const result = await groupService.processUnarchiveGroup(groupId, userId);
+
+    res.json(result);
   } catch (err) {
     console.error(" Unarchive group error:", err);
     res.status(500).json({ message: "Failed to unarchive group" });
   }
 };
 
-// CLEAR GROUP CHAT
+// CLEAR GROUP CHAT CONTROLLER
 export const clearGroupChat = async (req, res) => {
   try {
     const { groupId } = req.params;
     const userId = req.user.id;
 
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ message: "Group not found" });
+    const group = await groupService.fetchGroupById(groupId);
 
-    if (!group.members.includes(userId)) {
-      return res.status(403).json({ message: "Not a member" });
+    // Validation
+    const groupValidationResult = groupValidation.validateGroupExists(group);
+    if (!groupValidationResult.isValid) {
+      return res.status(groupValidationResult.statusCode).json({ message: groupValidationResult.message });
     }
 
-    const result = await Message.deleteMany({ groupId, isGroupMessage: true });
+    const memberValidation = groupValidation.validateIsMember(group, userId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
+    }
 
-    await Group.findByIdAndUpdate(groupId, {
-      lastMessage: "",
-      lastMessageTime: Date.now(),
-      lastMessageSender: null,
-    });
+    // Service call
+    const result = await groupService.processClearGroupChat(groupId, userId);
 
-    console.log(
-      ` Cleared ${result.deletedCount} messages from group ${groupId}`
-    );
+    // ✅ GET SOCKET.IO INSTANCE AND EMIT
+    const io = req.app.get("io");
+    
+    if (io) {
+      console.log("=================================");
+      console.log("🔌 EMITTING groupChatCleared EVENT");
+      console.log("=================================");
+      console.log("📤 Group ID:", groupId);
+      console.log("👤 Cleared by:", userId);
+      console.log("=================================");
+      
+      // ✅ Sirf jisne clear kiya usi ko event bhejo
+      io.to(userId).emit("groupChatCleared", {
+        groupId: result.groupId,
+        clearedBy: result.userId,
+        clearedFor: result.userId,
+        action: "clearedForMe"
+      });
+      
+      console.log("✅ Socket event emitted to clearing user only");
+      console.log("=================================");
+    }
+
     res.json({
-      message: "Group chat cleared",
+      message: result.message,
       deletedCount: result.deletedCount,
     });
   } catch (err) {
@@ -623,7 +539,8 @@ export const clearGroupChat = async (req, res) => {
     res.status(500).json({ message: "Failed to clear chat" });
   }
 };
-// ADD THIS FUNCTION - Serve Group Images
+
+// SERVE GROUP IMAGE CONTROLLER
 export const serveGroupImage = async (req, res) => {
   try {
     const filename = req.params.filename;
@@ -631,57 +548,29 @@ export const serveGroupImage = async (req, res) => {
 
     console.log(" Serving group image:", { filename, userId });
 
-    // Prevent path traversal attacks
-    if (
-      filename.includes("..") ||
-      filename.includes("/") ||
-      filename.includes("\\")
-    ) {
-      return res.status(400).json({ message: "Invalid filename" });
+    // Validation
+    const filenameValidation = groupValidation.validateFilename(filename);
+    if (!filenameValidation.isValid) {
+      return res.status(400).json({ message: filenameValidation.message });
     }
 
-    // Remove query strings (cache-busting timestamps)
-    const cleanFilename = filename.split("?")[0];
-
-    // Try multiple possible file paths
-    const possiblePaths = [
-      path.join(process.cwd(), "uploads", "groupImages", cleanFilename),
-      path.join(process.cwd(), "uploads", cleanFilename),
-    ];
-
-    let filePath = null;
-    for (const tryPath of possiblePaths) {
-      if (fs.existsSync(tryPath)) {
-        filePath = tryPath;
-        console.log(" Group image found at:", filePath);
-        break;
-      }
-    }
-
-    if (!filePath) {
-      console.error(" Group image not found:", cleanFilename);
-      return res.status(404).json({ message: "Image not found" });
-    }
-
-    // Determine MIME type
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes = {
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".png": "image/png",
-      ".gif": "image/gif",
-      ".webp": "image/webp",
-      ".jfif": "image/jpeg",
-    };
+    // Service call
+    const filePath = groupService.findGroupImageFile(filename);
+    const mimeType = groupService.getMimeType(filePath);
 
     // Set headers and send file
-    res.setHeader("Content-Type", mimeTypes[ext] || "image/jpeg");
+    res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "public, max-age=31536000");
     res.setHeader("Content-Disposition", "inline");
 
     return res.sendFile(filePath);
   } catch (error) {
     console.error(" Group image serve error:", error);
+    
+    if (error.message === "Image not found") {
+      return res.status(404).json({ message: error.message });
+    }
+    
     res.status(500).json({ message: "Failed to serve image" });
   }
 };

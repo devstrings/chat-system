@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "../hooks/useAuthImage";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
+import axios from "axios";
 export default function ProfileSettings({
   currentUser,
   onClose,
@@ -54,9 +55,11 @@ export default function ProfileSettings({
 
   const checkLocalAuth = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const response = await axios.get(`${API_BASE_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       console.log(" User info:", response.data);
@@ -95,29 +98,28 @@ export default function ProfileSettings({
 
   const loadBlockedUsers = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await fetch(`${API_BASE_URL}/api/friends/blocked`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
       setBlockedUsers(data);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadPendingRequests = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-   `${API_BASE_URL}/api/friends/requests/pending`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch(`${API_BASE_URL}/api/friends/requests/pending`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       setPendingRequests(data);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const handleUploadClick = () => {
@@ -130,12 +132,12 @@ export default function ProfileSettings({
     if (!file) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const formData = new FormData();
       formData.append("image", file);
 
       const uploadRes = await fetch(
-     `${API_BASE_URL}/api/users/profile/upload`,
+        `${API_BASE_URL}/api/users/profile/upload`,
         {
           method: "POST",
           headers: {
@@ -172,12 +174,12 @@ export default function ProfileSettings({
 
     setCoverPhotoLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const formData = new FormData();
       formData.append("coverPhoto", file);
 
       const uploadRes = await fetch(
-       `${API_BASE_URL}/api/users/profile/upload-cover`,
+        `${API_BASE_URL}/api/users/profile/upload-cover`,
         {
           method: "POST",
           headers: {
@@ -209,12 +211,14 @@ export default function ProfileSettings({
   const handleRemoveCoverPhoto = async () => {
     setCoverPhotoLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `${API_BASE_URL}/api/users/profile/remove-cover`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
 
@@ -237,10 +241,12 @@ export default function ProfileSettings({
   const handleRemoveImage = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       await fetch(`${API_BASE_URL}/api/users/profile/remove-image`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       onProfileImageUpdate(null);
@@ -273,11 +279,10 @@ export default function ProfileSettings({
     setPasswordLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-       `${API_BASE_URL}/api/auth/set-password`,
+      const token = localStorage.getItem("accessToken");
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/api/auth/set-password`,
         { newPassword },
-        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setPasswordSuccess(response.data.message);
@@ -330,11 +335,10 @@ export default function ProfileSettings({
     setChangePasswordLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-       `${API_BASE_URL}/api/auth/change-password`,
+      const token = localStorage.getItem("accessToken");
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/api/auth/change-password`,
         { oldPassword, newPassword },
-        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       setChangePasswordSuccess(response.data.message);
@@ -358,10 +362,12 @@ export default function ProfileSettings({
   };
   const handleUnblockUser = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
-      await fetch(`${API_BASE_URL}/api/friends/unblock/${userId}`,{
+      const token = localStorage.getItem("accessToken");
+      await fetch(`${API_BASE_URL}/api/friends/unblock/${userId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
       alert("User unblocked successfully!");
@@ -373,14 +379,13 @@ export default function ProfileSettings({
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token");
-      await fetch(
-     `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+      const token = localStorage.getItem("accessToken");
+      await fetch(`${API_BASE_URL}/api/friends/request/${requestId}/accept`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       alert("Friend request accepted!");
       setTimeout(() => window.location.reload(), 1500);
@@ -392,14 +397,13 @@ export default function ProfileSettings({
 
   const handleRejectRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token");
-      await fetch(
-       `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+      const token = localStorage.getItem("accessToken");
+      await fetch(`${API_BASE_URL}/api/friends/request/${requestId}/reject`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       alert("Friend request rejected");
     } catch (err) {
@@ -409,13 +413,11 @@ export default function ProfileSettings({
   };
 
   return (
- <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-0 md:p-4">
-  <div className="bg-white rounded-none md:rounded-lg shadow-2xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-0 md:p-4">
+      <div className="bg-white rounded-none md:rounded-lg shadow-2xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Profile 
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900">Profile</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-900"
@@ -444,7 +446,7 @@ export default function ProfileSettings({
             initialView === "settings") && (
             <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
               {/* Cover Photo Section */}
-         <div className="relative h-24 sm:h-32 bg-gradient-to-r from-blue-500 to-purple-600">
+              <div className="relative h-24 sm:h-32 bg-gradient-to-r from-blue-500 to-purple-600">
                 {coverImageLoading ? (
                   <div className="w-full h-full bg-gray-700 animate-pulse" />
                 ) : coverPreview ? (
@@ -510,23 +512,24 @@ export default function ProfileSettings({
               <div className="px-6 pb-6">
                 <div className="flex items-end gap-4 -mt-6 pt-2">
                   <div className="relative flex-shrink-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-  {imageLoading ? (
-    <div className="w-full h-full bg-gray-300 animate-pulse" />
-  ) : profilePreview ? (
-    <img
-      src={profilePreview}
-      alt="profile"
-      className="w-full h-full object-cover"
-      crossOrigin="anonymous"
-      referrerPolicy="no-referrer"
-    />
-  ) : (
-    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-semibold">
-      {currentUser?.username?.charAt(0)?.toUpperCase() || "U"}
-    </div>
-  )}
-</div>
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                      {imageLoading ? (
+                        <div className="w-full h-full bg-gray-300 animate-pulse" />
+                      ) : profilePreview ? (
+                        <img
+                          src={profilePreview}
+                          alt="profile"
+                          className="w-full h-full object-cover"
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-semibold">
+                          {currentUser?.username?.charAt(0)?.toUpperCase() ||
+                            "U"}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex-1 pt-4">
@@ -645,7 +648,7 @@ export default function ProfileSettings({
           })}
           {/* Set Password Section (Only for SSO users) */}
 
-       {initialView === "password" &&
+          {initialView === "password" &&
             authProvider &&
             authProvider !== "local" &&
             !hasPassword && (
@@ -754,7 +757,7 @@ export default function ProfileSettings({
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       minLength={6}
-className="w-full p-2.5 sm:p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 text-sm"
+                      className="w-full p-2.5 sm:p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 text-sm"
                     />
                   </div>
 
@@ -777,149 +780,148 @@ className="w-full p-2.5 sm:p-3 rounded-lg bg-white border border-gray-300 focus:
             )}
 
           {/*  CHANGE PASSWORD SECTION  */}
-       {initialView === "password" &&
-            hasPassword && (
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <h3 className="text-gray-900 font-semibold mb-2 text-lg flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Change Password
-                </h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  Update your current password
-                </p>
+          {initialView === "password" && hasPassword && (
+            <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+              <h3 className="text-gray-900 font-semibold mb-2 text-lg flex items-center gap-2">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Change Password
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Update your current password
+              </p>
 
-                {changePasswordError && (
-                  <div className="bg-red-500/20 border border-red-500 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                    {changePasswordError}
-                  </div>
-                )}
+              {changePasswordError && (
+                <div className="bg-red-500/20 border border-red-500 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {changePasswordError}
+                </div>
+              )}
 
-                {changePasswordSuccess && (
-                  <div className="bg-green-500/20 border border-green-500 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                    {changePasswordSuccess}
-                  </div>
-                )}
+              {changePasswordSuccess && (
+                <div className="bg-green-500/20 border border-green-500 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {changePasswordSuccess}
+                </div>
+              )}
 
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  {/* Current Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Current Password
-                    </label>
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                {/* Current Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Password
+                  </label>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter current password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    required
+                    className="w-full p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                  />
+                </div>
+
+                {/* New Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter current password"
-                      value={oldPassword}
-                      onChange={(e) => setOldPassword(e.target.value)}
-                      required
-                      className="w-full p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
-                    />
-                  </div>
-
-                  {/* New Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      New Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter new password (min 6 characters)"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        minLength={6}
-                        className="w-full p-3 pr-12 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Confirm New Password */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Confirm new password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Enter new password (min 6 characters)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="w-full p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                      className="w-full p-3 pr-12 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                      )}
+                    </button>
                   </div>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={changePasswordLoading}
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-wait shadow-lg hover:shadow-xl"
-                  >
-                    {changePasswordLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white"></div>
-                        Changing Password...
-                      </span>
-                    ) : (
-                      "Change Password"
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
+                {/* Confirm New Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full p-3 rounded-lg bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={changePasswordLoading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-wait shadow-lg hover:shadow-xl"
+                >
+                  {changePasswordLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white"></div>
+                      Changing Password...
+                    </span>
+                  ) : (
+                    "Change Password"
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
           {(initialView === "all" || initialView === "settings") && (
             <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
               <h3 className="text-gray-900 font-semibold mb-4 text-lg flex items-center gap-2">

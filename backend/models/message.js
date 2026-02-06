@@ -49,7 +49,6 @@ const messageSchema = new mongoose.Schema({
     ref: "User" 
   }],
   
-  // Delete functionality
   isDeleted: {
     type: Boolean,
     default: false
@@ -76,7 +75,14 @@ const messageSchema = new mongoose.Schema({
   },
   originalText: {
     type: String
-  }
+  },
+    editHistory: [{
+    text: String,
+    editedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 });
 
 // Index for faster queries

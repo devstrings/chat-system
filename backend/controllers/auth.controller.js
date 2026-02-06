@@ -1,131 +1,73 @@
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import User from "../models/user.js";
-import AuthProvider from "../models/AuthProvider.js";
-import config from "../config/index.js";
-import crypto from "crypto";
-// Helper function
-const generateToken = (userId, username) => {
-  return jwt.sign({ id: userId, username }, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn,
-  });
-};
 
-//  REGISTER
+import * as authService from "../services/auth.service.js";
+import * as authValidation from "../validations/auth.validation.js";
+import config from "../config/index.js";
+
+// REGISTER CONTROLLER
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+    // Validation
+    const validation = authValidation.validateRegister(username, email, password);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-    });
-
-    await AuthProvider.create({
-      userId: newUser._id,
-      provider: "local",
-    });
-
-    console.log(" User registered:", email);
+    // Service call
+    const user = await authService.registerUser(username, email, password);
 
     res.status(201).json({
       message: "User registered successfully",
-      user: {
-        _id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        profileImage: newUser.profileImage,
-      },
+      user,
     });
   } catch (err) {
     console.error(" Registration error:", err);
-    res
-      .status(500)
-      .json({ message: "Registration failed", error: err.message });
+    if (err.message === "Email already registered") {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(500).json({ message: "Registration failed", error: err.message });
   }
 };
 
-// LOGIN
+// LOGIN CONTROLLER
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
+    // Validation
+    const validation = authValidation.validateLogin(email, password);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    let localProvider = await AuthProvider.findOne({
-      userId: user._id,
-      provider: "local",
-    });
-
-    // Auto-migration fallback
-    if (!localProvider && user.password) {
-      console.log(" Auto-creating local provider for:", email);
-
-      localProvider = await AuthProvider.create({
-        userId: user._id,
-        provider: "local",
-      });
-
-      console.log(" Local provider auto-created");
-    }
-
-    if (!localProvider) {
-      return res.status(400).json({
-        message:
-          "This account was created with Google or Facebook. Please use social login.",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const token = generateToken(user._id, user.username);
-
-    console.log(" User logged in:", email);
+    // Service call
+    const result = await authService.loginUser(email, password);
 
     res.json({
       message: "Login successful",
-      token,
-      username: user.username,
-      profileImage: user.profileImage,
+      ...result,
     });
   } catch (err) {
     console.error(" Login error:", err);
+    if (err.message === "User not found") {
+      return res.status(404).json({ message: err.message });
+    }
+    if (err.message === "Invalid email or password") {
+      return res.status(401).json({ message: err.message });
+    }
+    if (err.message.includes("Google or Facebook")) {
+      return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({ message: "Login failed", error: err.message });
   }
 };
 
-// GOOGLE CALLBACk
+// GOOGLE CALLBACK CONTROLLER
 export const googleCallback = (req, res) => {
   try {
-    const token = generateToken(req.user._id, req.user.username);
-    const profileImage = req.user.profileImage || "";
-
-    const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
-
-    console.log(" Google OAuth success:", req.user.email);
-
+    // Service call
+    const redirectUrl = authService.handleGoogleCallback(req.user);
     res.redirect(redirectUrl);
   } catch (err) {
     console.error(" Google callback error:", err);
@@ -133,16 +75,11 @@ export const googleCallback = (req, res) => {
   }
 };
 
-// FACEBOOK CALLBACK
+// FACEBOOK CALLBACK CONTROLLER
 export const facebookCallback = (req, res) => {
   try {
-    const token = generateToken(req.user._id, req.user.username);
-    const profileImage = req.user.profileImage || "";
-
-    const redirectUrl = `${config.frontend.callbackUrl}?token=${token}&username=${encodeURIComponent(req.user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
-
-    console.log(" Facebook OAuth success:", req.user.email);
-
+    // Service call
+    const redirectUrl = authService.handleFacebookCallback(req.user);
     res.redirect(redirectUrl);
   } catch (err) {
     console.error("Facebook callback error:", err);
@@ -150,57 +87,26 @@ export const facebookCallback = (req, res) => {
   }
 };
 
-// FORGOT PASSWORD
+// FORGOT PASSWORD CONTROLLER
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+    // Validation
+    const validation = authValidation.validateForgotPassword(email);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      // Security: Don't reveal if email exists
-      return res.json({
-        message: "If this email exists, a reset link has been sent",
-      });
-    }
-
-    // Generate secure reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
-
-    // Save hashed token to database
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = new Date(
-      Date.now() + config.resetToken.expiryMinutes * 60 * 1000,
-    );
-    await user.save();
-
-    // Create reset URL
-    const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
-
-    //  CONSOLE LOGGING (instead of email)
-    console.log("\n" + "=".repeat(80));
-    console.log(" PASSWORD RESET REQUEST");
-    console.log("=".repeat(80));
-    console.log(" User Email:", user.email);
-    console.log(" Username:", user.username);
-    console.log(" Reset Link:");
-    console.log(resetUrl);
-    console.log(" Expires in:", config.resetToken.expiryMinutes, "minutes");
-    console.log("=".repeat(80) + "\n");
+    // Service call
+    const result = await authService.processForgotPassword(email);
 
     res.json({
-      message: "Password reset link generated successfully",
+      message: result.message,
       //  ONLY FOR DEVELOPMENT - Remove in production
-      ...(config.nodeEnv === "development" && {
-        resetUrl,
-        expiresIn: config.resetToken.expiryMinutes + " minutes",
+      ...(result.resetUrl && {
+        resetUrl: result.resetUrl,
+        expiresIn: result.expiresIn,
       }),
     });
   } catch (err) {
@@ -211,66 +117,27 @@ export const forgotPassword = async (req, res) => {
     });
   }
 };
-//  RESET PASSWORD
+
+// RESET PASSWORD CONTROLLER
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
-    if (!token || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "Token and new password required" });
+    // Validation
+    const validation = authValidation.validateResetPassword(token, newPassword);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
-    }
+    // Service call
+    const result = await authService.processResetPassword(token, newPassword);
 
-    // Hash the token to compare with database
-    const crypto = await import("crypto");
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    // Find user with valid token
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid or expired reset token",
-      });
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password and clear reset token
-    user.password = hashedPassword;
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
-    await user.save();
-
-    // Ensure local auth provider exists
-    let localProvider = await AuthProvider.findOne({
-      userId: user._id,
-      provider: "local",
-    });
-
-    if (!localProvider) {
-      await AuthProvider.create({
-        userId: user._id,
-        provider: "local",
-      });
-    }
-
-    console.log(" Password reset successful for:", user.email);
-
-    res.json({ message: "Password reset successful" });
+    res.json(result);
   } catch (err) {
     console.error("Reset password error:", err);
+    if (err.message === "Invalid or expired reset token") {
+      return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({
       message: "Failed to reset password",
       error: err.message,
@@ -278,115 +145,51 @@ export const resetPassword = async (req, res) => {
   }
 };
 
-// SET PASSWORD
+// SET PASSWORD CONTROLLER
 export const setPassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
     const userId = req.user.id || req.user.userId;
 
-    if (!newPassword) {
-      return res.status(400).json({ message: "New password is required" });
+    // Validation
+    const validation = authValidation.validateSetPassword(newPassword);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters" });
-    }
+    // Service call
+    const result = await authService.setUserPassword(userId, newPassword);
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    //Check only if password already exists
-    if (user.password) {
-      return res.status(400).json({
-        message: "You already have a password. Use 'Change Password' instead.",
-      });
-    }
-
-    // Hash and set password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
-
-    // Create local auth provider if doesn't exist
-    const localProvider = await AuthProvider.findOne({
-      userId: user._id,
-      provider: "local",
-    });
-
-    if (!localProvider) {
-      await AuthProvider.create({
-        userId: user._id,
-        provider: "local",
-      });
-    }
-
-    console.log(" Password set for SSO user:", user.email);
-
-    res.json({ message: "Password set successfully" });
+    res.json(result);
   } catch (err) {
     console.error("Set password error:", err);
+    if (err.message === "User not found") {
+      return res.status(404).json({ message: err.message });
+    }
+    if (err.message.includes("Change Password")) {
+      return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({
       message: "Failed to set password",
       error: err.message,
     });
   }
 };
-//  GET CURRENT USER INFO (with auth provider details)
+
+// GET CURRENT USER CONTROLLER
 export const getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.id || req.user.userId;
 
-    const user = await User.findById(userId).select(
-      "-resetPasswordToken -resetPasswordExpires",
-    );
+    // Service call
+    const userData = await authService.fetchCurrentUser(userId);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Check password existence properly
-    const hasPassword = !!(user.password && user.password.length > 0);
-
-    // Check all auth providers for this user
-    const authProviders = await AuthProvider.find({ userId: user._id });
-
-    const hasLocalAuth = authProviders.some((p) => p.provider === "local");
-    const hasGoogleAuth = authProviders.some((p) => p.provider === "google");
-    const hasFacebookAuth = authProviders.some(
-      (p) => p.provider === "facebook",
-    );
-
-    const primaryProvider =
-      authProviders.length > 0 ? authProviders[0].provider : "local";
-
-    // : Console log for debugging
-    console.log(" User Check:", {
-      email: user.email,
-      hasPasswordInDB: hasPassword,
-      passwordField: user.password ? "EXISTS" : "NULL",
-      hasLocalAuth,
-      primaryProvider,
-    });
-
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      profileImage: user.profileImage,
-      coverPhoto: user.coverPhoto,
-      hasPassword, //  This should be true if password exists
-      hasLocalAuth,
-      hasGoogleAuth,
-      hasFacebookAuth,
-      primaryProvider,
-      createdAt: user.createdAt,
-    });
+    res.json(userData);
   } catch (err) {
     console.error("Get user error:", err);
+    if (err.message === "User not found") {
+      return res.status(404).json({ message: err.message });
+    }
     res.status(500).json({
       message: "Failed to fetch user",
       error: err.message,
@@ -394,61 +197,57 @@ export const getCurrentUser = async (req, res) => {
   }
 };
 
+// CHANGE PASSWORD CONTROLLER
 export const changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
     const userId = req.user.id;
 
     // Validation
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({
-        message: "Old and new password required",
-      });
+    const validation = authValidation.validateChangePassword(oldPassword, newPassword);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters",
-      });
-    }
+    // Service call
+    const result = await authService.changeUserPassword(userId, oldPassword, newPassword);
 
-    // Get user
-    const user = await User.findById(userId);
-    if (!user || !user.password) {
-      return res.status(400).json({
-        message: "No password set. Use 'Set Password' first.",
-      });
-    }
-
-    // Verify old password
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Current password is incorrect",
-      });
-    }
-
-    // Check if new password is same as old
-    const isSamePassword = await bcrypt.compare(newPassword, user.password);
-    if (isSamePassword) {
-      return res.status(400).json({
-        message: "New password must be different from current password",
-      });
-    }
-
-    // Hash and update password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
-
-    console.log(" Password changed for:", user.email);
-
-    res.json({ message: "Password changed successfully" });
+    res.json(result);
   } catch (err) {
     console.error(" Change password error:", err);
+    if (err.message.includes("Set Password")) {
+      return res.status(400).json({ message: err.message });
+    }
+    if (err.message === "Current password is incorrect") {
+      return res.status(400).json({ message: err.message });
+    }
+    if (err.message.includes("must be different")) {
+      return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({
       message: "Failed to change password",
       error: err.message,
     });
+  }
+};
+
+// REFRESH TOKEN CONTROLLER
+export const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    // Validation
+    const validation = authValidation.validateRefreshToken(refreshToken);
+    if (!validation.isValid) {
+      return res.status(401).json({ message: validation.message });
+    }
+
+    // Service call
+    const result = authService.refreshAccessToken(refreshToken);
+
+    res.json(result);
+  } catch (err) {
+    console.error(" Refresh token error:", err);
+    return res.status(403).json({ message: "Invalid refresh token" });
   }
 };

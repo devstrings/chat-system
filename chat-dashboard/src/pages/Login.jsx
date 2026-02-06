@@ -1,20 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
 import API_BASE_URL from "../config/api";
+
 export default function Login() {
   const navigate = useNavigate();
+  const hasNavigated = useRef(false);
+  const hasCheckedAuth = useRef(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Check if user is already logged in
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      navigate("/dashboard", { replace: true });
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
+    const accessToken = localStorage.getItem("accessToken");
+    const refreshToken = localStorage.getItem("refreshToken");
+    
+    if (accessToken || refreshToken) {
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        navigate("/dashboard", { replace: true });
+      }
     }
   }, [navigate]);
 
@@ -23,39 +33,70 @@ export default function Login() {
     setError("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  console.log(" Form submitted!");
+  console.log(" Email:", formData.email);
+  
+  setLoading(true);
+  setError("");
 
-    try {
-      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, formData);
+  try {
+    console.log(" Making API call to:", `${API_BASE_URL}/api/auth/login`);
+    
+    const res = await axiosInstance.post("/api/auth/login", formData);
 
-      if (res.data.token) {
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("username", res.data.username);
+    console.log(" Full Response:", res);
+    console.log(" Response Data:", res.data);
+    console.log(" Access Token:", res.data.accessToken);
+    console.log(" Refresh Token:", res.data.refreshToken);
 
-        if (res.data.profileImage) {
-          localStorage.setItem("profileImage", res.data.profileImage);
-        }
+    if (res.data.accessToken && res.data.refreshToken) {
+      console.log(" About to save tokens...");
+      
+      localStorage.setItem("accessToken", res.data.accessToken);
+      localStorage.setItem("refreshToken", res.data.refreshToken);
+      localStorage.setItem("username", res.data.username);
 
-        navigate("/dashboard", { replace: true });
+      if (res.data.profileImage) {
+        localStorage.setItem("profileImage", res.data.profileImage);
       }
-    } catch (err) {
-      setError(err.response?.data?.message || "Invalid credentials");
-      console.error("Login error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  //  GOOGLE LOGIN
+      //  VERIFY tokens were saved
+      console.log(" Verification - Access Token saved:", localStorage.getItem("accessToken"));
+      console.log(" Verification - Refresh Token saved:", localStorage.getItem("refreshToken"));
+      
+      console.log(" Navigating to dashboard...");
+      
+      hasNavigated.current = true;
+      navigate("/dashboard", { replace: true });
+    } else {
+      console.error(" No tokens in response!");
+      console.error(" Response structure:", JSON.stringify(res.data, null, 2));
+      setError("Login failed - no tokens received");
+    }
+  } catch (err) {
+    console.error(" Login error:", err);
+    console.error(" Error message:", err.message);
+    console.error(" Error response:", err.response);
+    console.error(" Error data:", err.response?.data);
+    console.error(" Error status:", err.response?.status);
+    
+    setError(err.response?.data?.message || "Login failed. Please try again.");
+  } finally {
+    setLoading(false);
+    console.log(" Login process finished");
+  }
+};
+
   const handleGoogleLogin = () => {
+    console.log(" Google login clicked");
     window.location.href = `${API_BASE_URL}/api/auth/google`;
   };
 
-  //  FACEBOOK LOGIN
   const handleFacebookLogin = () => {
+    console.log(" Facebook login clicked");
     window.location.href = `${API_BASE_URL}/api/auth/facebook`;
   };
 
@@ -75,9 +116,9 @@ export default function Login() {
           </div>
         )}
 
-        {/* SOCIAL LOGIN BUTTONS */}
         <div className="space-y-3 mb-6">
           <button
+            type="button"
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-100 transition-all shadow-md hover:shadow-lg"
           >
@@ -86,6 +127,7 @@ export default function Login() {
           </button>
 
           <button
+            type="button"
             onClick={handleFacebookLogin}
             className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
           >
@@ -94,14 +136,12 @@ export default function Login() {
           </button>
         </div>
 
-        {/*  DIVIDER */}
         <div className="flex items-center gap-3 mb-6">
           <div className="flex-1 h-px bg-gray-700"></div>
           <span className="text-gray-500 text-sm">OR</span>
           <div className="flex-1 h-px bg-gray-700"></div>
         </div>
 
-        {/*  EMAIL/PASSWORD LOGIN */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">
@@ -134,7 +174,6 @@ export default function Login() {
               className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
 
-            {/*  FORGOT PASSWORD LINK */}
             <div className="text-right mt-2">
               <span
                 onClick={() => navigate("/forgot-password")}

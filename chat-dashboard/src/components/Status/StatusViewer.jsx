@@ -36,7 +36,7 @@ function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
         }
 
         // Local images
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
         if (!token) {
           setLoading(false);
           return;
@@ -169,7 +169,7 @@ export default function StatusViewer({
 
     const markAsViewed = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
         await fetch(`${API_BASE_URL}/api/status/${currentStatus._id}/view`, {
           method: "POST",
           headers: {

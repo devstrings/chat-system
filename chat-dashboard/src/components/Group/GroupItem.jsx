@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuthImage } from "../../hooks/useAuthImage";
 import ConfirmationDialog, { AlertDialog } from "../ConfirmationDialog";
-import axios from "axios";
+import axiosInstance from "../../utils/axiosInstance";
 import GroupProfile from "./GroupProfile";
 import API_BASE_URL from "../../config/api";
 export default function GroupItem({
@@ -138,10 +138,8 @@ export default function GroupItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
-          await axios.delete(`${API_BASE_URL}/api/groups/${group._id}/clear`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const token = localStorage.getItem("accessToken");
+          await axiosInstance.delete(`${API_BASE_URL}/api/groups/${group._id}/clear`);
 
           setAlertDialog({
             isOpen: true,
@@ -178,12 +176,11 @@ export default function GroupItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
 
-          await axios.post(
+          await axiosInstance.post(
             `${API_BASE_URL}/api/groups/${group._id}/leave`,
             {},
-            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           setAlertDialog({

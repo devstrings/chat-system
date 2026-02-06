@@ -1,7 +1,7 @@
 import React, { useState, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { useAuthImage } from "../hooks/useAuthImage";
 import API_BASE_URL from "../config/api";
 const UserItem = memo(function UserItem({
@@ -81,10 +81,14 @@ const UserItem = memo(function UserItem({
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
         const res = await fetch(
           `${API_BASE_URL}/api/friends/status/${user._id}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
         const data = await res.json();
         setRelationshipStatus(data.status);
@@ -169,7 +173,7 @@ const UserItem = memo(function UserItem({
 
   const handleSendRequest = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await fetch(`${API_BASE_URL}/api/friends/request/send`, {
         method: "POST",
         headers: {
@@ -207,7 +211,7 @@ const UserItem = memo(function UserItem({
 
   const handleAcceptRequest = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await fetch(
         `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
         {
@@ -247,12 +251,14 @@ const UserItem = memo(function UserItem({
 
   const handleRejectRequest = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await fetch(
         `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
 
@@ -293,12 +299,14 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           const res = await fetch(
             `${API_BASE_URL}/api/friends/unfriend/${user._id}`,
             {
               method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             },
           );
 
@@ -342,7 +350,7 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           const res = await fetch(`${API_BASE_URL}/api/friends/block`, {
             method: "POST",
             headers: {
@@ -392,12 +400,14 @@ const UserItem = memo(function UserItem({
       type: "success",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           const res = await fetch(
             `${API_BASE_URL}/api/friends/unblock/${user._id}`,
             {
               method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             },
           );
 
@@ -430,17 +440,14 @@ const UserItem = memo(function UserItem({
   };
 
   const handleClearChat = async () => {
-    //  Get or verify conversationId first
     let convId = conversationId;
 
     if (!convId) {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.post(
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.post(
           `${API_BASE_URL}/api/messages/conversation`,
-
           { otherUserId: user._id },
-          { headers: { Authorization: `Bearer ${token}` } },
         );
         convId = response.data._id;
       } catch (err) {
@@ -465,27 +472,28 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          console.log(" Clearing chat:", convId);
 
-          const response = await axios.patch(
+          await axiosInstance.patch(
             `${API_BASE_URL}/api/messages/conversation/${convId}/clear`,
             {},
-            { headers: { Authorization: `Bearer ${token}` } },
           );
 
-          if (response.data.action === "CLEAR") {
-          }
+          console.log(" Chat cleared successfully");
 
           setAlertDialog({
             isOpen: true,
             title: "Chat Cleared!",
-            message: "Messages deleted. Chat still in list.",
+            message: "All messages have been cleared.",
             type: "success",
           });
 
-          //  Keep conversation visible with empty message
-          setTimeout(() => window.location.reload(), 1000);
+          //  Close menu
+          setShowMenu(false);
+
+          // Socket will handle UI update automatically
         } catch (err) {
+          console.error(" Clear chat error:", err);
           setAlertDialog({
             isOpen: true,
             title: "Error",
@@ -500,20 +508,21 @@ const UserItem = memo(function UserItem({
   const handleDeleteConversation = async () => {
     let convId = conversationId;
 
+    // If no conversationId, fetch it first
     if (!convId) {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.post(
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.post(
           `${API_BASE_URL}/api/messages/conversation`,
           { otherUserId: user._id },
-          { headers: { Authorization: `Bearer ${token}` } },
         );
         convId = response.data._id;
+        console.log(" Fetched conversation ID:", convId);
       } catch (err) {
         setAlertDialog({
           isOpen: true,
           title: "Error",
-          message: "No conversation found.",
+          message: "No conversation found to delete.",
           type: "error",
         });
         return;
@@ -531,40 +540,54 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          console.log(" [UserItem] Deleting conversation:", convId);
+          console.log(" User ID:", user._id);
 
-          //  DELETE request - removes entire conversation
-          const response = await axios.delete(
+          // Send DELETE request with otherUserId in body
+          const response = await axiosInstance.delete(
             `${API_BASE_URL}/api/messages/conversation/${convId}/delete`,
             {
-              headers: { Authorization: `Bearer ${token}` },
               data: { otherUserId: user._id },
             },
           );
 
+          console.log(" Delete response:", response.data);
+
+          //  Show success alert
           setAlertDialog({
             isOpen: true,
             title: "Conversation Deleted!",
-            message: "Conversation permanently removed.",
+            message: "Conversation permanently removed from database.",
             type: "success",
           });
 
-          //  Remove from sidebar
+          //  Call parent's delete handler IMMEDIATELY
           if (onConversationDeleted) {
+            console.log("Calling onConversationDeleted for user:", user._id);
             onConversationDeleted(user._id);
           }
+
+          //  Close menu
+          setShowMenu(false);
+          setShowOptionsModal(false);
+
+          console.log(" Delete completed successfully");
         } catch (err) {
-          console.error(" Delete error:", err);
+          console.error(" Delete conversation error:", err);
+          console.error("Response:", err.response?.data);
+
           setAlertDialog({
             isOpen: true,
-            title: "Error",
+            title: "Delete Failed",
             message:
-              err.response?.data?.message || "Could not delete conversation.",
+              err.response?.data?.message ||
+              "Could not delete conversation. Please try again.",
             type: "error",
           });
         }
       },
     });
+
     setShowMenu(false);
   };
 

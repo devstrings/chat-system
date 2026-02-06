@@ -34,7 +34,7 @@ function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
           return;
         }
 
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
         if (!token) {
           setLoading(false);
           return;
@@ -108,7 +108,7 @@ export default function StatusRingsList({
 
   const loadStatuses = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(`${API_BASE_URL}/api/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
