@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import UserItem from "./UserItem";
 import GroupItem from "./Group/GroupItem";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { AlertDialog } from "./ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
 import { useSocket } from "../context/SocketContext";
@@ -295,10 +295,9 @@ export default function Sidebar({
     if (!searchUsers.trim()) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
+      const token = localStorage.getItem("accessToken");
+      const res = await axiosInstance.get(
         `${API_BASE_URL}/api/users/search?q=${encodeURIComponent(searchUsers)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
       );
       setAllUsers(res.data);
     } catch (err) {
@@ -316,13 +315,11 @@ export default function Sidebar({
 
   const handleSendRequest = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
-      await axios.post(
-        `${API_BASE_URL}/api/friends/request/send`,
-        { receiverId: userId },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      await axiosInstance.post(`${API_BASE_URL}/api/friends/request/send`, {
+        receiverId: userId,
+      });
 
       //  Success alert
       setAlertDialog({
@@ -356,11 +353,13 @@ export default function Sidebar({
 
   const loadPendingRequests = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
+      const token = localStorage.getItem("accessToken");
+      const res = await axiosInstance.get(
         `${API_BASE_URL}/api/friends/requests/pending`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
       setPendingRequests(res.data);
@@ -372,11 +371,10 @@ export default function Sidebar({
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.post(
+      const token = localStorage.getItem("accessToken");
+      await axiosInstance.post(
         `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } },
       );
       setAlertDialog({
         isOpen: true,
@@ -401,11 +399,13 @@ export default function Sidebar({
 
   const handleRejectRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(
+      const token = localStorage.getItem("accessToken");
+      await axiosInstance.delete(
         `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
       setAlertDialog({
@@ -430,10 +430,11 @@ export default function Sidebar({
 
   const loadBlockedUsers = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`${API_BASE_URL}/api/friends/blocked`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const token = localStorage.getItem("accessToken");
+      const res = await axiosInstance.get(
+        `${API_BASE_URL}/api/friends/blocked`,
+        {},
+      );
       setBlockedUsers(res.data);
       setShowBlocked(true);
     } catch (err) {
@@ -449,10 +450,15 @@ export default function Sidebar({
 
   const handleUnblockUser = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`${API_BASE_URL}/api/friends/unblock/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const token = localStorage.getItem("accessToken");
+      await axiosInstance.delete(
+        `${API_BASE_URL}/api/friends/unblock/${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
       setAlertDialog({
         isOpen: true,
         title: "User Unblocked!",

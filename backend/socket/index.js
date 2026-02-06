@@ -60,7 +60,13 @@ export const setupSocket = (io) => {
   io.on("connection", async (socket) => {
     const userId = socket.user.id;
     console.log(` Socket connected: ${socket.id} (User: ${userId})`);
-
+ console.log(` [SOCKET] User ${userId} joining their personal room`);
+    socket.join(userId);
+    
+    if (!userSockets.has(userId)) {
+      userSockets.set(userId, new Set());
+    }
+    userSockets.get(userId).add(socket.id);
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
     }

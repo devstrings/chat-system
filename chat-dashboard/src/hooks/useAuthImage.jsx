@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 
 export const useAuthImage = (imageUrl, type = "profile") => {
@@ -24,6 +24,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         cleanUrl = cleanUrl
           .replace(/localhost:5000https?:\/\//g, "")
           .replace(/^https?:\/\/localhost:5000\//, "");
+        
         // Step 2: Check if it's an external URL (Google/Facebook/etc)
         const isExternalHttps =
           cleanUrl.startsWith("https://") && !cleanUrl.includes("localhost");
@@ -58,7 +59,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
             cleanUrl = cleanUrl.replace(/s\d+-c$/, "s400-c");
           }
 
-          //  ENHANCEMENT: Increase Facebook image size
+          // ENHANCEMENT: Increase Facebook image size
           if (isFacebookImage && cleanUrl.includes("type=")) {
             cleanUrl = cleanUrl.replace(/type=\w+/, "type=large");
           }
@@ -104,7 +105,9 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
         console.log(" Fetching from:", apiUrl);
 
-        const token = localStorage.getItem("token");
+        // Use accessToken instead of token
+     const token = localStorage.getItem("accessToken");
+        
         if (!token) {
           console.warn(" No auth token found");
           setImageSrc(null);
@@ -112,7 +115,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
           return;
         }
 
-        const response = await axios.get(apiUrl, {
+        const response = await axiosInstance.get(apiUrl, {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
         });
@@ -122,7 +125,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         setImageSrc(objectUrl);
         console.log(" Local image loaded successfully");
       } catch (err) {
-        console.error("useAuthImage error:", {
+        console.error(" useAuthImage error:", {
           message: err.message,
           status: err.response?.status,
           originalUrl: imageUrl,

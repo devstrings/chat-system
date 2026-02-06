@@ -468,7 +468,76 @@ export function handleMessage(io, socket) {
     }
   });
   
+// Socket events section mein ye add karo:
+socket.on("editMessage", async ({ messageId, text, conversationId }) => {
+  try {
+    console.log(" Edit message request:", messageId);
 
+    const message = await Message.findById(messageId).populate('conversationId');
+    if (!message) {
+      socket.emit("errorMessage", { message: "Message not found" });
+      return;
+    }
+
+    const userId = socket.user.id;
+
+    // Only sender can edit
+    if (message.sender.toString() !== userId) {
+      socket.emit("errorMessage", { message: "Only sender can edit" });
+      return;
+    }
+
+    // Check 3 hour limit
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const threeHours = 3 * 60 * 60 * 1000;
+
+    if (messageAge > threeHours) {
+      socket.emit("errorMessage", { 
+        message: "Cannot edit after 3 hours" 
+      });
+      return;
+    }
+
+    // Save to history
+    if (!message.editHistory) {
+      message.editHistory = [];
+    }
+    message.editHistory.push({
+      text: message.text,
+      editedAt: new Date()
+    });
+
+    // Update
+    message.text = text;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    const editData = {
+      messageId,
+      conversationId,
+      text,
+      isEdited: true,
+      editedAt: message.editedAt
+    };
+
+    // Emit to all participants
+    for (const participant of message.conversationId.participants) {
+      const targetSocket = [...io.sockets.sockets.values()].find(
+        (s) => s.user && s.user.id === participant.toString()
+      );
+
+      if (targetSocket) {
+        targetSocket.emit("messageEdited", editData);
+      }
+    }
+
+    console.log(" Message edited successfully");
+  } catch (err) {
+    console.error(" Edit message error:", err);
+    socket.emit("errorMessage", { message: "Failed to edit message" });
+  }
+});
 /// GROUP MESSAGE HANDLER
 socket.on("sendGroupMessage", async ({ groupId, text, attachments = [] }) => {
   try {

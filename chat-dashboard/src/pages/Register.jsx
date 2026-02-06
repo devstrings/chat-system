@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
 import API_BASE_URL from "../config/api";
@@ -15,7 +15,7 @@ export default function Register() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+const token = localStorage.getItem("accessToken");
     if (token) {
       navigate("/dashboard", { replace: true });
     }
@@ -32,7 +32,7 @@ export default function Register() {
     setError("");
 
     try {
-      await axios.post(`${API_BASE_URL}/api/auth/register`, formData);
+await axiosInstance.post("/api/auth/register", formData);
       alert("Registration successful! Please login.");
       navigate("/login", { replace: true });
     } catch (err) {

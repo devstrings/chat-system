@@ -69,7 +69,7 @@ export default function StatusManager({
     console.log(" Loading my statuses for user:", currentUser._id);
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `${API_BASE_URL}/api/status/user/${currentUser._id}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -127,7 +127,7 @@ export default function StatusManager({
     setLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const formData = new FormData();
 
       formData.append("type", statusType);
@@ -199,7 +199,7 @@ export default function StatusManager({
     if (!confirm("Delete this status?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       await fetch(`${API_BASE_URL}/api/status/${statusId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -215,7 +215,7 @@ export default function StatusManager({
 
   const handleViewStatusViewers = async (statusId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `${API_BASE_URL}/api/status/${statusId}/viewers`,
         { headers: { Authorization: `Bearer ${token}` } },

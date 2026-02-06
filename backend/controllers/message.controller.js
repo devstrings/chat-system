@@ -1,53 +1,45 @@
-import Message from "../models/message.js";
-import Conversation from "../models/Conversation.js";
-import Attachment from "../models/Attachment.js";
-import Friendship from "../models/Friendship.js";
-import Group from "../models/Group.js";
 
-// Get or create conversation between two users
+import * as messageService from "../services/message.service.js";
+import * as messageValidation from "../validations/message.validation.js";
+
+// GET OR CREATE CONVERSATION CONTROLLER
 export const getOrCreateConversation = async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const { otherUserId } = req.body;
+    const { otherUserId, skipCreate } = req.body;
 
-    if (!otherUserId) {
-      return res.status(400).json({ message: "Other user ID required" });
+    // Validation
+    const validation = messageValidation.validateOtherUserId(otherUserId);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    // Check if they are friends
-    const friendship = await Friendship.findOne({
-      $or: [
-        { user1: currentUserId, user2: otherUserId },
-        { user1: otherUserId, user2: currentUserId },
-      ],
-    });
-
-    if (!friendship) {
-      return res.status(403).json({ message: "You must be friends to chat" });
+    // Check friendship
+    const friendship = await messageService.checkFriendship(currentUserId, otherUserId);
+    const friendshipValidation = messageValidation.validateFriendship(friendship);
+    if (!friendshipValidation.isValid) {
+      return res.status(friendshipValidation.statusCode).json({ message: friendshipValidation.message });
     }
 
-    // Find existing conversation
-    let conversation = await Conversation.findOne({
-      participants: { $all: [currentUserId, otherUserId] },
-    });
+    // Service call
+    const conversation = await messageService.processGetOrCreateConversation(currentUserId, otherUserId, skipCreate);
 
-    // Create new if doesn't exist
-    if (!conversation) {
-      conversation = await Conversation.create({
-        participants: [currentUserId, otherUserId],
+    // ✅ If skipCreate flag is set and no conversation found
+    if (!conversation && skipCreate) {
+      return res.status(404).json({ 
+        message: "No conversation found",
+        exists: false 
       });
     }
 
     res.json(conversation);
   } catch (err) {
     console.error("Get/Create conversation error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to get conversation", error: err.message });
+    res.status(500).json({ message: "Failed to get conversation", error: err.message });
   }
 };
 
-// Get messages for a conversation
+// GET MESSAGES CONTROLLER
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -56,116 +48,64 @@ export const getMessages = async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
 
     // Verify conversation exists and user is participant
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    if (!conversation.participants.includes(currentUserId)) {
-      return res.status(403).json({ message: "Unauthorized" });
+    const participantValidation = messageValidation.validateIsParticipant(conversation, currentUserId);
+    if (!participantValidation.isValid) {
+      return res.status(participantValidation.statusCode).json({ message: participantValidation.message });
     }
 
     // Check if users are still friends
-    const otherUserId = conversation.participants.find(
-      (p) => p.toString() !== currentUserId,
-    );
-
-    const friendship = await Friendship.findOne({
-      $or: [
-        { user1: currentUserId, user2: otherUserId },
-        { user1: otherUserId, user2: currentUserId },
-      ],
-    });
-
-    if (!friendship) {
-      return res
-        .status(403)
-        .json({ message: "You must be friends to view messages" });
+    const otherUserId = messageService.findOtherUserInConversation(conversation, currentUserId);
+    const friendship = await messageService.checkFriendship(currentUserId, otherUserId);
+    
+    const friendshipValidation = messageValidation.validateFriendshipForMessages(friendship);
+    if (!friendshipValidation.isValid) {
+      return res.status(friendshipValidation.statusCode).json({ message: friendshipValidation.message });
     }
 
-    const messages = await Message.find({
-      conversationId,
-      // Filter out messages deleted for current user
-      $or: [{ isDeleted: false }, { deletedFor: { $ne: currentUserId } }],
-    })
-      .populate("sender", "username email")
-      .populate({
-        path: "attachments",
-        select:
-          "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage",
-      })
-      .sort({ createdAt: 1 })
-      .skip(skip)
-      .limit(limit);
-
-    // Transform attachments to match frontend expectations
-    const transformedMessages = messages.map((msg) => {
-      const messageObj = msg.toObject();
-
-      // Add deleted info for frontend
-      messageObj.isDeletedForMe = msg.deletedFor.includes(currentUserId);
-      messageObj.isDeletedForEveryone = msg.deletedForEveryone;
-
-      if (messageObj.attachments && messageObj.attachments.length > 0) {
-        messageObj.attachments = messageObj.attachments.map((att) => ({
-          url: `/api/file/get/${att.serverFileName}`,
-          filename: att.fileName,
-          fileType: att.fileType,
-          fileSize: att.sizeInKilobytes * 1024,
-          attachmentId: att._id,
-          duration: att.duration || 0,
-          isVoiceMessage: att.isVoiceMessage || false,
-        }));
-      }
-
-      return messageObj;
-    });
+    // Service call
+    const messages = await messageService.fetchMessages(conversationId, currentUserId, limit, skip);
+    const transformedMessages = messageService.transformMessages(messages, currentUserId);
 
     res.json(transformedMessages);
   } catch (err) {
     console.error("Get messages error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch messages", error: err.message });
+    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
   }
 };
 
-// Get all conversations for current user
+// GET USER CONVERSATIONS CONTROLLER
 export const getUserConversations = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
-    const conversations = await Conversation.find({
-      participants: currentUserId,
-      "archivedBy.userId": { $ne: currentUserId },
-    })
-      .populate("participants", "username email profileImage")
-      .populate("lastMessageSender", "username")
-      .sort({ lastMessageTime: -1 });
+    // Service call
+    const conversations = await messageService.fetchUserConversations(currentUserId);
 
     res.json(conversations);
   } catch (err) {
     console.error("Get conversations error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch conversations", error: err.message });
+    res.status(500).json({ message: "Failed to fetch conversations", error: err.message });
   }
 };
 
-// CLEAR CHAT - Mark messages as deleted for current user ONLY
+// CLEAR CHAT CONTROLLER
 export const clearChat = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log("🧹 CLEAR CHAT START");
-    console.log("conversationId:", conversationId);
-    console.log("userId:", currentUserId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    const conversation = await Conversation.findById(conversationId);
-
-    if (!conversation) {
+    // Validation
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
       console.log(" Conversation not found");
       return res.status(404).json({
         success: false,
@@ -173,7 +113,8 @@ export const clearChat = async (req, res) => {
       });
     }
 
-    if (!conversation.participants.includes(currentUserId)) {
+    const participantValidation = messageValidation.validateIsParticipant(conversation, currentUserId);
+    if (!participantValidation.isValid) {
       console.log(" User not participant");
       return res.status(403).json({
         success: false,
@@ -181,35 +122,48 @@ export const clearChat = async (req, res) => {
       });
     }
 
-    // ADD USER TO deletedFor ARRAY (Don't actually delete)
-    const result = await Message.updateMany(
-      {
-        conversationId,
-        deletedFor: { $ne: currentUserId }, // Only update if not already added
-      },
-      {
-        $addToSet: { deletedFor: currentUserId }, // Add user to deletedFor array
-      },
-    );
+    // Service call
+    const result = await messageService.processClearChat(conversationId, currentUserId);
 
-    console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
+    //  GET SOCKET.IO INSTANCE AND EMIT
+    const io = req.app.get("io");
 
-    // (Other user will still see their last message)
-    conversation.lastMessage = "";
-    conversation.lastMessageTime = new Date();
-    await conversation.save();
-
-    console.log(" Conversation cleared for current user only");
-
+    if (io) {
+      console.log("=================================");
+      console.log("🔌 EMITTING chatCleared EVENT");
+      console.log("=================================");
+      console.log("📤 Conversation ID:", conversationId.toString());
+      console.log("👥 Participants:", result.participants.map(p => p.toString()));
+      console.log("🧹 Cleared by:", currentUserId);
+      console.log("=================================");
+      
+      // ✅ FIXED: Sirf jisne clear kiya usi ko bhejo
+      console.log(`📤 Emitting ONLY to user who cleared: ${currentUserId}`);
+      
+      io.to(currentUserId).emit("chatCleared", {
+        conversationId: conversationId.toString(),
+        clearedBy: currentUserId,
+        clearedFor: currentUserId,
+        action: "clearedForMe"
+      });
+      
+      console.log("✅ Socket event emitted to clearing user only");
+      console.log("=================================");
+    } else {
+      console.error("❌ Socket.IO not available!");
+    }
+    
     res.json({
-      success: true,
-      action: "CLEAR",
-      message: "Messages cleared for you only",
-      clearedCount: result.modifiedCount,
-      conversationId: conversationId,
+      success: result.success,
+      action: result.action,
+      message: result.message,
+      clearedCount: result.clearedCount,
+      conversationId: result.conversationId,
     });
+
   } catch (err) {
-    console.error(" CLEAR CHAT ERROR:", err);
+    console.error("CLEAR CHAT ERROR:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({
       success: false,
       message: "Failed to clear chat",
@@ -217,75 +171,47 @@ export const clearChat = async (req, res) => {
     });
   }
 };
-//  DELETE CONVERSATION - Remove everything
+
+// DELETE CONVERSATION CONTROLLER
 export const deleteConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const currentUserId = req.user.id;
     const { otherUserId } = req.body;
 
-    console.log(" DELETE CONVERSATION - conversationId:", conversationId);
+    // Service call
+    const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
 
-    let conversation;
+    // ✅ Emit socket event ONLY to current user
+    const io = req.app.get("io");
+    if (io) {
+      // Find current user's socket
+      const userSocket = [...io.sockets.sockets.values()].find(
+        (s) => s.user && s.user.id === currentUserId
+      );
 
-    // Find conversation
-    if (
-      conversationId &&
-      conversationId !== "undefined" &&
-      conversationId !== "null"
-    ) {
-      conversation = await Conversation.findById(conversationId);
+      if (userSocket) {
+        userSocket.emit("conversationDeleted", {
+          conversationId: result.conversationId.toString(),
+          deletedBy: currentUserId,
+          otherUserId: result.userId,
+        });
+        console.log("✅ Socket event sent ONLY to deleting user");
+      }
     }
 
-    if (!conversation && otherUserId) {
-      conversation = await Conversation.findOne({
-        participants: { $all: [currentUserId, otherUserId] },
-      });
-    }
+    res.json(result);
 
-    if (!conversation) {
+  } catch (err) {
+    console.error("❌ Delete conversation error:", err);
+    
+    if (err.message === "No conversation found to delete") {
       return res.status(404).json({
         success: false,
-        message: "No conversation found to delete",
+        message: err.message,
       });
     }
-
-    // Check authorization
-    const isParticipant = conversation.participants.some(
-      (p) => p.toString() === currentUserId,
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized",
-      });
-    }
-
-    //  Get other user ID for frontend
-    const otherUser = conversation.participants.find(
-      (p) => p.toString() !== currentUserId,
-    );
-
-    //  DELETE EVERYTHING
-    await Message.deleteMany({ conversationId: conversation._id });
-    await Attachment.updateMany(
-      { conversationId: conversation._id },
-      { status: "deleted" },
-    );
-    await Conversation.findByIdAndDelete(conversation._id);
-
-    console.log(" Conversation FULLY deleted:", conversation._id);
-
-    res.json({
-      success: true,
-      action: "DELETE",
-      message: "Conversation permanently deleted",
-      conversationId: conversation._id,
-      userId: otherUser?.toString(),
-    });
-  } catch (err) {
-    console.error(" Delete conversation error:", err);
+    
     res.status(500).json({
       success: false,
       message: "Failed to delete conversation",
@@ -293,296 +219,171 @@ export const deleteConversation = async (req, res) => {
     });
   }
 };
-// DELETE MESSAGE FOR ME
+
+// DELETE MESSAGE FOR ME CONTROLLER
 export const deleteMessageForMe = async (req, res) => {
   try {
     const { messageId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log(" Delete for me - Message:", messageId, "User:", currentUserId);
+    // Fetch message
+    const message = await messageService.fetchMessageWithConversation(messageId);
 
-    // Populate conversation to get participants
-    const message =
-      await Message.findById(messageId).populate("conversationId");
-
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
+    // Validation
+    const messageValidationResult = messageValidation.validateMessageExists(message);
+    if (!messageValidationResult.isValid) {
+      return res.status(messageValidationResult.statusCode).json({ message: messageValidationResult.message });
     }
 
-    if (!message.conversationId) {
-      return res.status(404).json({ message: "Conversation not found" });
+    const convValidation = messageValidation.validateMessageConversationExists(message);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    // Verify user is part of conversation
-    const isParticipant = message.conversationId.participants.some(
-      (p) => p.toString() === currentUserId,
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({ message: "Unauthorized" });
+    const participantValidation = messageValidation.validateIsMessageParticipant(message, currentUserId);
+    if (!participantValidation.isValid) {
+      return res.status(participantValidation.statusCode).json({ message: participantValidation.message });
     }
 
-    // Add user to deletedFor array
-    if (!message.deletedFor.includes(currentUserId)) {
-      message.deletedFor.push(currentUserId);
-    }
+    // Service call
+    const result = await messageService.processDeleteMessageForMe(messageId, currentUserId);
 
-    // If ALL participants deleted, mark as fully deleted
-    const allDeleted = message.conversationId.participants.every((p) =>
-      message.deletedFor.includes(p.toString()),
-    );
-
-    if (allDeleted) {
-      message.isDeleted = true;
-      message.deletedAt = new Date();
-    }
-
-    await message.save();
-
-    console.log(" Message deleted for user");
-
-    res.json({
-      message: "Message deleted for you",
-      deletedFor: message.deletedFor,
-      isDeleted: message.isDeleted,
-    });
+    res.json(result);
   } catch (err) {
     console.error("Delete for me error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to delete message", error: err.message });
+    res.status(500).json({ message: "Failed to delete message", error: err.message });
   }
 };
 
-// DELETE MESSAGE FOR EVERYONE
+// DELETE MESSAGE FOR EVERYONE CONTROLLER
 export const deleteMessageForEveryone = async (req, res) => {
   try {
     const { messageId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log(
-      " Delete for everyone - Message:",
-      messageId,
-      "User:",
-      currentUserId,
-    );
+    const message = await messageService.fetchMessageById(messageId);
 
-    const message = await Message.findById(messageId);
-
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
+    // Validation
+    const messageValidationResult = messageValidation.validateMessageExists(message);
+    if (!messageValidationResult.isValid) {
+      return res.status(messageValidationResult.statusCode).json({ message: messageValidationResult.message });
     }
 
-    // Only sender can delete for everyone
-    if (message.sender.toString() !== currentUserId) {
-      return res
-        .status(403)
-        .json({ message: "Only sender can delete for everyone" });
+    const senderValidation = messageValidation.validateIsSender(message, currentUserId);
+    if (!senderValidation.isValid) {
+      return res.status(senderValidation.statusCode).json({ message: senderValidation.message });
     }
 
-    // Check time limit (5 minutes)
-    const messageAge = Date.now() - new Date(message.createdAt).getTime();
-    const fiveMinutes = 5 * 60 * 1000;
-
-    if (messageAge > fiveMinutes) {
-      return res.status(400).json({
-        message: "Cannot delete for everyone after 5 minutes",
-      });
+    const timeLimitValidation = messageValidation.validateDeleteTimeLimit(message);
+    if (!timeLimitValidation.isValid) {
+      return res.status(timeLimitValidation.statusCode).json({ message: timeLimitValidation.message });
     }
 
-    // Mark as deleted for everyone
-    message.deletedForEveryone = true;
-    message.isDeleted = true;
-    message.deletedAt = new Date();
-    message.text = ""; // Clear text
-    message.attachments = []; // Clear attachments
-
-    await message.save();
+    // Service call
+    const result = await messageService.processDeleteMessageForEveryone(messageId);
 
     console.log(" Message deleted for everyone");
-
-    res.json({
-      message: "Message deleted for everyone",
-      deletedForEveryone: true,
-    });
+    res.json(result);
   } catch (err) {
     console.error(" Delete for everyone error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to delete message", error: err.message });
+    res.status(500).json({ message: "Failed to delete message", error: err.message });
   }
 };
 
-// BULK DELETE MESSAGES
+// BULK DELETE MESSAGES CONTROLLER
 export const bulkDeleteMessages = async (req, res) => {
   try {
     const { messageIds } = req.body;
     const currentUserId = req.user.id;
 
-    console.log(
-      " Bulk delete - Messages:",
-      messageIds.length,
-      "User:",
-      currentUserId,
-    );
-
-    if (!messageIds || messageIds.length === 0) {
-      return res.status(400).json({ message: "No messages to delete" });
+    // Validation
+    const validation = messageValidation.validateBulkDeleteMessages(messageIds);
+    if (!validation.isValid) {
+      return res.status(validation.statusCode).json({ message: validation.message });
     }
 
-    // Populate conversation for each message
-    const messages = await Message.find({ _id: { $in: messageIds } }).populate(
-      "conversationId",
-    );
+    // Service call
+    const result = await messageService.processBulkDeleteMessages(messageIds, currentUserId);
 
-    let deletedCount = 0;
-
-    for (const message of messages) {
-      if (!message.conversationId) {
-        continue; // Skip if conversation not found
-      }
-
-      // Verify user is participant
-      const isParticipant = message.conversationId.participants.some(
-        (p) => p.toString() === currentUserId,
-      );
-
-      if (isParticipant) {
-        if (!message.deletedFor.includes(currentUserId)) {
-          message.deletedFor.push(currentUserId);
-        }
-
-        // If all participants deleted, mark as fully deleted
-        const allDeleted = message.conversationId.participants.every((p) =>
-          message.deletedFor.includes(p.toString()),
-        );
-
-        if (allDeleted) {
-          message.isDeleted = true;
-          message.deletedAt = new Date();
-        }
-
-        await message.save();
-        deletedCount++;
-      }
-    }
-
-    console.log(" Bulk delete completed:", deletedCount, "messages");
-
-    res.json({
-      message: `${deletedCount} messages deleted`,
-      deletedCount,
-    });
+    res.json(result);
   } catch (err) {
     console.error(" Bulk delete error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to delete messages", error: err.message });
+    res.status(500).json({ message: "Failed to delete messages", error: err.message });
   }
 };
 
-// PIN CONVERSATION
+// PIN CONVERSATION CONTROLLER
 export const pinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+    // Validation
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    // Check if user is participant
-    const isParticipant = conversation.participants.some(
-      (p) => p.toString() === userId,
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({ message: "Not authorized" });
+    const participantValidation = messageValidation.validateIsConversationParticipant(conversation, userId);
+    if (!participantValidation.isValid) {
+      return res.status(participantValidation.statusCode).json({ message: participantValidation.message });
     }
 
-    // Check if already pinned
-    const alreadyPinned = conversation.pinnedBy.some(
-      (pin) => pin.userId.toString() === userId,
-    );
-
-    if (alreadyPinned) {
-      return res.status(400).json({ message: "Already pinned" });
+    const pinnedValidation = messageValidation.validateNotAlreadyPinnedConversation(conversation, userId);
+    if (!pinnedValidation.isValid) {
+      return res.status(pinnedValidation.statusCode).json({ message: pinnedValidation.message });
     }
 
     // Check pin limit (max 3 like WhatsApp)
-    const userPinnedCount = await Conversation.countDocuments({
-      "pinnedBy.userId": userId,
-    });
-
-    if (userPinnedCount >= 3) {
-      return res.status(400).json({
-        message: "Maximum 3 chats can be pinned. Unpin a chat first.",
-      });
+    const userPinnedCount = await messageService.checkUserConversationPinCount(userId);
+    const pinLimitValidation = messageValidation.validatePinLimitConversation(userPinnedCount);
+    if (!pinLimitValidation.isValid) {
+      return res.status(pinLimitValidation.statusCode).json({ message: pinLimitValidation.message });
     }
 
-    // Add pin
-    conversation.pinnedBy.push({
-      userId: userId,
-      pinnedAt: new Date(),
-    });
+    // Service call
+    const result = await messageService.processPinConversation(conversationId, userId);
 
-    await conversation.save();
-
-    console.log(` Conversation pinned: ${conversationId} by ${userId}`);
-
-    res.json({
-      message: "Conversation pinned successfully",
-      conversation,
-    });
+    res.json(result);
   } catch (err) {
     console.error(" Pin conversation error:", err);
     res.status(500).json({ message: "Failed to pin conversation" });
   }
 };
 
-//  UNPIN CONVERSATION
+//  UNPIN CONVERSATION CONTROLLER
 export const unpinConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+    // Validation
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    // Remove pin
-    conversation.pinnedBy = conversation.pinnedBy.filter(
-      (pin) => pin.userId.toString() !== userId,
-    );
+    // Service call
+    const result = await messageService.processUnpinConversation(conversationId, userId);
 
-    await conversation.save();
-
-    console.log(` Conversation unpinned: ${conversationId} by ${userId}`);
-
-    res.json({
-      message: "Conversation unpinned successfully",
-      conversation,
-    });
+    res.json(result);
   } catch (err) {
     console.error(" Unpin conversation error:", err);
     res.status(500).json({ message: "Failed to unpin conversation" });
   }
 };
 
-// GET PINNED CONVERSATIONS
+// GET PINNED CONVERSATIONS CONTROLLER
 export const getPinnedConversations = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const pinnedConversations = await Conversation.find({
-      "pinnedBy.userId": userId,
-    })
-      .populate("participants", "username email profileImage")
-      .sort({ "pinnedBy.pinnedAt": -1 });
+    // Service call
+    const pinnedConversations = await messageService.fetchPinnedConversations(userId);
 
     res.json(pinnedConversations);
   } catch (err) {
@@ -591,98 +392,71 @@ export const getPinnedConversations = async (req, res) => {
   }
 };
 
-// ARCHIVE CONVERSATION
+// ARCHIVE CONVERSATION CONTROLLER
 export const archiveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+    // Validation
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    // Check if user is participant
-    const isParticipant = conversation.participants.some(
-      (p) => p.toString() === userId,
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({ message: "Not authorized" });
+    const participantValidation = messageValidation.validateIsConversationParticipant(conversation, userId);
+    if (!participantValidation.isValid) {
+      return res.status(participantValidation.statusCode).json({ message: participantValidation.message });
     }
 
-    // Check if already archived
-    const alreadyArchived = conversation.archivedBy.some(
-      (archive) => archive.userId.toString() === userId,
-    );
-
-    if (alreadyArchived) {
-      return res.status(400).json({ message: "Already archived" });
+    const archivedValidation = messageValidation.validateNotAlreadyArchived(conversation, userId);
+    if (!archivedValidation.isValid) {
+      return res.status(archivedValidation.statusCode).json({ message: archivedValidation.message });
     }
 
-    // Add to archive
-    conversation.archivedBy.push({
-      userId: userId,
-      archivedAt: new Date(),
-    });
+    // Service call
+    const result = await messageService.processArchiveConversation(conversationId, userId);
 
-    await conversation.save();
-
-    console.log(` Conversation archived: ${conversationId} by ${userId}`);
-
-    res.json({
-      message: "Conversation archived successfully",
-      conversation,
-    });
+    res.json(result);
   } catch (err) {
     console.error(" Archive conversation error:", err);
     res.status(500).json({ message: "Failed to archive conversation" });
   }
 };
 
-// UNARCHIVE CONVERSATION
+// UNARCHIVE CONVERSATION CONTROLLER
 export const unarchiveConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await messageService.fetchConversationById(conversationId);
 
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
+    // Validation
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ message: convValidation.message });
     }
 
-    // Remove from archive
-    conversation.archivedBy = conversation.archivedBy.filter(
-      (archive) => archive.userId.toString() !== userId,
-    );
+    // Service call
+    const result = await messageService.processUnarchiveConversation(conversationId, userId);
 
-    await conversation.save();
-
-    console.log(` Conversation unarchived: ${conversationId} by ${userId}`);
-
-    res.json({
-      message: "Conversation unarchived successfully",
-      conversation,
-    });
+    res.json(result);
   } catch (err) {
     console.error("Unarchive conversation error:", err);
     res.status(500).json({ message: "Failed to unarchive conversation" });
   }
 };
 
-//  GET ARCHIVED CONVERSATIONS
+//  GET ARCHIVED CONVERSATIONS CONTROLLER
 export const getArchivedConversations = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const archivedConversations = await Conversation.find({
-      "archivedBy.userId": userId,
-    })
-      .populate("participants", "username email profileImage")
-      .populate("lastMessageSender", "username")
-      .sort({ "archivedBy.archivedAt": -1 });
+    // Service call
+    const archivedConversations = await messageService.fetchArchivedConversations(userId);
 
     res.json(archivedConversations);
   } catch (err) {
@@ -690,8 +464,8 @@ export const getArchivedConversations = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch archived conversations" });
   }
 };
-// GET GROUP MESSAGES
 
+// GET GROUP MESSAGES CONTROLLER
 export const getGroupMessages = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -700,56 +474,65 @@ export const getGroupMessages = async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
 
     // Verify user is group member
-    const group = await Group.findById(groupId);
+    const group = await messageService.fetchGroupById(groupId);
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
+    // Validation
+    const groupValidation = messageValidation.validateGroupExists(group);
+    if (!groupValidation.isValid) {
+      return res.status(groupValidation.statusCode).json({ message: groupValidation.message });
     }
 
-    if (!group.members.includes(currentUserId)) {
-      return res.status(403).json({ message: "Not a member of this group" });
+    const memberValidation = messageValidation.validateIsGroupMember(group, currentUserId);
+    if (!memberValidation.isValid) {
+      return res.status(memberValidation.statusCode).json({ message: memberValidation.message });
     }
 
-    const messages = await Message.find({
-      groupId,
-      isGroupMessage: true,
-      isDeleted: false,
-    })
-      .populate("sender", "username email profileImage")
-      .populate({
-        path: "attachments",
-        select:
-          "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
-      })
-      .sort({ createdAt: 1 })
-      .skip(skip)
-      .limit(limit);
-
-    // Transform attachments
-    const transformedMessages = messages.map((msg) => {
-      const messageObj = msg.toObject();
-
-      if (messageObj.attachments && messageObj.attachments.length > 0) {
-        messageObj.attachments = messageObj.attachments.map((att) => ({
-          url: `/api/file/get/${att.serverFileName}`,
-          filename: att.fileName,
-          fileType: att.fileType,
-          fileSize: att.sizeInKilobytes * 1024,
-          attachmentId: att._id,
-          duration: att.duration || 0,
-          isVoiceMessage: att.isVoiceMessage || false,
-        }));
-      }
-
-      return messageObj;
-    });
+    // Service call
+    const messages = await messageService.fetchGroupMessages(groupId, limit, skip);
+    const transformedMessages = messageService.transformGroupMessages(messages);
 
     console.log(`Fetched ${transformedMessages.length} group messages`);
     res.json(transformedMessages);
   } catch (err) {
     console.error(" Get group messages error:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch messages", error: err.message });
+    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
+  }
+};
+
+// EDIT MESSAGE CONTROLLER
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const currentUserId = req.user.id;
+
+    const message = await messageService.fetchMessageWithConversation(messageId);
+
+    // Validation
+    const messageValidationResult = messageValidation.validateMessageExists(message);
+    if (!messageValidationResult.isValid) {
+      return res.status(messageValidationResult.statusCode).json({ message: messageValidationResult.message });
+    }
+
+    const senderValidation = messageValidation.validateIsSenderForEdit(message, currentUserId);
+    if (!senderValidation.isValid) {
+      return res.status(senderValidation.statusCode).json({ message: senderValidation.message });
+    }
+
+    const timeLimitValidation = messageValidation.validateEditTimeLimit(message);
+    if (!timeLimitValidation.isValid) {
+      return res.status(timeLimitValidation.statusCode).json({ message: timeLimitValidation.message });
+    }
+
+    // Service call
+    const result = await messageService.processEditMessage(messageId, text);
+
+    res.json(result);
+  } catch (err) {
+    console.error("Edit message error:", err);
+    res.status(500).json({ 
+      message: "Failed to edit message", 
+      error: err.message 
+    });
   }
 };

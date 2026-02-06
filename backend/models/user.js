@@ -27,7 +27,6 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
-  //  Password Reset Fields
   resetPasswordToken: {
     type: String,
     default: null
@@ -36,7 +35,6 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-   //   STATUS FIELDS
   statusPrivacy: {
     type: String,
     enum: ["contacts", "except", "only"],

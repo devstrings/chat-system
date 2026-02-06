@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 export default function MessageInput({
   conversationId,
@@ -240,9 +240,9 @@ export default function MessageInput({
         isGroup ? "(group)" : "(DM)",
       );
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `${API_BASE_URL}/api/file/upload`,
         formData,
         {
@@ -356,9 +356,9 @@ export default function MessageInput({
       formData.append("isVoiceMessage", "true");
       formData.append("duration", duration.toString());
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
-      const response = await axios.post(
+      const response = await axiosInstance.post(
         `${API_BASE_URL}/api/file/upload`,
         formData,
         {

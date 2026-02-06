@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 export default function Message({
   message,
@@ -17,6 +17,8 @@ export default function Message({
   const [audioProgress, setAudioProgress] = useState({});
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+const [editedText, setEditedText] = useState(message.text || "");
   const audioRefs = React.useRef({});
 
   const formatTime = (date) => {
@@ -36,6 +38,35 @@ export default function Message({
 
   const getSenderName = () => {
     return message.sender?.username || "Unknown";
+  };
+    const canEdit = () => {
+    if (!isOwn) return false;
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const threeHours = 3 * 60 * 60 * 1000;
+    return messageAge <= threeHours;
+  };
+
+  const handleEditMessage = () => {
+    setIsEditing(true);
+    setEditedText(message.text);
+    setShowOptions(false);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editedText.trim()) return;
+    
+    socket?.emit("editMessage", {
+      messageId: message._id,
+      text: editedText,
+      conversationId: message.conversationId
+    });
+    
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedText(message.text);
   };
 
   const getFileIcon = (fileType) => {
@@ -76,10 +107,9 @@ export default function Message({
         });
       } else {
         // HTTP endpoint for regular messages
-        const token = localStorage.getItem("token");
-        await axios.delete(
+        const token = localStorage.getItem("accessToken");
+        await axiosInstance.delete(
           `${API_BASE_URL}/api/messages/message/${message._id}/for-me`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (socket) {
@@ -109,10 +139,9 @@ export default function Message({
         });
       } else {
         // HTTP endpoint for regular messages
-        const token = localStorage.getItem("token");
-        await axios.delete(
+        const token = localStorage.getItem("accessToken");
+        await axiosInstance.delete(
           `${API_BASE_URL}/api/messages/message/${message._id}/for-everyone`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (socket) {
@@ -147,7 +176,7 @@ export default function Message({
 
     if (!audio) {
       const newAudio = new Audio();
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       //  Check if URL is external
       if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
@@ -178,7 +207,6 @@ export default function Message({
 
       // Local file - fetch from backend with auth
       fetch(`${API_BASE_URL}${audioUrl}`, {
-        headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.blob())
         .then((blob) => {
@@ -234,7 +262,7 @@ export default function Message({
     const fetchSecureImages = async () => {
       if (!message.attachments || message.attachments.length === 0) return;
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       if (!token) return;
 
       for (const [index, file] of message.attachments.entries()) {
@@ -306,7 +334,7 @@ export default function Message({
   // handleFileDownload function
   const handleFileDownload = async (file) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       if (!token) {
         alert("Please login to download files");
         return;
@@ -506,6 +534,27 @@ export default function Message({
                   ></div>
 
                   <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
+                     {isOwn && canEdit() && !isEditing && (
+        <button
+          onClick={handleEditMessage}
+          className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+          Edit Message
+        </button>
+      )}
                     <button
                       onClick={() => {
                         setShowDeleteModal(true);
@@ -728,11 +777,53 @@ export default function Message({
             </div>
           )}
 
-          {message.text && (
-            <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
-              {message.text}
-            </p>
-          )}
+         {message.text && (
+  isEditing ? (
+    //  EDIT MODE UI
+    <div className="space-y-2">
+      <textarea
+        value={editedText}
+        onChange={(e) => setEditedText(e.target.value)}
+        className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${
+          isOwn 
+            ? "bg-white/10 border border-white/20 text-white" 
+            : "bg-gray-100 border border-gray-300 text-gray-900"
+        }`}
+        rows={3}
+        autoFocus
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={handleSaveEdit}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium"
+        >
+          Save
+        </button>
+        <button
+          onClick={handleCancelEdit}
+          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    //  NORMAL VIEW MODE 
+    <>
+      <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
+        {message.text}
+      </p>
+      {message.isEdited && (
+        <p className="text-xs opacity-70 italic mt-1">
+           Edited
+        </p>
+      )}
+    </>
+  )
+)}
+
+
+
 
           <div
             className={`flex items-center gap-1 mt-1 ${

@@ -9,31 +9,190 @@ import {
   resetPassword,     
   setPassword,
   changePassword,
-    getCurrentUser     
-
+  getCurrentUser,
+  refreshToken    
 } from "../controllers/auth.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import config from "../config/index.js"; 
 
 const router = express.Router();
 
-// LOCAL AUTH ROUTES
-
 /**
- * @route   POST /api/auth/register
- * @body   { username, email, password }
- * @auth  Public
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User registered successfully
  */
 router.post("/register", register);
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User logged in successfully
+ */
 router.post("/login", login);
 
-// PASSWORD RESET ROUTES
+/**
+ * @swagger
+ * /auth/refresh-token:
+ *   post:
+ *     summary: Refresh JWT token
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ */
+router.post("/refresh-token", refreshToken);
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request password reset
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password reset link sent
+ */
 router.post("/forgot-password", forgotPassword);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password using token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ */
 router.post("/reset-password", resetPassword);
+
+/**
+ * @swagger
+ * /auth/set-password:
+ *   post:
+ *     summary: Set password for authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password set successfully
+ */
 router.post("/set-password", verifyToken, setPassword);
+
+/**
+ * @swagger
+ * /auth/change-password:
+ *   post:
+ *     summary: Change password for authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ */
 router.post("/change-password", verifyToken, changePassword);
+
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user retrieved successfully
+ */
 router.get("/me", verifyToken, getCurrentUser);
-// GOOGLE OAUTH ROUTES
+
+/**
+ * @swagger
+ * /auth/google:
+ *   get:
+ *     summary: Google OAuth login
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirect to Google login
+ */
 router.get(
   "/google",
   passport.authenticate("google", { 
@@ -42,6 +201,16 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /auth/google/callback:
+ *   get:
+ *     summary: Google OAuth callback
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirect after Google login
+ */
 router.get(
   "/google/callback",
   passport.authenticate("google", { 
@@ -51,7 +220,16 @@ router.get(
   googleCallback
 );
 
-// FACEBOOK OAUTH ROUTES
+/**
+ * @swagger
+ * /auth/facebook:
+ *   get:
+ *     summary: Facebook OAuth login
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirect to Facebook login
+ */
 router.get(
   "/facebook",
   passport.authenticate("facebook", { 
@@ -60,6 +238,16 @@ router.get(
   })
 );
 
+/**
+ * @swagger
+ * /auth/facebook/callback:
+ *   get:
+ *     summary: Facebook OAuth callback
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirect after Facebook login
+ */
 router.get(
   "/facebook/callback",
   passport.authenticate("facebook", { 

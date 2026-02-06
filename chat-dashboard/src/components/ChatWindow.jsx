@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSocket } from "../context/SocketContext";
 import Message from "./Message";
-import axios from "axios";
+import axiosInstance from "../utils/axiosInstance";
 import ConfirmationDialog from "./ConfirmationDialog";
 import API_BASE_URL from "../config/api";
 
@@ -38,41 +38,56 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  useEffect(() => {
-    if (!conversationId) {
+ useEffect(() => {
+  if (!conversationId) {
+    setMessages([]);
+    return;
+  }
+
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("accessToken");
+      const response = await axiosInstance.get(
+        `${API_BASE_URL}/api/messages/${conversationId}`,
+      );
+
+      //  Filter out messages deleted for current user
+      const filteredMessages = response.data.filter(
+        (msg) => !msg.isDeletedForMe && !msg.deletedFor?.includes(currentUserId)
+      );
+
+      setMessages(filteredMessages);
+      setLoading(false);
+    } catch (err) {
+      console.error("Fetch messages error:", err);
       setMessages([]);
       setLoading(false);
-      return;
     }
+  };
 
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
+  fetchMessages();
+}, [conversationId, currentUserId]);
 
-        const res = await axios.get(
-          `${API_BASE_URL}/api/messages/${conversationId}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+// CHAT CLEARED SOCKET LISTENER
+useEffect(() => {
+  if (!socket || !conversationId) return;
+const handleChatCleared = (data) => {
+  console.log(" [CHATWINDOW] Chat cleared event:", data);
+  
+  if (data.conversationId === conversationId && data.clearedFor === currentUserId) {
+    console.log(" Clearing MY chat from UI");
+    setMessages([]);
+  } else {
+    console.log(" Not my chat clear event, ignoring");
+  }
+};
+  socket.on("chatCleared", handleChatCleared);
 
-        setMessages(res.data);
-
-        if (socket && res.data.length > 0) {
-          socket.emit("markAsRead", { conversationId });
-        }
-      } catch (err) {
-        console.error("Error fetching messages:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMessages();
-
-    setIsSelectionMode(false);
-    setSelectedMessages(new Set());
-  }, [conversationId, socket]);
-
+  return () => {
+    socket.off("chatCleared", handleChatCleared);
+  };
+}, [socket, conversationId]);
   useEffect(() => {
     if (!socket) return;
 
@@ -173,7 +188,24 @@ export default function ChatWindow({
         );
       }
     };
-
+const handleMessageEdited = (data) => {
+    console.log(" Message edited event:", data);
+    
+    if (data.conversationId === conversationIdRef.current) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.messageId
+            ? {
+                ...msg,
+                text: data.text,
+                isEdited: true,
+                editedAt: data.editedAt
+              }
+            : msg
+        )
+      );
+    }
+  };
     //  TYPING HANDLER
     const handleTyping = ({ userId, isTyping, conversationId }) => {
       console.log(" TYPING EVENT RECEIVED:", {
@@ -210,6 +242,7 @@ export default function ChatWindow({
     socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     socket.on("userTyping", handleTyping);
+     socket.on("messageEdited", handleMessageEdited); 
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
@@ -218,6 +251,7 @@ export default function ChatWindow({
       socket.off("messageDeleted", handleMessageDeleted);
       socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
       socket.off("userTyping", handleTyping);
+        socket.off("messageEdited", handleMessageEdited);
     };
   }, [socket, currentUserId, onUpdateLastMessageStatus, selectedUser]);
 
@@ -262,28 +296,30 @@ export default function ChatWindow({
     });
   };
 
-  const confirmBulkDelete = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const messageIds = Array.from(selectedMessages);
+ const confirmBulkDelete = async () => {
+  try {
+    const token = localStorage.getItem("accessToken");
+    const messageIds = Array.from(selectedMessages);
 
-      await axios.post(
-        `${API_BASE_URL}/api/messages/messages/bulk-delete`,
-        { messageIds },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+    await axiosInstance.post(
+      `${API_BASE_URL}/api/messages/messages/bulk-delete`,
+      { messageIds },
+    );
 
-      setMessages((prev) =>
-        prev.filter((msg) => !selectedMessages.has(msg._id)),
-      );
+    setMessages((prev) =>
+      prev.filter((msg) => !selectedMessages.has(msg._id)),
+    );
 
-      setIsSelectionMode(false);
-      setSelectedMessages(new Set());
-    } catch (err) {
-      console.error("Bulk delete error:", err);
-      alert("Failed to delete messages");
-    }
-  };
+    setIsSelectionMode(false);
+    setSelectedMessages(new Set());
+    
+    setDeleteDialog({ isOpen: false, count: 0 });
+    
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+    alert("Failed to delete messages");
+  }
+};
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>

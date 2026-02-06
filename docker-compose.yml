@@ -19,7 +19,7 @@ services:
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # Linux ke liye zaruri
+      - "host.docker.internal:host-gateway"  
     networks:
       - chat_network
     volumes:

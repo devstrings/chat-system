@@ -1,11 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import API_BASE_URL from "../config/api";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
-import axios from "axios";
 import ConfirmationDialog, {
   AlertDialog,
 } from "../components/ConfirmationDialog";
@@ -15,6 +14,7 @@ import GroupChatWindow from "../components/Group/GroupChatWindow";
 import StatusManager from "../components/Status/StatusManager";
 import StatusViewer from "../components/Status/StatusViewer";
 import StatusRingsList from "../components/Status/StatusRingsList";
+import axiosInstance from "../utils/axiosInstance";
 export default function Dashboard() {
   const navigate = useNavigate();
   const { socket, onlineUsers } = useSocket();
@@ -32,7 +32,10 @@ export default function Dashboard() {
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [lastMessages, setLastMessages] = useState({});
+
   const selectedUserRef = useRef(null);
+  const hasInitialized = useRef(false);
+  const lastMessagesRef = useRef({});
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
   const [archivedConversations, setArchivedConversations] = useState(new Set());
@@ -74,10 +77,13 @@ export default function Dashboard() {
   useEffect(() => {
     const loadAllStatuses = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_BASE_URL}/api/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const token =
+          localStorage.getItem("accessToken") ||
+          localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
+          `${API_BASE_URL}/api/status`,
+          {},
+        );
         setAllStatuses(response.data);
       } catch (err) {
         console.error("Load statuses error:", err);
@@ -92,15 +98,19 @@ export default function Dashboard() {
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
+  useEffect(() => {
+    lastMessagesRef.current = lastMessages;
+  }, [lastMessages]);
 
   //Load current user and set shared state
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_BASE_URL}/api/users/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
+          `${API_BASE_URL}/api/users/auth/me`,
+          {},
+        );
         setCurrentUser(response.data);
 
         if (response.data.profileImage) {
@@ -124,10 +134,9 @@ export default function Dashboard() {
   useEffect(() => {
     const loadPinnedConversations = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
           `${API_BASE_URL}/api/messages/pinned`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const pinnedIds = new Set(response.data.map((conv) => conv._id));
@@ -150,10 +159,9 @@ export default function Dashboard() {
   useEffect(() => {
     const loadArchivedConversations = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
           `${API_BASE_URL}/api/messages/archived`,
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         const archivedIds = new Set(response.data.map((conv) => conv._id));
@@ -208,10 +216,11 @@ export default function Dashboard() {
   //   handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`${API_BASE_URL}/api/users/profile/remove-image`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const token = localStorage.getItem("accessToken");
+      await axiosInstance.delete(
+        `${API_BASE_URL}/api/users/profile/remove-image`,
+        {},
+      );
 
       // UPDATE SHARED STATE
       setSharedProfileImage(null);
@@ -238,7 +247,7 @@ export default function Dashboard() {
   //Archeived
   const handleArchiveConversation = async (conversationId, isArchived) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       //  CHECK IF IT'S A GROUP
       const isGroup = groups.some((g) => g._id === conversationId);
@@ -250,9 +259,7 @@ export default function Dashboard() {
           ? `${API_BASE_URL}/api/groups/${conversationId}/unarchive`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unarchive`;
 
-        await axios.delete(endpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axiosInstance.delete(endpoint, {});
         setArchivedConversations((prev) => {
           const newSet = new Set(prev);
           newSet.delete(conversationId);
@@ -285,16 +292,11 @@ export default function Dashboard() {
         });
       } else {
         // Archive
-        // Archive endpoint
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/archive`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/archive`;
 
-        await axios.post(
-          endpoint,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        await axiosInstance.post(endpoint, {});
 
         setArchivedConversations((prev) => new Set([...prev, conversationId]));
 
@@ -338,21 +340,19 @@ export default function Dashboard() {
   // Pin/Unpin conversation handler
   const handlePinConversation = async (conversationId, isPinned) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       // CHECK IF IT'S A GROUP
       const isGroup = groups.some((g) => g._id === conversationId);
 
       if (isPinned) {
         // Unpin
-        // Unpin
+
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/unpin`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unpin`;
 
-        await axios.delete(endpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axiosInstance.delete(endpoint, {});
 
         setPinnedConversations((prev) => {
           const newSet = new Set(prev);
@@ -386,16 +386,12 @@ export default function Dashboard() {
         });
       } else {
         // Pin
-        // Pin
+
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/pin`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/pin`;
 
-        await axios.post(
-          endpoint,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        await axiosInstance.post(endpoint, {});
 
         setPinnedConversations((prev) => new Set([...prev, conversationId]));
 
@@ -434,30 +430,68 @@ export default function Dashboard() {
       });
     }
   };
-
   const handleConversationDeleted = (userId) => {
-    //  REMOVE from lastMessages
+    console.log(
+      " [DASHBOARD] Handling conversation deletion for user:",
+      userId,
+    );
+
+    const conversationIdToRemove = lastMessages[userId]?.conversationId;
+    console.log(" Conversation ID to remove:", conversationIdToRemove);
+
+    //  Remove from users list
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u._id !== userId);
+      console.log(" Users updated. Remaining users:", updated.length);
+      return updated;
+    });
+
+    //  Remove from lastMessages
     setLastMessages((prev) => {
       const updated = { ...prev };
       delete updated[userId];
+      console.log(
+        " LastMessages updated. Remaining entries:",
+        Object.keys(updated).length,
+      );
       return updated;
     });
 
-    //  REMOVE from unreadCounts
+    //  Remove from unreadCounts
     setUnreadCounts((prev) => {
       const updated = { ...prev };
       delete updated[userId];
+      console.log(" UnreadCounts updated");
       return updated;
     });
 
-    // CLEAR selection if this was the selected user
+    // Clear selection if this was the selected user
     if (selectedUser?._id === userId) {
+      console.log(" Clearing selected user");
       setSelectedUser(null);
       setConversationId(null);
+      setIsGroupChat(false);
     }
+
+    //  Remove from pinned/archived sets
+    if (conversationIdToRemove) {
+      setPinnedConversations((prev) => {
+        const updated = new Set(prev);
+        updated.delete(conversationIdToRemove);
+        return updated;
+      });
+
+      setArchivedConversations((prev) => {
+        const updated = new Set(prev);
+        updated.delete(conversationIdToRemove);
+        return updated;
+      });
+      console.log(" Removed from pinned/archived");
+    }
+
+    console.log(" Conversation fully deleted from all states");
   };
 
-  // Add this around line 146
   const formatAttachmentText = (attachments) => {
     if (!attachments || attachments.length === 0) return "";
 
@@ -490,11 +524,30 @@ export default function Dashboard() {
 
   // Initial data fetch
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    console.log(" Initial fetch useEffect triggered");
+    console.log("hasInitialized:", hasInitialized.current);
+
+    if (hasInitialized.current) {
+      console.log(" Already initialized, skipping");
+      return;
+    }
+
+    hasInitialized.current = true;
+    console.log(" Setting hasInitialized to true");
+
+    const accessToken = localStorage.getItem("accessToken");
+    const refreshToken = localStorage.getItem("refreshToken");
     const storedUsername = localStorage.getItem("username");
 
-    if (!token || !storedUsername) {
-      navigate("/login");
+    console.log(" Tokens:", {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      hasUsername: !!storedUsername,
+    });
+
+    if ((!accessToken && !refreshToken) || !storedUsername) {
+      console.log(" No valid tokens, redirecting to login");
+      navigate("/login", { replace: true });
       return;
     }
 
@@ -502,35 +555,38 @@ export default function Dashboard() {
 
     const fetchUsers = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/friends/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        //......
+        console.log(" Fetching users...");
+        const res = await axiosInstance.get(`${API_BASE_URL}/api/friends/list`);
         setUsers(res.data);
+        console.log(" Users fetched:", res.data.length);
 
+        const token = accessToken || refreshToken;
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.id);
+        console.log(" Current user ID set:", payload.id);
       } catch (err) {
         console.error(" Error fetching users:", err);
-        if (err.response?.status === 401) {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          console.log(" Auth error, clearing storage and redirecting");
           localStorage.clear();
-          navigate("/login");
+          navigate("/login", { replace: true });
         }
       } finally {
         setLoading(false);
+        console.log(" Loading set to false");
       }
     };
 
     fetchUsers();
   }, [navigate]);
-
   useEffect(() => {
     const loadGroups = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_BASE_URL}/api/groups/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
+          `${API_BASE_URL}/api/groups/list`,
+          {},
+        );
         setGroups(response.data);
       } catch (err) {
         console.error("Failed to load groups:", err);
@@ -548,90 +604,113 @@ export default function Dashboard() {
 
     const loadLastMessages = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
 
-        // Users ke liye
-        // Users ke liye
         for (const user of users) {
-          const convRes = await axios.post(
-            `${API_BASE_URL}/api/messages/conversation`,
-            { otherUserId: user._id },
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          const conversationId = convRes.data._id;
-
-          const msgRes = await axios.get(
-            `${API_BASE_URL}/api/messages/${conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          const messages = msgRes.data;
-
-          //  ALWAYS set lastMessage entry (even if empty)
-          if (messages.length > 0) {
-            const lastMsg = messages[messages.length - 1];
-
-            const messageText =
-              lastMsg.text ||
-              (lastMsg.attachments?.length > 0
-                ? formatAttachmentText(lastMsg.attachments)
-                : "");
-
-            setLastMessages((prev) => ({
-              ...prev,
-              [user._id]: {
-                text: messageText,
-                time: lastMsg.createdAt,
-                sender: lastMsg.sender._id || lastMsg.sender,
-                status: lastMsg.status || "sent",
-                lastMessageId: lastMsg._id,
-                conversationId: conversationId,
-                attachments: lastMsg.attachments,
-                _updated: Date.now(),
-              },
-            }));
-
-            const unreadCount = messages.filter(
-              (msg) =>
-                msg.sender._id !== currentUserId && msg.status !== "read",
-            ).length;
-
-            if (unreadCount > 0) {
-              setUnreadCounts((prev) => ({
-                ...prev,
-                [user._id]: unreadCount,
-              }));
-            }
-          } else {
-            setLastMessages((prev) => ({
-              ...prev,
-              [user._id]: {
-                text: "",
-                time: null,
-                sender: null,
-                status: "sent",
-                lastMessageId: null,
-                conversationId: conversationId,
-                attachments: [],
-                _updated: Date.now(),
-              },
-            }));
-          }
-        }
-
-        // Groups
-        for (const group of groups) {
           try {
-            const msgRes = await axios.get(
-              `${API_BASE_URL}/api/messages/group/${group._id}`,
-              { headers: { Authorization: `Bearer ${token}` } },
+            const convRes = await axiosInstance.post(
+              `${API_BASE_URL}/api/messages/conversation`,
+              {
+                otherUserId: user._id,
+                skipCreate: true,
+              },
+            );
+
+            //  Skip if conversation was deleted by current user
+            if (
+              convRes.data.deletedBy?.some((d) => d.userId === currentUserId)
+            ) {
+              console.log(
+                ` Conversation with ${user._id} deleted by me, skipping`,
+              );
+              continue;
+            }
+
+            const conversationId = convRes.data._id;
+
+            const msgRes = await axiosInstance.get(
+              `${API_BASE_URL}/api/messages/${conversationId}`,
             );
 
             const messages = msgRes.data;
-            if (messages.length > 0) {
-              const lastMsg = messages[messages.length - 1];
+            const visibleMessages = messages.filter(
+              (msg) => !msg.deletedFor?.includes(currentUserId),
+            );
 
+            if (visibleMessages.length > 0) {
+              const lastMsg = visibleMessages[visibleMessages.length - 1];
+              const messageText =
+                lastMsg.text ||
+                (lastMsg.attachments?.length > 0
+                  ? formatAttachmentText(lastMsg.attachments)
+                  : "");
+
+              setLastMessages((prev) => ({
+                ...prev,
+                [user._id]: {
+                  text: messageText,
+                  time: lastMsg.createdAt,
+                  sender: lastMsg.sender._id || lastMsg.sender,
+                  status: lastMsg.status || "sent",
+                  lastMessageId: lastMsg._id,
+                  conversationId: conversationId,
+                  attachments: lastMsg.attachments,
+                  _updated: Date.now(),
+                },
+              }));
+
+              const unreadCount = messages.filter(
+                (msg) =>
+                  msg.sender._id !== currentUserId && msg.status !== "read",
+              ).length;
+
+              if (unreadCount > 0) {
+                setUnreadCounts((prev) => ({
+                  ...prev,
+                  [user._id]: unreadCount,
+                }));
+              }
+            } else {
+              setLastMessages((prev) => ({
+                ...prev,
+                [user._id]: {
+                  text: "",
+                  time: null,
+                  sender: null,
+                  status: "sent",
+                  lastMessageId: null,
+                  conversationId: conversationId,
+                  attachments: [],
+                  _updated: Date.now(),
+                },
+              }));
+            }
+          } catch (userErr) {
+            if (userErr.response?.status === 404) {
+              console.log(` No conversation found for ${user._id}, skipping`);
+              continue;
+            }
+            console.error(
+              `Error loading messages for user ${user._id}:`,
+              userErr,
+            );
+          }
+        }
+
+        // Groups (same as before)
+        for (const group of groups) {
+          try {
+            const msgRes = await axiosInstance.get(
+              `${API_BASE_URL}/api/messages/group/${group._id}`,
+            );
+
+            const messages = msgRes.data;
+            const visibleMessages = messages.filter(
+              (msg) => !msg.deletedFor?.includes(currentUserId),
+            );
+
+            if (visibleMessages.length > 0) {
+              const lastMsg = visibleMessages[visibleMessages.length - 1];
               const messageText =
                 lastMsg.text ||
                 (lastMsg.attachments?.length > 0
@@ -667,9 +746,11 @@ export default function Dashboard() {
 
     loadLastMessages();
   }, [currentUserId, users, groups]);
+
   useEffect(() => {
     if (!socket || !currentUserId) return;
-
+    console.log(" Joining user room:", currentUserId);
+    socket.emit("joinUserRoom", currentUserId);
     const handleNewMessage = (msg) => {
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver;
@@ -679,7 +760,7 @@ export default function Dashboard() {
         (msg.attachments?.length > 0
           ? formatAttachmentText(msg.attachments)
           : "");
-      // Check if message is from a group
+
       if (msg.groupId) {
         setLastMessages((prev) => ({
           ...prev,
@@ -696,7 +777,6 @@ export default function Dashboard() {
           },
         }));
       } else {
-        // Individual message
         const associatedUserId =
           senderId === currentUserId ? receiverId : senderId;
 
@@ -744,11 +824,9 @@ export default function Dashboard() {
           }
         }
 
-        if (!targetUserId) {
-          return prev;
-        }
+        if (!targetUserId) return prev;
 
-        const newState = {
+        return {
           ...prev,
           [targetUserId]: {
             ...prev[targetUserId],
@@ -756,28 +834,18 @@ export default function Dashboard() {
             _updated: Date.now(),
           },
         };
-
-        return newState;
       });
     };
 
-    const handleMessageDeleted = async (data) => {
-      console.log(" Message deleted (ignored for clear chat):", data);
-      // Do nothing - clear chat will reload page, delete conversation uses different flow
-    };
     const handleMessageDeletedForEveryone = async (data) => {
-      console.log("Message deleted for everyone:", data);
+      console.log(" Message deleted for everyone:", data);
 
       if (data.messageId && data.conversationId) {
         try {
-          // Fetch messages to find previous one
-          const token = localStorage.getItem("token");
-          const response = await axios.get(
+          const response = await axiosInstance.get(
             `${API_BASE_URL}/api/messages/${data.conversationId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
           );
 
-          // Filter out deleted message
           const messages = response.data.filter(
             (msg) => msg._id !== data.messageId && !msg.deletedForEveryone,
           );
@@ -789,7 +857,6 @@ export default function Dashboard() {
             for (const [userId, msgData] of Object.entries(prev)) {
               if (msgData?.conversationId === data.conversationId) {
                 if (previousMessage) {
-                  //  Show previous message
                   const messageText =
                     previousMessage.text ||
                     (previousMessage.attachments?.length > 0
@@ -807,7 +874,6 @@ export default function Dashboard() {
                     _updated: Date.now(),
                   };
                 } else {
-                  // No messages left
                   updated[userId] = {
                     ...msgData,
                     text: "",
@@ -827,7 +893,145 @@ export default function Dashboard() {
       }
     };
 
-    //  GROUP MESSAGE LISTENER
+    const handleMessageEdited = (data) => {
+      console.log(" Message edited in dashboard:", data);
+
+      // Update lastMessages if this was the last message
+      setLastMessages((prev) => {
+        const updated = { ...prev };
+
+        // Find which user/group has this conversation
+        for (const [userId, msgData] of Object.entries(prev)) {
+          if (msgData?.lastMessageId === data.messageId) {
+            updated[userId] = {
+              ...msgData,
+              text: data.text,
+              _updated: Date.now(),
+            };
+            break;
+          }
+        }
+
+        return updated;
+      });
+    };
+
+    const handleConversationDeletedSocket = (data) => {
+      console.log(" Conversation deleted via socket:", data);
+
+      const { conversationId, otherUserId, deletedBy } = data;
+      let targetUserId = otherUserId;
+
+      if (!targetUserId) {
+        for (const [userId, msgData] of Object.entries(lastMessages)) {
+          if (msgData?.conversationId === conversationId) {
+            targetUserId = userId;
+            break;
+          }
+        }
+      }
+
+      if (targetUserId) {
+        console.log(" Found targetUserId:", targetUserId);
+        console.log(" Calling handleConversationDeleted");
+        handleConversationDeleted(targetUserId);
+      } else {
+        console.log(
+          " Could not find targetUserId for conversation:",
+          conversationId,
+        );
+      }
+    };
+    //  GROUP CHAT CLEARED HANDLER
+    socket.on("groupChatCleared", (data) => {
+      console.log(" [DASHBOARD] Group chat cleared event:", data);
+
+      //  Check if this event is for ME
+      if (data.clearedFor !== currentUserId) {
+        console.log(" Group chat cleared for other user, ignoring");
+        return;
+      }
+
+      console.log(" This is MY group chat clear, updating sidebar...");
+
+      // Update lastMessages for this group
+      setLastMessages((prev) => {
+        if (prev[data.groupId]) {
+          return {
+            ...prev,
+            [data.groupId]: {
+              ...prev[data.groupId],
+              text: "",
+              time: new Date().toISOString(),
+              lastMessageId: null,
+              sender: null,
+              status: "sent",
+              attachments: [],
+              _updated: Date.now(),
+              isGroup: true,
+            },
+          };
+        }
+        return prev;
+      });
+
+      //  Clear unread count for this group
+      setUnreadCounts((prev) => {
+        const updated = { ...prev };
+        delete updated[data.groupId];
+        return updated;
+      });
+    });
+
+    //  CHAT CLEARED HANDLER
+    const handleChatCleared = (data) => {
+      console.log(" [DASHBOARD] Chat cleared event received:", data);
+
+      if (data.clearedFor !== currentUserId) {
+        console.log(" Chat cleared for OTHER user, ignoring:", data.clearedFor);
+        return;
+      }
+
+      console.log("This is MY clear chat event, updating UI...");
+
+      // Baaki code same rahega...
+      if (!data.conversationId) {
+        console.log(" No conversationId in event");
+        return;
+      }
+
+      let foundUserId = null;
+      for (const [userId, msgData] of Object.entries(lastMessages)) {
+        if (msgData?.conversationId === data.conversationId) {
+          foundUserId = userId;
+          break;
+        }
+      }
+
+      if (foundUserId) {
+        setLastMessages((prev) => ({
+          ...prev,
+          [foundUserId]: {
+            ...prev[foundUserId],
+            text: "",
+            time: new Date().toISOString(),
+            lastMessageId: null,
+            sender: null,
+            status: "sent",
+            attachments: [],
+            _updated: Date.now(),
+          },
+        }));
+
+        setUnreadCounts((prev) => {
+          const updated = { ...prev };
+          delete updated[foundUserId];
+          return updated;
+        });
+      }
+    };
+
+    // Register all socket listeners
     socket.on("receiveGroupMessage", (msg) => {
       console.log(" Group msg received:", msg);
 
@@ -851,17 +1055,13 @@ export default function Dashboard() {
       }
     });
 
-    // Socket listeners for status updates
     socket.on("newStatus", (data) => {
       console.log(" New status received:", data);
-
-      // Reload all statuses to get fresh data
       const loadStatuses = async () => {
         try {
-          const token = localStorage.getItem("token");
-          const response = await axios.get("http://localhost:5000/api/status", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const response = await axiosInstance.get(
+            `${API_BASE_URL}/api/status`,
+          );
           setAllStatuses(response.data);
         } catch (err) {
           console.error("Reload statuses error:", err);
@@ -870,10 +1070,8 @@ export default function Dashboard() {
       loadStatuses();
     });
 
-    // Real-time status view updates
     socket.on("statusViewed", (data) => {
       console.log(" Status viewed:", data);
-
       setAllStatuses((prev) => {
         return prev.map((userStatus) => ({
           ...userStatus,
@@ -895,22 +1093,30 @@ export default function Dashboard() {
         }));
       });
     });
+
     socket.on("receiveMessage", handleNewMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
-    // socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
+    socket.on("conversationDeleted", handleConversationDeletedSocket);
+    socket.on("chatCleared", handleChatCleared);
+    socket.on("messageEdited", handleMessageEdited);
+    console.log(" Socket listeners registered");
 
     return () => {
       socket.off("receiveGroupMessage");
       socket.off("receiveMessage", handleNewMessage);
       socket.off("messageStatusUpdate", handleStatusUpdate);
-      socket.off("messageDeleted", handleMessageDeleted);
       socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
+      socket.off("messageEdited", handleMessageEdited);
       socket.off("newStatus");
-      socket.off("statusDeleted");
       socket.off("statusViewed");
+      socket.off("groupChatCleared");
+      socket.off("chatCleared", handleChatCleared);
+      socket.off("conversationDeleted", handleConversationDeletedSocket);
+
+      console.log(" Socket listeners removed");
     };
-  }, [socket, currentUserId]);
+  }, [socket, currentUserId, lastMessages]);
   // Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
@@ -920,12 +1126,11 @@ export default function Dashboard() {
 
     const getConversation = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("accessToken");
 
-        const res = await axios.post(
-          "http://localhost:5000/api/messages/conversation",
+        const res = await axiosInstance.post(
+          `${API_BASE_URL}/api/messages/conversation`,
           { otherUserId: selectedUser._id },
-          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         setConversationId(res.data._id);
@@ -945,28 +1150,59 @@ export default function Dashboard() {
 
     getConversation();
   }, [selectedUser?._id, socket]);
+  useEffect(() => {
+    if (!socket) return;
 
+    console.log("🔌 Socket connected:", socket.id);
+    console.log(
+      "🔌 Socket status:",
+      socket.connected ? "CONNECTED" : "DISCONNECTED",
+    );
+
+    // Test event
+    socket.on("connect", () => {
+      console.log(" Socket CONNECTED:", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+      console.log(" Socket DISCONNECTED");
+    });
+
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+    };
+  }, [socket]);
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("username");
+    localStorage.removeItem("profileImage");
     if (socket) socket.disconnect();
     navigate("/login", { replace: true });
   };
   const handleClearChat = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       if (!conversationId) {
         console.error(" No conversationId!");
         return;
       }
 
-      await axios.patch(
+      console.log(" Clearing chat for conversation:", conversationId);
+
+      await axiosInstance.patch(
         `${API_BASE_URL}/api/messages/conversation/${conversationId}/clear`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } },
       );
 
+      console.log(" Backend cleared successfully");
+
+      //  Close dialog first
+      setClearChatDialog({ isOpen: false, username: "" });
+
+      //  Success alert
       setAlertDialog({
         isOpen: true,
         title: "Chat Cleared!",
@@ -974,23 +1210,8 @@ export default function Dashboard() {
         type: "success",
       });
 
-      //  Update lastMessages to empty but KEEP conversationId
-      setLastMessages((prev) => ({
-        ...prev,
-        [selectedUser?._id]: {
-          text: "",
-          time: new Date().toISOString(),
-          sender: null,
-          status: "sent",
-          lastMessageId: null,
-          conversationId: conversationId,
-          attachments: [],
-          _updated: Date.now(),
-        },
-      }));
-
-      // DON'T reload - just close dialog
-      setClearChatDialog({ isOpen: false, username: "" });
+      // No need to manually update state here - socket listener will do it
+      console.log(" Waiting for socket event to update UI...");
     } catch (err) {
       console.error(" Clear error:", err);
       setAlertDialog({
@@ -1084,10 +1305,11 @@ export default function Dashboard() {
     // Reload statuses
     const loadStatuses = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get("http://localhost:5000/api/status", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const token = localStorage.getItem("accessToken");
+        const response = await axiosInstance.get(
+          `${API_BASE_URL}/api/status`,
+          {},
+        );
         setAllStatuses(response.data);
       } catch (err) {
         console.error("Reload statuses error:", err);

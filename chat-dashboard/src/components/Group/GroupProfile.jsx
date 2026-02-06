@@ -404,7 +404,7 @@ export default function GroupProfile({
       const formData = new FormData();
       formData.append("groupImage", selectedImage);
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       const response = await axios.put(
         `${API_BASE_URL}/api/groups/${group._id}/image`,
@@ -455,7 +455,7 @@ export default function GroupProfile({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           const response = await axios.delete(
             `${API_BASE_URL}/api/groups/${group._id}/image`,
             { headers: { Authorization: `Bearer ${token}` } },
@@ -494,7 +494,7 @@ export default function GroupProfile({
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
 
       const response = await axios.put(
         `${API_BASE_URL}/api/groups/${group._id}`,
@@ -527,7 +527,7 @@ export default function GroupProfile({
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await axios.get(
         `${API_BASE_URL}/api/users/search?q=${searchUsers}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -547,7 +547,7 @@ export default function GroupProfile({
   //  Add member
   const handleAddMember = async (userId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await axios.post(
         `${API_BASE_URL}/api/groups/${group._id}/add-members`,
         { memberIds: [userId] },
@@ -583,7 +583,7 @@ export default function GroupProfile({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           await axios.delete(
             `${API_BASE_URL}/api/groups/${group._id}/remove/${memberId}`,
             { headers: { Authorization: `Bearer ${token}` } },
@@ -611,7 +611,7 @@ export default function GroupProfile({
   //  make ADMIN FUNCTION
   const handleMakeAdmin = async (memberId) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken");
       const res = await axios.post(
         `${API_BASE_URL}/api/groups/${group._id}/make-admin/${memberId}`,
         {},
@@ -645,7 +645,7 @@ export default function GroupProfile({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           const res = await axios.delete(
             `${API_BASE_URL}/api/groups/${group._id}/remove-admin/${memberId}`,
             { headers: { Authorization: `Bearer ${token}` } },
@@ -679,7 +679,7 @@ export default function GroupProfile({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = localStorage.getItem("accessToken");
           await axios.post(
             `${API_BASE_URL}/api/groups/${group._id}/leave`,
             {},
@@ -751,7 +751,7 @@ export default function GroupProfile({
             type: "danger",
             onConfirm: async () => {
               try {
-                const token = localStorage.getItem("token");
+                const token = localStorage.getItem("accessToken");
                 await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
@@ -791,7 +791,7 @@ export default function GroupProfile({
         type: "danger",
         onConfirm: async () => {
           try {
-            const token = localStorage.getItem("token");
+            const token = localStorage.getItem("accessToken");
             await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
