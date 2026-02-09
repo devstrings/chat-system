@@ -832,7 +832,86 @@ socket.on("deleteGroupMessageForEveryone", async ({ messageId, groupId }) => {
       console.error("Delete status error:", err);
     }
   });
+//  EDIT GROUP MESSAGE 
+socket.on("editGroupMessage", async ({ messageId, text, groupId }) => {
+  try {
+    console.log(" Edit group message request:", { messageId, groupId, userId: socket.user.id });
 
+    const message = await Message.findById(messageId);
+    if (!message || !message.isGroupMessage) {
+      socket.emit("errorMessage", { message: "Group message not found" });
+      return;
+    }
+
+    const userId = socket.user.id;
+
+    // Only sender can edit
+    if (message.sender.toString() !== userId) {
+      socket.emit("errorMessage", { message: "Only sender can edit" });
+      return;
+    }
+
+    // Check 3 hour limit
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const threeHours = 3 * 60 * 60 * 1000;
+
+    if (messageAge > threeHours) {
+      socket.emit("errorMessage", { 
+        message: "Cannot edit after 3 hours" 
+      });
+      return;
+    }
+
+    // Verify user is group member
+    const group = await Group.findById(groupId).populate("members", "_id");
+    if (!group || !group.members.some(m => m._id.toString() === userId)) {
+      socket.emit("errorMessage", { message: "Not authorized" });
+      return;
+    }
+
+    // Save to edit history
+    if (!message.editHistory) {
+      message.editHistory = [];
+    }
+    message.editHistory.push({
+      text: message.text,
+      editedAt: new Date()
+    });
+
+    // Update message
+    message.text = text;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    const editData = {
+      messageId,
+      groupId,
+      text,
+      isEdited: true,
+      editedAt: message.editedAt
+    };
+
+    console.log(" Broadcasting groupMessageEdited to all group members");
+
+    // Emit to all group members
+    for (const member of group.members) {
+      const memberSockets = [...io.sockets.sockets.values()].filter(
+        s => s.user?.id === member._id.toString()
+      );
+      
+      for (const s of memberSockets) {
+        s.emit("groupMessageEdited", editData);
+        console.log(`Sent edit to ${member._id}`);
+      }
+    }
+
+    console.log(" Group message edited successfully");
+  } catch (err) {
+    console.error(" Edit group message error:", err);
+    socket.emit("errorMessage", { message: "Failed to edit message" });
+  }
+});
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.user.id}`);
   });

@@ -62,8 +62,29 @@ const groupSchema = new mongoose.Schema({
       type: Boolean, 
       default: true 
     }
+  },
+  isEdited: {
+    type: Boolean,
+    default: false
+  },
+  editedAt: {
+    type: Date
+  },
+  editHistory: [{
+    text: String,
+    editedAt: Date
+  }],
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group'
+  },
+  isGroupMessage: {
+    type: Boolean,
+    default: false
   }
 });
+
+
 
 groupSchema.index({ members: 1 });
 groupSchema.index({ lastMessageTime: -1 });

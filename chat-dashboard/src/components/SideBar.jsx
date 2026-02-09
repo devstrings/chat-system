@@ -4,8 +4,15 @@ import GroupItem from "./Group/GroupItem";
 import axiosInstance from "../utils/axiosInstance";
 import { AlertDialog } from "./ConfirmationDialog";
 import { useAuthImage } from "../hooks/useAuthImage";
-import { useSocket } from "../context/SocketContext";
 import API_BASE_URL from "../config/api";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchPendingRequests,
+  fetchBlockedUsers,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  unblockUser,
+} from "../store/slices/userSlice";
 import {
   CreateGroupDialog,
   BlockedUsersModal,
@@ -16,15 +23,11 @@ import {
 import StatusRingsList from "./Status/StatusRingsList";
 
 export default function Sidebar({
-  users = [],
-  groups = [],
   selectedUserId,
   onSelectUser,
   currentUsername = "",
   currentUserId = "",
   onLogout,
-  unreadCounts = {},
-  lastMessages = {},
   isMobileSidebarOpen = false,
   profileImageUrl,
   onCloseMobileSidebar = () => {},
@@ -44,18 +47,21 @@ export default function Sidebar({
   onViewMyStatus = () => {},
   currentUserForStatus = null,
 }) {
-  const { onlineUsers } = useSocket();
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [searchUsers, setSearchUsers] = useState("");
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [pendingRequests, setPendingRequests] = useState([]);
+  const socket = useSelector((state) => state.socket.socket);
+  const connected = useSelector((state) => state.socket.connected);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
-  const [blockedUsers, setBlockedUsers] = useState([]);
+  const dispatch = useDispatch();
+  const { pendingRequests, blockedUsers } = useSelector((state) => state.user);
   const [showBlocked, setShowBlocked] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -66,7 +72,17 @@ export default function Sidebar({
     useAuthImage(profileImageUrl);
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
+  const { friends: users } = useSelector((state) => state.user);
+  const { groups } = useSelector((state) => state.group);
+  const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
 
+  //  Debug logs
+  console.log(" Sidebar Redux Data:", {
+    usersCount: users?.length || 0,
+    groupsCount: groups?.length || 0,
+    lastMessagesCount: Object.keys(lastMessages || {}).length,
+    unreadCountsCount: Object.keys(unreadCounts || {}).length,
+  });
   function ProfileImageWithAuth({
     imageUrl,
     username,
@@ -353,17 +369,8 @@ export default function Sidebar({
 
   const loadPendingRequests = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axiosInstance.get(
-        `${API_BASE_URL}/api/friends/requests/pending`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      setPendingRequests(res.data);
-      setShowRequests(true);
+      await dispatch(fetchPendingRequests()).unwrap();
+      setShowRequestsModal(true);
     } catch (err) {
       console.error("Load requests error:", err);
     }
@@ -371,18 +378,13 @@ export default function Sidebar({
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axiosInstance.post(
-        `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
-        {},
-      );
+      await dispatch(acceptFriendRequest(requestId)).unwrap();
       setAlertDialog({
         isOpen: true,
         title: "Friend Request Accepted!",
         message: "You are now friends with this user.",
         type: "success",
       });
-      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       setTimeout(() => {
         setShowRequestsModal(false);
         window.location.reload();
@@ -391,7 +393,7 @@ export default function Sidebar({
       setAlertDialog({
         isOpen: true,
         title: "Error",
-        message: err.response?.data?.message || "Failed to accept request",
+        message: err || "Failed to accept request",
         type: "error",
       });
     }
@@ -399,22 +401,13 @@ export default function Sidebar({
 
   const handleRejectRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axiosInstance.delete(
-        `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+      await dispatch(rejectFriendRequest(requestId)).unwrap();
       setAlertDialog({
         isOpen: true,
         title: "Request Rejected",
         message: "Friend request has been rejected.",
         type: "info",
       });
-      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       setTimeout(() => {
         setShowRequestsModal(false);
       }, 1000);
@@ -422,7 +415,7 @@ export default function Sidebar({
       setAlertDialog({
         isOpen: true,
         title: "Error",
-        message: err.response?.data?.message || "Failed to reject request",
+        message: err || "Failed to reject request",
         type: "error",
       });
     }
@@ -430,43 +423,27 @@ export default function Sidebar({
 
   const loadBlockedUsers = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axiosInstance.get(
-        `${API_BASE_URL}/api/friends/blocked`,
-        {},
-      );
-      setBlockedUsers(res.data);
-      setShowBlocked(true);
+      await dispatch(fetchBlockedUsers()).unwrap();
+      setShowBlockedModal(true);
     } catch (err) {
       console.error("Load blocked users error:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to load blocked users",
-        type: "error",
-      });
     }
   };
 
   const handleUnblockUser = async (userId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axiosInstance.delete(
-        `${API_BASE_URL}/api/friends/unblock/${userId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+      await dispatch(unblockUser(userId)).unwrap();
       setAlertDialog({
         isOpen: true,
         title: "User Unblocked!",
         message: "User has been unblocked successfully.",
         type: "success",
       });
-      setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
-      if (blockedUsers.length === 1) {
+
+      const remainingBlocked = blockedUsers.filter(
+        (b) => b.blocked._id !== userId,
+      );
+      if (remainingBlocked.length === 0) {
         setTimeout(() => {
           setShowBlockedModal(false);
         }, 1000);
@@ -475,7 +452,7 @@ export default function Sidebar({
       setAlertDialog({
         isOpen: true,
         title: "Error",
-        message: err.response?.data?.message || "Failed to unblock user",
+        message: err || "Failed to unblock user",
         type: "error",
       });
     }
@@ -985,9 +962,7 @@ export default function Sidebar({
                         lastMessageSender={lastMsg?.sender || null}
                         lastMessageStatus={lastMsg?.status || "sent"}
                         onGroupUpdate={(updatedGroup) => {
-                          if (typeof onGroupUpdate === "function") {
-                            onGroupUpdate(updatedGroup);
-                          }
+                          onGroupUpdate(updatedGroup);
                         }}
                         onGroupDeleted={() => {
                           window.location.reload();

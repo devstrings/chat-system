@@ -1,10 +1,16 @@
 import { useEffect, useState, useRef } from "react";
-import { useSocket } from "../context/SocketContext";
 import Message from "./Message";
 import axiosInstance from "../utils/axiosInstance";
 import ConfirmationDialog from "./ConfirmationDialog";
 import API_BASE_URL from "../config/api";
+import {
+  fetchMessages,
+  clearChat,
+  addMessage,
+  updateMessageStatus,
+} from "../store/slices/chatSlice";
 
+import { useDispatch, useSelector } from "react-redux";
 export default function ChatWindow({
   conversationId,
   currentUserId,
@@ -12,17 +18,21 @@ export default function ChatWindow({
   onUpdateLastMessageStatus,
   selectedUser = null,
 }) {
-  const { socket, onlineUsers } = useSocket();
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+  const messages = useSelector(
+    (state) => state.chat.conversations[conversationId]?.messages || [],
+  );
+
+  const loading = useSelector((state) => state.chat.loading);
   const messagesEndRef = useRef(null);
   const conversationIdRef = useRef(null);
   const messagesRef = useRef(messages);
+  const socket = useSelector((state) => state.socket.socket);
+  const connected = useSelector((state) => state.socket.connected);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
-
-  // TYPING INDICATOR STATE
   const [typingUsers, setTypingUsers] = useState(new Set());
 
   const [deleteDialog, setDeleteDialog] = useState({
@@ -38,56 +48,37 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
- useEffect(() => {
-  if (!conversationId) {
-    setMessages([]);
-    return;
-  }
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
 
-  const fetchMessages = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("accessToken");
-      const response = await axiosInstance.get(
-        `${API_BASE_URL}/api/messages/${conversationId}`,
-      );
+    dispatch(fetchMessages({ conversationId, currentUserId }));
+  }, [dispatch, conversationId, currentUserId]);
 
-      //  Filter out messages deleted for current user
-      const filteredMessages = response.data.filter(
-        (msg) => !msg.isDeletedForMe && !msg.deletedFor?.includes(currentUserId)
-      );
+  // CHAT CLEARED SOCKET LISTENER
+  useEffect(() => {
+    if (!socket || !conversationId) return;
 
-      setMessages(filteredMessages);
-      setLoading(false);
-    } catch (err) {
-      console.error("Fetch messages error:", err);
-      setMessages([]);
-      setLoading(false);
-    }
-  };
+    const handleChatCleared = (data) => {
+      console.log(" [CHATWINDOW] Chat cleared event:", data);
 
-  fetchMessages();
-}, [conversationId, currentUserId]);
+      if (
+        data.conversationId === conversationId &&
+        data.clearedFor === currentUserId
+      ) {
+        console.log("Clearing MY chat from UI");
+        dispatch(clearChat.fulfilled(conversationId));
+      } else {
+        console.log(" Not my chat clear event, ignoring");
+      }
+    };
 
-// CHAT CLEARED SOCKET LISTENER
-useEffect(() => {
-  if (!socket || !conversationId) return;
-const handleChatCleared = (data) => {
-  console.log(" [CHATWINDOW] Chat cleared event:", data);
-  
-  if (data.conversationId === conversationId && data.clearedFor === currentUserId) {
-    console.log(" Clearing MY chat from UI");
-    setMessages([]);
-  } else {
-    console.log(" Not my chat clear event, ignoring");
-  }
-};
-  socket.on("chatCleared", handleChatCleared);
+    socket.on("chatCleared", handleChatCleared);
 
-  return () => {
-    socket.off("chatCleared", handleChatCleared);
-  };
-}, [socket, conversationId]);
+    return () => {
+      socket.off("chatCleared", handleChatCleared);
+    };
+  }, [socket, conversationId, currentUserId, dispatch]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -102,7 +93,19 @@ const handleChatCleared = (data) => {
               isVoiceMessage: att.isVoiceMessage ?? false,
             })) || [],
         };
-        setMessages((prev) => [...prev, processedMsg]);
+
+        //  Redux update
+        dispatch(
+          addMessage({
+            conversationId: msg.conversationId,
+            message: processedMsg,
+            userId:
+              msg.sender._id === currentUserId
+                ? selectedUser?._id
+                : msg.sender._id,
+            isGroup: false,
+          }),
+        );
 
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus({
@@ -132,10 +135,13 @@ const handleChatCleared = (data) => {
         return;
       }
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === msgId ? { ...msg, status: status } : msg,
-        ),
+      //  Redux update
+      dispatch(
+        updateMessageStatus({
+          conversationId,
+          messageId: msgId,
+          status,
+        }),
       );
 
       if (onUpdateLastMessageStatus) {
@@ -154,14 +160,6 @@ const handleChatCleared = (data) => {
 
     const handleMessagesRead = (data) => {
       if (data.conversationId === conversationIdRef.current) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.sender._id === currentUserId && msg.status !== "read"
-              ? { ...msg, status: "read", readAt: new Date() }
-              : msg,
-          ),
-        );
-
         if (onUpdateLastMessageStatus) {
           onUpdateLastMessageStatus({
             status: "read",
@@ -173,42 +171,26 @@ const handleChatCleared = (data) => {
 
     const handleMessageDeleted = (data) => {
       if (data.messageId) {
-        setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
+        // Redux will handle this via deleteMessage action
       }
     };
 
     const handleMessageDeletedForEveryone = (data) => {
       if (data.messageId && data.conversationId === conversationIdRef.current) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === data.messageId
-              ? { ...msg, deletedForEveryone: true, text: "", attachments: [] }
-              : msg,
-          ),
-        );
+        // Redux will handle this
       }
     };
-const handleMessageEdited = (data) => {
-    console.log(" Message edited event:", data);
-    
-    if (data.conversationId === conversationIdRef.current) {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === data.messageId
-            ? {
-                ...msg,
-                text: data.text,
-                isEdited: true,
-                editedAt: data.editedAt
-              }
-            : msg
-        )
-      );
-    }
-  };
-    //  TYPING HANDLER
+
+    const handleMessageEdited = (data) => {
+      console.log(" Message edited event:", data);
+
+      if (data.conversationId === conversationIdRef.current) {
+        // Redux will handle via updateMessage action
+      }
+    };
+
     const handleTyping = ({ userId, isTyping, conversationId }) => {
-      console.log(" TYPING EVENT RECEIVED:", {
+      console.log("⌨ TYPING EVENT RECEIVED:", {
         userId,
         isTyping,
         conversationId,
@@ -242,7 +224,7 @@ const handleMessageEdited = (data) => {
     socket.on("messageDeleted", handleMessageDeleted);
     socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     socket.on("userTyping", handleTyping);
-     socket.on("messageEdited", handleMessageEdited); 
+    socket.on("messageEdited", handleMessageEdited);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
@@ -251,9 +233,15 @@ const handleMessageEdited = (data) => {
       socket.off("messageDeleted", handleMessageDeleted);
       socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
       socket.off("userTyping", handleTyping);
-        socket.off("messageEdited", handleMessageEdited);
+      socket.off("messageEdited", handleMessageEdited);
     };
-  }, [socket, currentUserId, onUpdateLastMessageStatus, selectedUser]);
+  }, [
+    socket,
+    currentUserId,
+    onUpdateLastMessageStatus,
+    selectedUser,
+    dispatch,
+  ]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -296,30 +284,29 @@ const handleMessageEdited = (data) => {
     });
   };
 
- const confirmBulkDelete = async () => {
-  try {
-    const token = localStorage.getItem("accessToken");
-    const messageIds = Array.from(selectedMessages);
+  const confirmBulkDelete = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const messageIds = Array.from(selectedMessages);
 
-    await axiosInstance.post(
-      `${API_BASE_URL}/api/messages/messages/bulk-delete`,
-      { messageIds },
-    );
+      await axiosInstance.post(
+        `${API_BASE_URL}/api/messages/messages/bulk-delete`,
+        { messageIds },
+      );
 
-    setMessages((prev) =>
-      prev.filter((msg) => !selectedMessages.has(msg._id)),
-    );
+      setMessages((prev) =>
+        prev.filter((msg) => !selectedMessages.has(msg._id)),
+      );
 
-    setIsSelectionMode(false);
-    setSelectedMessages(new Set());
-    
-    setDeleteDialog({ isOpen: false, count: 0 });
-    
-  } catch (err) {
-    console.error("Bulk delete error:", err);
-    alert("Failed to delete messages");
-  }
-};
+      setIsSelectionMode(false);
+      setSelectedMessages(new Set());
+
+      setDeleteDialog({ isOpen: false, count: 0 });
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+      alert("Failed to delete messages");
+    }
+  };
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>

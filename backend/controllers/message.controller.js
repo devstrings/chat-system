@@ -21,15 +21,40 @@ export const getOrCreateConversation = async (req, res) => {
       return res.status(friendshipValidation.statusCode).json({ message: friendshipValidation.message });
     }
 
+    //  Check if conversation already exists
+    const existingConversation = await messageService.findExistingConversation(currentUserId, otherUserId);
+    const isNewConversation = !existingConversation && !skipCreate;
+
     // Service call
     const conversation = await messageService.processGetOrCreateConversation(currentUserId, otherUserId, skipCreate);
 
-    // ✅ If skipCreate flag is set and no conversation found
     if (!conversation && skipCreate) {
       return res.status(404).json({ 
         message: "No conversation found",
         exists: false 
       });
+    }
+
+    //  Emit socket event for NEW conversation only
+    if (isNewConversation && conversation) {
+      const io = req.app.get("io");
+      if (io) {
+        console.log(" Emitting newConversation event:", {
+          conversationId: conversation._id,
+          participants: [currentUserId, otherUserId]
+        });
+        
+        // Emit to both users
+        io.to(currentUserId).emit("newConversation", {
+          conversationId: conversation._id.toString(),
+          otherUserId,
+        });
+        
+        io.to(otherUserId).emit("newConversation", {
+          conversationId: conversation._id.toString(),
+          otherUserId: currentUserId,
+        });
+      }
     }
 
     res.json(conversation);
@@ -38,7 +63,6 @@ export const getOrCreateConversation = async (req, res) => {
     res.status(500).json({ message: "Failed to get conversation", error: err.message });
   }
 };
-
 // GET MESSAGES CONTROLLER
 export const getMessages = async (req, res) => {
   try {
@@ -129,16 +153,12 @@ export const clearChat = async (req, res) => {
     const io = req.app.get("io");
 
     if (io) {
-      console.log("=================================");
-      console.log("🔌 EMITTING chatCleared EVENT");
-      console.log("=================================");
-      console.log("📤 Conversation ID:", conversationId.toString());
-      console.log("👥 Participants:", result.participants.map(p => p.toString()));
-      console.log("🧹 Cleared by:", currentUserId);
-      console.log("=================================");
+      console.log("EMITTING chatCleared EVENT");
+      console.log(" Conversation ID:", conversationId.toString());
+      console.log(" Participants:", result.participants.map(p => p.toString()));
+      console.log(" Cleared by:", currentUserId);
       
-      // ✅ FIXED: Sirf jisne clear kiya usi ko bhejo
-      console.log(`📤 Emitting ONLY to user who cleared: ${currentUserId}`);
+      console.log(` Emitting ONLY to user who cleared: ${currentUserId}`);
       
       io.to(currentUserId).emit("chatCleared", {
         conversationId: conversationId.toString(),
@@ -147,10 +167,9 @@ export const clearChat = async (req, res) => {
         action: "clearedForMe"
       });
       
-      console.log("✅ Socket event emitted to clearing user only");
-      console.log("=================================");
+      console.log(" Socket event emitted to clearing user only");
     } else {
-      console.error("❌ Socket.IO not available!");
+      console.error(" Socket.IO not available!");
     }
     
     res.json({
@@ -182,7 +201,7 @@ export const deleteConversation = async (req, res) => {
     // Service call
     const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
 
-    // ✅ Emit socket event ONLY to current user
+    //  Emit socket event ONLY to current user
     const io = req.app.get("io");
     if (io) {
       // Find current user's socket
@@ -196,14 +215,14 @@ export const deleteConversation = async (req, res) => {
           deletedBy: currentUserId,
           otherUserId: result.userId,
         });
-        console.log("✅ Socket event sent ONLY to deleting user");
+        console.log(" Socket event sent ONLY to deleting user");
       }
     }
 
     res.json(result);
 
   } catch (err) {
-    console.error("❌ Delete conversation error:", err);
+    console.error(" Delete conversation error:", err);
     
     if (err.message === "No conversation found to delete") {
       return res.status(404).json({

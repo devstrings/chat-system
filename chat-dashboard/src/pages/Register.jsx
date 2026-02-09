@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
+import { useDispatch, useSelector } from 'react-redux';
+import { register, clearError } from '../store/slices/authSlice';
 import API_BASE_URL from "../config/api";
 export default function Register() {
   const navigate = useNavigate();
@@ -11,8 +13,8 @@ export default function Register() {
     email: "",
     password: "",
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const dispatch = useDispatch();
+const { loading, error } = useSelector((state) => state.auth);
 
   useEffect(() => {
 const token = localStorage.getItem("accessToken");
@@ -21,28 +23,21 @@ const token = localStorage.getItem("accessToken");
     }
   }, [navigate]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError("");
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-await axiosInstance.post("/api/auth/register", formData);
-      alert("Registration successful! Please login.");
-      navigate("/login", { replace: true });
-    } catch (err) {
-      console.error("Registration error:", err);
-      setError(err.response?.data?.message || "Registration failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+ const handleChange = (e) => {
+  setFormData({ ...formData, [e.target.name]: e.target.value });
+  dispatch(clearError());
+};
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  dispatch(clearError());
+  
+  const result = await dispatch(register(formData));
+  
+  if (register.fulfilled.match(result)) {
+    alert("Registration successful! Please login.");
+    navigate("/login", { replace: true });
+  }
+};
   //  GOOGLE SIGNUP
   const handleGoogleSignup = () => {
     window.location.href = `${API_BASE_URL}/api/auth/google`;

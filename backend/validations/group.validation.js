@@ -117,7 +117,13 @@ export const validateCannotDemoteCreator = (group, memberId) => {
 };
 
 export const validateIsMemberOfGroup = (group, memberId) => {
-  if (!group.members.some((m) => m.toString() === memberId)) {
+  //  Handle both populated and unpopulated members
+  const isMember = group.members.some((m) => {
+    const mId = m._id ? m._id.toString() : m.toString();
+    return mId === memberId;
+  });
+  
+  if (!isMember) {
     return {
       isValid: false,
       statusCode: 400,

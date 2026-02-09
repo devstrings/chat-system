@@ -2,6 +2,9 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import { useAuthImage } from "../../hooks/useAuthImage";
 import API_BASE_URL from "../../config/api";
+import axiosInstance from "../../utils/axiosInstance";
+import { useDispatch } from "react-redux";
+import { updateGroup } from "../../store/slices/groupSlice";
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {
   if (!isOpen) return null;
@@ -121,7 +124,8 @@ function MemberItem({
 }) {
   const { imageSrc: memberImage } = useAuthImage(member.profileImage);
   const [showMemberMenu, setShowMemberMenu] = useState(false);
-
+  const [showMenu, setShowMenu] = useState(false);
+  const dispatch = useDispatch();
   // Check if current user can manage this member
   const canManage =
     (currentUserIsAdmin || currentUserIsCreator) &&
@@ -322,6 +326,7 @@ export default function GroupProfile({
   onGroupDeleted,
   onMemberRemoved,
 }) {
+  const dispatch = useDispatch();
   const [uploading, setUploading] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchUsers, setSearchUsers] = useState("");
@@ -546,15 +551,35 @@ export default function GroupProfile({
 
   //  Add member
   const handleAddMember = async (userId) => {
+    const token = localStorage.getItem("accessToken");
+
+    const isAlreadyMember = group.members.some((m) => m._id === userId);
+
+    if (isAlreadyMember) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Already a Member",
+        message: "This user is already a member of the group",
+        type: "info",
+      });
+      return;
+    }
+
+    let res;
+
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axios.post(
+      res = await axios.post(
         `${API_BASE_URL}/api/groups/${group._id}/add-members`,
         { memberIds: [userId] },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
+      console.log(" MEMBER ADDED - Response:", res.data);
+
+      //  UPDATE STATE
+      dispatch(updateGroup(res.data));
       onGroupUpdate(res.data);
+
       setSearchResults([]);
       setSearchUsers("");
 
@@ -565,6 +590,7 @@ export default function GroupProfile({
         type: "success",
       });
     } catch (err) {
+      console.error(" ADD MEMBER ERROR:", err.response?.data);
       setAlertDialog({
         isOpen: true,
         title: "Error",
@@ -573,7 +599,6 @@ export default function GroupProfile({
       });
     }
   };
-
   // Remove member
   const handleRemoveMember = (memberId) => {
     setConfirmDialog({
@@ -584,11 +609,16 @@ export default function GroupProfile({
       onConfirm: async () => {
         try {
           const token = localStorage.getItem("accessToken");
-          await axios.delete(
+
+          const res = await axios.delete(
             `${API_BASE_URL}/api/groups/${group._id}/remove/${memberId}`,
             { headers: { Authorization: `Bearer ${token}` } },
           );
 
+          console.log(" MEMBER REMOVED - Response:", res.data);
+
+          //  UPDATE STATE
+          dispatch(updateGroup(res.data));
           onMemberRemoved(memberId);
 
           setAlertDialog({
@@ -598,6 +628,7 @@ export default function GroupProfile({
             type: "success",
           });
         } catch (err) {
+          console.error(" REMOVE MEMBER ERROR:", err.response?.data);
           setAlertDialog({
             isOpen: true,
             title: "Error",
@@ -618,6 +649,10 @@ export default function GroupProfile({
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
+      console.log(" ADMIN ADDED - Response:", res.data);
+
+      //  UPDATE STATE
+      dispatch(updateGroup(res.data));
       onGroupUpdate(res.data);
 
       setAlertDialog({
@@ -627,6 +662,7 @@ export default function GroupProfile({
         type: "success",
       });
     } catch (err) {
+      console.error(" MAKE ADMIN ERROR:", err.response?.data);
       setAlertDialog({
         isOpen: true,
         title: "Error",
@@ -646,11 +682,16 @@ export default function GroupProfile({
       onConfirm: async () => {
         try {
           const token = localStorage.getItem("accessToken");
+
           const res = await axios.delete(
             `${API_BASE_URL}/api/groups/${group._id}/remove-admin/${memberId}`,
             { headers: { Authorization: `Bearer ${token}` } },
           );
 
+          console.log("ADMIN REMOVED - Response:", res.data);
+
+          //  UPDATE STATE
+          dispatch(updateGroup(res.data));
           onGroupUpdate(res.data);
 
           setAlertDialog({
@@ -660,6 +701,7 @@ export default function GroupProfile({
             type: "success",
           });
         } catch (err) {
+          console.error(" REMOVE ADMIN ERROR:", err.response?.data);
           setAlertDialog({
             isOpen: true,
             title: "Error",

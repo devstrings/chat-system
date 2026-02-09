@@ -1,69 +1,52 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useSocket } from "../../context/SocketContext";
 import Message from "../Message";
-import { useAuthImage } from "../../hooks/useAuthImage";
 import API_BASE_URL from "../../config/api";
 import axiosInstance from "../../utils/axiosInstance";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchGroupMessages,
+  addGroupMessage,
+  deleteGroupMessage,
+  clearGroupChatMessages,
+  updateGroupMessage,
+} from "../../store/slices/groupSlice";
+
 export default function GroupChatWindow({
   group,
   currentUserId,
   searchQuery = "",
 }) {
-  const { socket } = useSocket();
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  //  Redux setup
+  const dispatch = useDispatch();
+  const socket = useSelector((state) => state.socket.socket);
+  const messages = useSelector(
+    (state) => state.group.groupMessages[group._id]?.messages || [],
+  );
+  const loading = useSelector((state) => state.group.loading);
+
   const messagesEndRef = useRef(null);
   const [typingUsers, setTypingUsers] = useState(new Set());
 
-  // Fetch messages
+  //  Fetch messages
   useEffect(() => {
-    if (!group?._id) {
-      setMessages([]);
-      setLoading(false);
-      return;
+    if (group?._id && currentUserId) {
+      dispatch(fetchGroupMessages({ groupId: group._id, currentUserId }));
     }
+  }, [dispatch, group?._id, currentUserId]);
 
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("accessToken");
-
-        const res = await axiosInstance.get(
-          `${API_BASE_URL}/api/messages/group/${group._id}`,
-        );
-
-        console.log(" Loaded", res.data.length, "group messages");
-        setMessages(res.data);
-      } catch (err) {
-        console.error(" Error fetching group messages:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMessages();
-  }, [group?._id]);
-
-  // Socket listeners
+  //  Socket listeners
   useEffect(() => {
     if (!socket || !group?._id) return;
 
+    // Handler 1: Receive message
     const handleReceiveGroupMessage = (msg) => {
-      // only groupId
-      const matchesGroup = msg.groupId === group._id;
-
-      if (matchesGroup) {
-        setMessages((prev) => {
-          const exists = prev.some((m) => m._id === msg._id);
-          if (exists) return prev;
-          return [...prev, msg];
-        });
+      if (msg.groupId === group._id) {
+        dispatch(addGroupMessage({ groupId: msg.groupId, message: msg }));
       }
     };
 
+    // Handler 2: Typing indicator
     const handleGroupTyping = ({ userId, groupId, isTyping }) => {
-      console.log(" Group typing:", { userId, groupId, isTyping });
-
       if (groupId === group._id && userId !== currentUserId) {
         setTypingUsers((prev) => {
           const newSet = new Set(prev);
@@ -77,29 +60,47 @@ export default function GroupChatWindow({
       }
     };
 
+    // Handler 3: Delete message (for me)
     const handleGroupMessageDeleted = ({ messageId, groupId }) => {
       if (groupId === group._id) {
-        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+        dispatch(deleteGroupMessage({ groupId, messageId }));
       }
     };
 
+    // Handler 4: Delete message (for everyone)
     const handleGroupMessageDeletedForEveryone = ({ messageId, groupId }) => {
       if (groupId === group._id) {
-        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+        dispatch(deleteGroupMessage({ groupId, messageId }));
       }
     };
- const handleGroupChatCleared = (data) => {
-    console.log(" [GROUP] Chat cleared event:", data);
-    
-    //  Check if this is for current user AND this group
-    if (data.groupId === group._id && data.clearedFor === currentUserId) {
-      console.log(" Clearing group chat from UI");
-      setMessages([]);
-    } else {
-      console.log(" Not my group chat clear event, ignoring");
-    }
-  };
-    //  Register all listeners
+
+    //  Handler 5: Clear chat
+    const handleGroupChatCleared = (data) => {
+      console.log("🧹 [GROUP] Chat cleared event:", data);
+
+      if (data.groupId === group._id && data.clearedFor === currentUserId) {
+        console.log("Clearing group chat from UI");
+        dispatch(clearGroupChatMessages(data.groupId));
+      }
+    };
+
+    //  Handler 6: Message edited
+    const handleGroupMessageEdited = (data) => {
+      console.log(" [GROUP] Message edited:", data);
+
+      if (data.groupId === group._id) {
+        dispatch(
+          updateGroupMessage({
+            groupId: data.groupId,
+            messageId: data.messageId,
+            text: data.text,
+            editedAt: data.editedAt,
+          }),
+        );
+      }
+    };
+
+    //  Register ALL listeners
     socket.on("receiveGroupMessage", handleReceiveGroupMessage);
     socket.on("groupUserTyping", handleGroupTyping);
     socket.on("groupMessageDeleted", handleGroupMessageDeleted);
@@ -108,7 +109,9 @@ export default function GroupChatWindow({
       handleGroupMessageDeletedForEveryone,
     );
     socket.on("groupChatCleared", handleGroupChatCleared);
+    socket.on("groupMessageEdited", handleGroupMessageEdited);
 
+    //  Cleanup ALL listeners
     return () => {
       socket.off("receiveGroupMessage", handleReceiveGroupMessage);
       socket.off("groupUserTyping", handleGroupTyping);
@@ -117,9 +120,10 @@ export default function GroupChatWindow({
         "groupMessageDeletedForEveryone",
         handleGroupMessageDeletedForEveryone,
       );
-         socket.off("groupChatCleared", handleGroupChatCleared); 
+      socket.off("groupChatCleared", handleGroupChatCleared);
+      socket.off("groupMessageEdited", handleGroupMessageEdited);
     };
-  }, [socket, group?._id, currentUserId]);
+  }, [socket, group?._id, currentUserId, dispatch]);
 
   // Auto scroll
   useEffect(() => {
@@ -219,8 +223,6 @@ export default function GroupChatWindow({
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
-      {/*  GROUP HEADER */}
-
       <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-4">
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
@@ -236,7 +238,6 @@ export default function GroupChatWindow({
             {/* Messages */}
             {msgs.map((msg) => (
               <div key={msg._id} className="mb-4">
-                {/* Sender name for group messages */}
                 {msg.sender._id !== currentUserId && (
                   <p className="text-[10px] sm:text-xs text-gray-500 mb-1 ml-1 sm:ml-2">
                     {msg.sender.username}
