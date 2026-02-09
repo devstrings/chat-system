@@ -19,6 +19,7 @@ import {
   unarchiveGroup,
   clearGroupChat,
   serveGroupImage,
+    editGroupMessage
 } from "../controllers/group.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
@@ -445,5 +446,34 @@ router.delete("/:groupId/clear", verifyToken, clearGroupChat);
  *         description: Image served
  */
 router.get("/image/:filename", verifyToken, serveGroupImage);
+/**
+ * @swagger
+ * /groups/message/{messageId}:
+ *   put:
+ *     summary: Edit a group message
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Message edited successfully
+ */
+router.put("/message/:messageId", verifyToken, editGroupMessage);  
 
 export default router;
+

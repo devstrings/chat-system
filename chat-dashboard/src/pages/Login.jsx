@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from "../utils/axiosInstance";
+import { useDispatch, useSelector } from 'react-redux';
+import { login, clearError } from '../store/slices/authSlice';
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
 import API_BASE_URL from "../config/api";
@@ -9,9 +10,10 @@ export default function Login() {
   const navigate = useNavigate();
   const hasNavigated = useRef(false);
   const hasCheckedAuth = useRef(false);
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+const dispatch = useDispatch();
+const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
+const [formData, setFormData] = useState({ email: "", password: "" });
 
   useEffect(() => {
     if (hasCheckedAuth.current) return;
@@ -28,65 +30,20 @@ export default function Login() {
     }
   }, [navigate]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError("");
-  };
+const handleChange = (e) => {
+  setFormData({ ...formData, [e.target.name]: e.target.value });
+  dispatch(clearError());  
+};
 
- const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
+  dispatch(clearError());
   
-  console.log(" Form submitted!");
-  console.log(" Email:", formData.email);
+  const result = await dispatch(login(formData));
   
-  setLoading(true);
-  setError("");
-
-  try {
-    console.log(" Making API call to:", `${API_BASE_URL}/api/auth/login`);
-    
-    const res = await axiosInstance.post("/api/auth/login", formData);
-
-    console.log(" Full Response:", res);
-    console.log(" Response Data:", res.data);
-    console.log(" Access Token:", res.data.accessToken);
-    console.log(" Refresh Token:", res.data.refreshToken);
-
-    if (res.data.accessToken && res.data.refreshToken) {
-      console.log(" About to save tokens...");
-      
-      localStorage.setItem("accessToken", res.data.accessToken);
-      localStorage.setItem("refreshToken", res.data.refreshToken);
-      localStorage.setItem("username", res.data.username);
-
-      if (res.data.profileImage) {
-        localStorage.setItem("profileImage", res.data.profileImage);
-      }
-
-      //  VERIFY tokens were saved
-      console.log(" Verification - Access Token saved:", localStorage.getItem("accessToken"));
-      console.log(" Verification - Refresh Token saved:", localStorage.getItem("refreshToken"));
-      
-      console.log(" Navigating to dashboard...");
-      
-      hasNavigated.current = true;
-      navigate("/dashboard", { replace: true });
-    } else {
-      console.error(" No tokens in response!");
-      console.error(" Response structure:", JSON.stringify(res.data, null, 2));
-      setError("Login failed - no tokens received");
-    }
-  } catch (err) {
-    console.error(" Login error:", err);
-    console.error(" Error message:", err.message);
-    console.error(" Error response:", err.response);
-    console.error(" Error data:", err.response?.data);
-    console.error(" Error status:", err.response?.status);
-    
-    setError(err.response?.data?.message || "Login failed. Please try again.");
-  } finally {
-    setLoading(false);
-    console.log(" Login process finished");
+  if (login.fulfilled.match(result)) {
+    hasNavigated.current = true;
+    navigate("/dashboard", { replace: true });
   }
 };
 

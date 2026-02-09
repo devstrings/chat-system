@@ -1,7 +1,7 @@
 
 import * as groupService from "../services/group.service.js";
 import * as groupValidation from "../validations/group.validation.js";
-
+import Message from "../models/message.js";
 // CREATE GROUP CONTROLLER
 export const createGroup = async (req, res) => {
   try {
@@ -21,6 +21,71 @@ export const createGroup = async (req, res) => {
   } catch (err) {
     console.error("Create group error:", err);
     res.status(500).json({ message: "Failed to create group" });
+  }
+};
+// EDIT GROUP MESSAGE CONTROLLER 
+export const editGroupMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const userId = req.user.id;
+
+    console.log(" Editing group message:", { messageId, userId, text });
+
+    // Validation
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: "Message text is required" });
+    }
+
+    // Find message
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      console.log(" Message not found:", messageId);
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Check if group message
+    if (!message.isGroupMessage || !message.groupId) {
+      return res.status(400).json({ message: "Not a group message" });
+    }
+
+    // Check if user is sender
+    if (message.sender.toString() !== userId) {
+      console.log(" User not authorized:", { sender: message.sender, userId });
+      return res.status(403).json({ message: "Can only edit your own messages" });
+    }
+
+    // Update message
+    message.text = text.trim();
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    console.log(" Message updated:", message._id);
+
+    // Emit socket event to all group members
+    const io = req.app.get("io");
+    if (io) {
+      const groupId = message.groupId.toString();
+      console.log(" Emitting groupMessageEdited to group:", groupId);
+      
+      io.to(groupId).emit("groupMessageEdited", {
+        groupId: groupId,
+        messageId: message._id.toString(),
+        text: message.text,
+        editedAt: message.editedAt
+      });
+      
+      console.log(" Socket event emitted");
+    } else {
+      console.log(" Socket.io instance not found");
+    }
+
+    res.json(message);
+  } catch (err) {
+    console.error(" Edit group message error:", err);
+    res.status(500).json({ message: "Failed to edit message" });
   }
 };
 
@@ -507,18 +572,14 @@ export const clearGroupChat = async (req, res) => {
     // Service call
     const result = await groupService.processClearGroupChat(groupId, userId);
 
-    // ✅ GET SOCKET.IO INSTANCE AND EMIT
+    //  GET SOCKET.IO INSTANCE AND EMIT
     const io = req.app.get("io");
     
     if (io) {
-      console.log("=================================");
-      console.log("🔌 EMITTING groupChatCleared EVENT");
-      console.log("=================================");
-      console.log("📤 Group ID:", groupId);
-      console.log("👤 Cleared by:", userId);
-      console.log("=================================");
+      console.log(" EMITTING groupChatCleared EVENT");
+      console.log(" Group ID:", groupId);
+      console.log(" Cleared by:", userId);
       
-      // ✅ Sirf jisne clear kiya usi ko event bhejo
       io.to(userId).emit("groupChatCleared", {
         groupId: result.groupId,
         clearedBy: result.userId,
@@ -526,8 +587,7 @@ export const clearGroupChat = async (req, res) => {
         action: "clearedForMe"
       });
       
-      console.log("✅ Socket event emitted to clearing user only");
-      console.log("=================================");
+      console.log("Socket event emitted to clearing user only");
     }
 
     res.json({

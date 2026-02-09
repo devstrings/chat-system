@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import API_BASE_URL from "../config/api";
 import { useNavigate } from "react-router-dom";
-import { useSocket } from "../context/SocketContext";
 import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
@@ -15,23 +14,47 @@ import StatusManager from "../components/Status/StatusManager";
 import StatusViewer from "../components/Status/StatusViewer";
 import StatusRingsList from "../components/Status/StatusRingsList";
 import axiosInstance from "../utils/axiosInstance";
+
+import { setUser } from "../store/slices/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { logout, fetchCurrentUser } from "../store/slices/authSlice";
+import { fetchFriendsList } from "../store/slices/userSlice";
+import { fetchGroups } from "../store/slices/groupSlice";
+import {
+  fetchConversation,
+  fetchMessages,
+  clearUnreadCount,
+  addMessage,
+  incrementUnreadCount,
+  deleteConversation,
+  updateMessageStatus,
+  updateMessage,
+} from "../store/slices/chatSlice";
+import { addGroupMessage, updateGroup } from "../store/slices/groupSlice";
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { socket, onlineUsers } = useSocket();
-  const [username, setUsername] = useState("");
-  const [currentUserId, setCurrentUserId] = useState("");
-  const [users, setUsers] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const socket = useSelector((state) => state.socket.socket);
+  const connected = useSelector((state) => state.socket.connected);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // Redux state
+  const { currentUser, currentUserId, isAuthenticated } = useSelector(
+    (state) => state.auth,
+  );
+  const { friends: users } = useSelector((state) => state.user);
+  const { groups } = useSelector((state) => state.group);
+  const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
+
   const [loading, setLoading] = useState(true);
+
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [searchInChat, setSearchInChat] = useState("");
   const [showSearchBox, setShowSearchBox] = useState(false);
-  const [unreadCounts, setUnreadCounts] = useState({});
-  const [lastMessages, setLastMessages] = useState({});
 
   const selectedUserRef = useRef(null);
   const hasInitialized = useRef(false);
@@ -55,7 +78,6 @@ export default function Dashboard() {
   const [allStatuses, setAllStatuses] = useState([]);
   const [showStatusRings, setShowStatusRings] = useState(false);
 
-  // Group image hook (add after line 119)
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
     "group",
@@ -73,6 +95,107 @@ export default function Dashboard() {
     type: "info",
   });
 
+  //SOCKET LISTENERS FOR SIDEBAR UPDATES
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
+
+    console.log(" Setting up sidebar socket listeners");
+
+    //  Individual message received
+    const handleSidebarMessage = (msg) => {
+      console.log(" [SIDEBAR] Individual message:", msg._id);
+
+      dispatch(
+        addMessage({
+          conversationId: msg.conversationId,
+          message: msg,
+          userId:
+            msg.sender._id === currentUserId
+              ? selectedUser?._id || msg.conversationId
+              : msg.sender._id,
+          isGroup: false,
+        }),
+      );
+    };
+
+    //  Group message received
+    const handleSidebarGroupMessage = (msg) => {
+      console.log(" [SIDEBAR] Group message:", msg._id);
+
+      // Update group messages in groupSlice
+      dispatch(
+        addGroupMessage({
+          groupId: msg.groupId,
+          message: msg,
+        }),
+      );
+
+      // Also update lastMessages for sidebar
+      dispatch(
+        addMessage({
+          conversationId: msg.groupId,
+          message: msg,
+          userId: msg.groupId,
+          isGroup: true,
+        }),
+      );
+    };
+
+    //  Status update
+    const handleSidebarStatus = (data) => {
+      console.log(" [SIDEBAR] Status update:", data.messageId);
+
+      dispatch(
+        updateMessageStatus({
+          conversationId: data.conversationId,
+          messageId: data.messageId,
+          status: data.status,
+        }),
+      );
+    };
+
+    //  Message edited
+    const handleSidebarEdit = (data) => {
+      console.log(" [SIDEBAR] Message edited:", data.messageId);
+
+      dispatch(
+        updateMessage({
+          conversationId: data.conversationId,
+          messageId: data.messageId,
+          text: data.text,
+          editedAt: data.editedAt,
+        }),
+      );
+    };
+    //  ADD THIS - Group message edited
+    const handleSidebarGroupEdit = (data) => {
+      console.log(" [SIDEBAR] Group message edited:", data.messageId);
+
+      dispatch(
+        updateGroupMessage({
+          groupId: data.groupId,
+          messageId: data.messageId,
+          text: data.text,
+          editedAt: data.editedAt,
+        }),
+      );
+    };
+
+    socket.on("receiveMessage", handleSidebarMessage);
+    socket.on("receiveGroupMessage", handleSidebarGroupMessage);
+    socket.on("messageStatusUpdate", handleSidebarStatus);
+    socket.on("messageEdited", handleSidebarEdit);
+    socket.on("groupMessageEdited", handleSidebarGroupEdit);
+
+    return () => {
+      console.log(" Cleaning up sidebar socket listeners");
+      socket.off("receiveMessage", handleSidebarMessage);
+      socket.off("receiveGroupMessage", handleSidebarGroupMessage);
+      socket.off("messageStatusUpdate", handleSidebarStatus);
+      socket.off("messageEdited", handleSidebarEdit);
+      socket.off("groupMessageEdited", handleSidebarGroupEdit);
+    };
+  }, [socket, currentUserId, dispatch, selectedUser]);
   // Load all statuses
   useEffect(() => {
     const loadAllStatuses = async () => {
@@ -111,8 +234,7 @@ export default function Dashboard() {
           `${API_BASE_URL}/api/users/auth/me`,
           {},
         );
-        setCurrentUser(response.data);
-
+        dispatch(setUser(response.data));
         if (response.data.profileImage) {
           setSharedProfileImage(response.data.profileImage);
         }
@@ -201,16 +323,10 @@ export default function Dashboard() {
     if (isCoverPhoto) {
       //  UPDATE BOTH STATES
       setSharedCoverPhoto(newImageUrl);
-      setCurrentUser((prev) => ({
-        ...prev,
-        coverPhoto: newImageUrl,
-      }));
+      dispatch(setUser({ ...currentUser, coverPhoto: newImageUrl }));
     } else {
       setSharedProfileImage(newImageUrl);
-      setCurrentUser((prev) => ({
-        ...prev,
-        profileImage: newImageUrl,
-      }));
+      dispatch(setUser({ ...currentUser, profileImage: newImageUrl }));
     }
   };
   //   handleRemoveProfileImage function
@@ -224,7 +340,7 @@ export default function Dashboard() {
 
       // UPDATE SHARED STATE
       setSharedProfileImage(null);
-      setCurrentUser((prev) => ({ ...prev, profileImage: null }));
+      dispatch(setUser({ ...currentUser, profileImage: null }));
       setShowProfileSettings(false);
 
       setAlertDialog({
@@ -245,41 +361,44 @@ export default function Dashboard() {
   };
 
   //Archeived
+
   const handleArchiveConversation = async (conversationId, isArchived) => {
     try {
       const token = localStorage.getItem("accessToken");
 
-      //  CHECK IF IT'S A GROUP
+      // CHECK IF IT'S A GROUP
       const isGroup = groups.some((g) => g._id === conversationId);
 
       if (isArchived) {
         // Unarchive
-        // Unarchive endpoint
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/unarchive`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unarchive`;
 
         await axiosInstance.delete(endpoint, {});
+
         setArchivedConversations((prev) => {
           const newSet = new Set(prev);
           newSet.delete(conversationId);
           return newSet;
         });
 
-        // UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        //  UPDATE REDUX STATE
         if (isGroup) {
-          setGroups((prev) =>
-            prev.map((g) =>
-              g._id === conversationId
-                ? {
-                    ...g,
-                    archivedBy:
-                      g.archivedBy?.filter((a) => a.userId !== currentUserId) ||
-                      [],
-                  }
-                : g,
-            ),
-          );
+          const updatedGroup = groups.find((g) => g._id === conversationId);
+          if (updatedGroup) {
+            const newArchivedBy =
+              updatedGroup.archivedBy?.filter(
+                (a) => a.userId !== currentUserId,
+              ) || [];
+
+            dispatch(
+              updateGroup({
+                ...updatedGroup,
+                archivedBy: newArchivedBy,
+              }),
+            );
+          }
         }
 
         setAlertDialog({
@@ -300,21 +419,22 @@ export default function Dashboard() {
 
         setArchivedConversations((prev) => new Set([...prev, conversationId]));
 
-        //  UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        //  UPDATE REDUX STATE
         if (isGroup) {
-          setGroups((prev) =>
-            prev.map((g) =>
-              g._id === conversationId
-                ? {
-                    ...g,
-                    archivedBy: [
-                      ...(g.archivedBy || []),
-                      { userId: currentUserId, archivedAt: new Date() },
-                    ],
-                  }
-                : g,
-            ),
-          );
+          const updatedGroup = groups.find((g) => g._id === conversationId);
+          if (updatedGroup) {
+            const newArchivedBy = [
+              ...(updatedGroup.archivedBy || []),
+              { userId: currentUserId, archivedAt: new Date() },
+            ];
+
+            dispatch(
+              updateGroup({
+                ...updatedGroup,
+                archivedBy: newArchivedBy,
+              }),
+            );
+          }
         }
 
         setAlertDialog({
@@ -347,7 +467,6 @@ export default function Dashboard() {
 
       if (isPinned) {
         // Unpin
-
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/unpin`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unpin`;
@@ -360,20 +479,22 @@ export default function Dashboard() {
           return newSet;
         });
 
-        //  UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        //  UPDATE REDUX STATE
         if (isGroup) {
-          setGroups((prev) =>
-            prev.map((g) =>
-              g._id === conversationId
-                ? {
-                    ...g,
-                    pinnedBy:
-                      g.pinnedBy?.filter((p) => p.userId !== currentUserId) ||
-                      [],
-                  }
-                : g,
-            ),
-          );
+          const updatedGroup = groups.find((g) => g._id === conversationId);
+          if (updatedGroup) {
+            const newPinnedBy =
+              updatedGroup.pinnedBy?.filter(
+                (p) => p.userId !== currentUserId,
+              ) || [];
+
+            dispatch(
+              updateGroup({
+                ...updatedGroup,
+                pinnedBy: newPinnedBy,
+              }),
+            );
+          }
         }
 
         setAlertDialog({
@@ -386,7 +507,6 @@ export default function Dashboard() {
         });
       } else {
         // Pin
-
         const endpoint = isGroup
           ? `${API_BASE_URL}/api/groups/${conversationId}/pin`
           : `${API_BASE_URL}/api/messages/conversation/${conversationId}/pin`;
@@ -395,21 +515,22 @@ export default function Dashboard() {
 
         setPinnedConversations((prev) => new Set([...prev, conversationId]));
 
-        // UPDATE GROUPS STATE TOO (FOR REAL-TIME UI)
+        //  UPDATE REDUX STATE
         if (isGroup) {
-          setGroups((prev) =>
-            prev.map((g) =>
-              g._id === conversationId
-                ? {
-                    ...g,
-                    pinnedBy: [
-                      ...(g.pinnedBy || []),
-                      { userId: currentUserId, pinnedAt: new Date() },
-                    ],
-                  }
-                : g,
-            ),
-          );
+          const updatedGroup = groups.find((g) => g._id === conversationId);
+          if (updatedGroup) {
+            const newPinnedBy = [
+              ...(updatedGroup.pinnedBy || []),
+              { userId: currentUserId, pinnedAt: new Date() },
+            ];
+
+            dispatch(
+              updateGroup({
+                ...updatedGroup,
+                pinnedBy: newPinnedBy,
+              }),
+            );
+          }
         }
 
         setAlertDialog({
@@ -439,31 +560,15 @@ export default function Dashboard() {
     const conversationIdToRemove = lastMessages[userId]?.conversationId;
     console.log(" Conversation ID to remove:", conversationIdToRemove);
 
-    //  Remove from users list
-    setUsers((prev) => {
-      const updated = prev.filter((u) => u._id !== userId);
-      console.log(" Users updated. Remaining users:", updated.length);
-      return updated;
-    });
-
-    //  Remove from lastMessages
-    setLastMessages((prev) => {
-      const updated = { ...prev };
-      delete updated[userId];
-      console.log(
-        " LastMessages updated. Remaining entries:",
-        Object.keys(updated).length,
+    //  Use Redux deleteConversation action
+    if (conversationIdToRemove) {
+      dispatch(
+        deleteConversation({
+          conversationId: conversationIdToRemove,
+          otherUserId: userId,
+        }),
       );
-      return updated;
-    });
-
-    //  Remove from unreadCounts
-    setUnreadCounts((prev) => {
-      const updated = { ...prev };
-      delete updated[userId];
-      console.log(" UnreadCounts updated");
-      return updated;
-    });
+    }
 
     // Clear selection if this was the selected user
     if (selectedUser?._id === userId) {
@@ -473,7 +578,7 @@ export default function Dashboard() {
       setIsGroupChat(false);
     }
 
-    //  Remove from pinned/archived sets
+    // Remove from pinned/archived sets (local state)
     if (conversationIdToRemove) {
       setPinnedConversations((prev) => {
         const updated = new Set(prev);
@@ -491,7 +596,6 @@ export default function Dashboard() {
 
     console.log(" Conversation fully deleted from all states");
   };
-
   const formatAttachmentText = (attachments) => {
     if (!attachments || attachments.length === 0) return "";
 
@@ -522,90 +626,32 @@ export default function Dashboard() {
     return "📎 File";
   };
 
-  // Initial data fetch
   useEffect(() => {
-    console.log(" Initial fetch useEffect triggered");
-    console.log("hasInitialized:", hasInitialized.current);
-
-    if (hasInitialized.current) {
-      console.log(" Already initialized, skipping");
-      return;
-    }
-
+    if (hasInitialized.current) return;
     hasInitialized.current = true;
-    console.log(" Setting hasInitialized to true");
 
-    const accessToken = localStorage.getItem("accessToken");
-    const refreshToken = localStorage.getItem("refreshToken");
-    const storedUsername = localStorage.getItem("username");
-
-    console.log(" Tokens:", {
-      hasAccessToken: !!accessToken,
-      hasRefreshToken: !!refreshToken,
-      hasUsername: !!storedUsername,
-    });
-
-    if ((!accessToken && !refreshToken) || !storedUsername) {
-      console.log(" No valid tokens, redirecting to login");
-      navigate("/login", { replace: true });
-      return;
-    }
-
-    setUsername(storedUsername);
-
-    const fetchUsers = async () => {
+    const loadInitialData = async () => {
       try {
-        console.log(" Fetching users...");
-        const res = await axiosInstance.get(`${API_BASE_URL}/api/friends/list`);
-        setUsers(res.data);
-        console.log(" Users fetched:", res.data.length);
-
-        const token = accessToken || refreshToken;
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUserId(payload.id);
-        console.log(" Current user ID set:", payload.id);
+        await dispatch(fetchCurrentUser()).unwrap();
+        await dispatch(fetchFriendsList()).unwrap();
+        await dispatch(fetchGroups()).unwrap();
       } catch (err) {
-        console.error(" Error fetching users:", err);
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          console.log(" Auth error, clearing storage and redirecting");
-          localStorage.clear();
-          navigate("/login", { replace: true });
-        }
+        console.error("Failed to load initial data:", err);
+        navigate("/login", { replace: true });
       } finally {
         setLoading(false);
-        console.log(" Loading set to false");
       }
     };
 
-    fetchUsers();
-  }, [navigate]);
-  useEffect(() => {
-    const loadGroups = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/groups/list`,
-          {},
-        );
-        setGroups(response.data);
-      } catch (err) {
-        console.error("Failed to load groups:", err);
-      }
-    };
+    loadInitialData();
+  }, [dispatch, navigate]);
 
-    if (currentUserId) {
-      loadGroups();
-    }
-  }, [currentUserId]);
-
-  // Load last messages for all users on mount
   useEffect(() => {
     if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
 
     const loadLastMessages = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-
+        // Load messages for all friends
         for (const user of users) {
           try {
             const convRes = await axiosInstance.post(
@@ -616,17 +662,16 @@ export default function Dashboard() {
               },
             );
 
-            //  Skip if conversation was deleted by current user
+            // Skip if conversation was deleted
             if (
-              convRes.data.deletedBy?.some((d) => d.userId === currentUserId)
+              convRes.data?.deletedBy?.some((d) => d.userId === currentUserId)
             ) {
-              console.log(
-                ` Conversation with ${user._id} deleted by me, skipping`,
-              );
+              console.log(` Conversation with ${user._id} deleted, skipping`);
               continue;
             }
 
-            const conversationId = convRes.data._id;
+            const conversationId = convRes.data?._id;
+            if (!conversationId) continue;
 
             const msgRes = await axiosInstance.get(
               `${API_BASE_URL}/api/messages/${conversationId}`,
@@ -639,55 +684,49 @@ export default function Dashboard() {
 
             if (visibleMessages.length > 0) {
               const lastMsg = visibleMessages[visibleMessages.length - 1];
-              const messageText =
-                lastMsg.text ||
-                (lastMsg.attachments?.length > 0
-                  ? formatAttachmentText(lastMsg.attachments)
-                  : "");
 
-              setLastMessages((prev) => ({
-                ...prev,
-                [user._id]: {
-                  text: messageText,
-                  time: lastMsg.createdAt,
-                  sender: lastMsg.sender._id || lastMsg.sender,
-                  status: lastMsg.status || "sent",
-                  lastMessageId: lastMsg._id,
-                  conversationId: conversationId,
-                  attachments: lastMsg.attachments,
-                  _updated: Date.now(),
-                },
-              }));
+              //  Update Redux
+              dispatch(
+                addMessage({
+                  conversationId,
+                  message: lastMsg,
+                  userId: user._id,
+                  isGroup: false,
+                }),
+              );
 
+              // Update unread count
               const unreadCount = messages.filter(
                 (msg) =>
                   msg.sender._id !== currentUserId && msg.status !== "read",
               ).length;
 
               if (unreadCount > 0) {
-                setUnreadCounts((prev) => ({
-                  ...prev,
-                  [user._id]: unreadCount,
-                }));
+                for (let i = 0; i < unreadCount; i++) {
+                  dispatch(incrementUnreadCount(user._id));
+                }
               }
             } else {
-              setLastMessages((prev) => ({
-                ...prev,
-                [user._id]: {
-                  text: "",
-                  time: null,
-                  sender: null,
-                  status: "sent",
-                  lastMessageId: null,
-                  conversationId: conversationId,
-                  attachments: [],
-                  _updated: Date.now(),
-                },
-              }));
+              // Empty conversation exists
+              dispatch(
+                addMessage({
+                  conversationId,
+                  message: {
+                    _id: `temp-${Date.now()}`,
+                    text: "",
+                    createdAt: new Date().toISOString(),
+                    sender: currentUserId,
+                    status: "sent",
+                    attachments: [],
+                  },
+                  userId: user._id,
+                  isGroup: false,
+                }),
+              );
             }
           } catch (userErr) {
             if (userErr.response?.status === 404) {
-              console.log(` No conversation found for ${user._id}, skipping`);
+              console.log(` No conversation for ${user._id}`);
               continue;
             }
             console.error(
@@ -697,7 +736,7 @@ export default function Dashboard() {
           }
         }
 
-        // Groups (same as before)
+        //  Load messages for all groups
         for (const group of groups) {
           try {
             const msgRes = await axiosInstance.get(
@@ -711,26 +750,14 @@ export default function Dashboard() {
 
             if (visibleMessages.length > 0) {
               const lastMsg = visibleMessages[visibleMessages.length - 1];
-              const messageText =
-                lastMsg.text ||
-                (lastMsg.attachments?.length > 0
-                  ? formatAttachmentText(lastMsg.attachments)
-                  : "");
 
-              setLastMessages((prev) => ({
-                ...prev,
-                [group._id]: {
-                  text: messageText,
-                  time: lastMsg.createdAt,
-                  sender: lastMsg.sender._id || lastMsg.sender,
-                  status: lastMsg.status || "sent",
-                  lastMessageId: lastMsg._id,
+              dispatch(
+                addMessage({
                   conversationId: group._id,
-                  attachments: lastMsg.attachments,
-                  _updated: Date.now(),
+                  message: lastMsg,
                   isGroup: true,
-                },
-              }));
+                }),
+              );
             }
           } catch (err) {
             console.error(
@@ -745,378 +772,12 @@ export default function Dashboard() {
     };
 
     loadLastMessages();
-  }, [currentUserId, users, groups]);
+  }, [currentUserId, users, groups, dispatch]);
 
   useEffect(() => {
     if (!socket || !currentUserId) return;
-    console.log(" Joining user room:", currentUserId);
     socket.emit("joinUserRoom", currentUserId);
-    const handleNewMessage = (msg) => {
-      const senderId = msg.sender?._id || msg.sender;
-      const receiverId = msg.receiver;
-
-      const messageText =
-        msg.text ||
-        (msg.attachments?.length > 0
-          ? formatAttachmentText(msg.attachments)
-          : "");
-
-      if (msg.groupId) {
-        setLastMessages((prev) => ({
-          ...prev,
-          [msg.groupId]: {
-            text: messageText,
-            time: msg.createdAt || new Date().toISOString(),
-            sender: senderId,
-            status: msg.status || "sent",
-            conversationId: msg.groupId,
-            lastMessageId: msg._id,
-            attachments: msg.attachments,
-            _updated: Date.now(),
-            isGroup: true,
-          },
-        }));
-      } else {
-        const associatedUserId =
-          senderId === currentUserId ? receiverId : senderId;
-
-        setLastMessages((prev) => ({
-          ...prev,
-          [associatedUserId]: {
-            text: messageText,
-            time: msg.createdAt || new Date().toISOString(),
-            sender: senderId,
-            status: msg.status || "sent",
-            conversationId: msg.conversationId,
-            lastMessageId: msg._id,
-            attachments: msg.attachments,
-            _updated: Date.now(),
-          },
-        }));
-
-        if (
-          senderId !== currentUserId &&
-          selectedUserRef.current?._id !== senderId
-        ) {
-          setUnreadCounts((prev) => ({
-            ...prev,
-            [senderId]: (prev[senderId] || 0) + 1,
-          }));
-        }
-      }
-    };
-
-    const handleStatusUpdate = ({ messageId, _id, status, conversationId }) => {
-      const msgId = messageId || _id;
-
-      if (!status || !conversationId) {
-        console.warn(" Invalid status update");
-        return;
-      }
-
-      setLastMessages((prev) => {
-        let targetUserId = null;
-
-        for (const [userId, msgData] of Object.entries(prev)) {
-          if (msgData?.conversationId === conversationId) {
-            targetUserId = userId;
-            break;
-          }
-        }
-
-        if (!targetUserId) return prev;
-
-        return {
-          ...prev,
-          [targetUserId]: {
-            ...prev[targetUserId],
-            status: status,
-            _updated: Date.now(),
-          },
-        };
-      });
-    };
-
-    const handleMessageDeletedForEveryone = async (data) => {
-      console.log(" Message deleted for everyone:", data);
-
-      if (data.messageId && data.conversationId) {
-        try {
-          const response = await axiosInstance.get(
-            `${API_BASE_URL}/api/messages/${data.conversationId}`,
-          );
-
-          const messages = response.data.filter(
-            (msg) => msg._id !== data.messageId && !msg.deletedForEveryone,
-          );
-          const previousMessage = messages[messages.length - 1];
-
-          setLastMessages((prev) => {
-            const updated = { ...prev };
-
-            for (const [userId, msgData] of Object.entries(prev)) {
-              if (msgData?.conversationId === data.conversationId) {
-                if (previousMessage) {
-                  const messageText =
-                    previousMessage.text ||
-                    (previousMessage.attachments?.length > 0
-                      ? formatAttachmentText(previousMessage.attachments)
-                      : "");
-
-                  updated[userId] = {
-                    ...msgData,
-                    text: messageText,
-                    lastMessageId: previousMessage._id,
-                    time: previousMessage.createdAt,
-                    sender:
-                      previousMessage.sender._id || previousMessage.sender,
-                    status: previousMessage.status || "sent",
-                    _updated: Date.now(),
-                  };
-                } else {
-                  updated[userId] = {
-                    ...msgData,
-                    text: "",
-                    lastMessageId: null,
-                    _updated: Date.now(),
-                  };
-                }
-                break;
-              }
-            }
-
-            return updated;
-          });
-        } catch (err) {
-          console.error(" Error fetching previous message:", err);
-        }
-      }
-    };
-
-    const handleMessageEdited = (data) => {
-      console.log(" Message edited in dashboard:", data);
-
-      // Update lastMessages if this was the last message
-      setLastMessages((prev) => {
-        const updated = { ...prev };
-
-        // Find which user/group has this conversation
-        for (const [userId, msgData] of Object.entries(prev)) {
-          if (msgData?.lastMessageId === data.messageId) {
-            updated[userId] = {
-              ...msgData,
-              text: data.text,
-              _updated: Date.now(),
-            };
-            break;
-          }
-        }
-
-        return updated;
-      });
-    };
-
-    const handleConversationDeletedSocket = (data) => {
-      console.log(" Conversation deleted via socket:", data);
-
-      const { conversationId, otherUserId, deletedBy } = data;
-      let targetUserId = otherUserId;
-
-      if (!targetUserId) {
-        for (const [userId, msgData] of Object.entries(lastMessages)) {
-          if (msgData?.conversationId === conversationId) {
-            targetUserId = userId;
-            break;
-          }
-        }
-      }
-
-      if (targetUserId) {
-        console.log(" Found targetUserId:", targetUserId);
-        console.log(" Calling handleConversationDeleted");
-        handleConversationDeleted(targetUserId);
-      } else {
-        console.log(
-          " Could not find targetUserId for conversation:",
-          conversationId,
-        );
-      }
-    };
-    //  GROUP CHAT CLEARED HANDLER
-    socket.on("groupChatCleared", (data) => {
-      console.log(" [DASHBOARD] Group chat cleared event:", data);
-
-      //  Check if this event is for ME
-      if (data.clearedFor !== currentUserId) {
-        console.log(" Group chat cleared for other user, ignoring");
-        return;
-      }
-
-      console.log(" This is MY group chat clear, updating sidebar...");
-
-      // Update lastMessages for this group
-      setLastMessages((prev) => {
-        if (prev[data.groupId]) {
-          return {
-            ...prev,
-            [data.groupId]: {
-              ...prev[data.groupId],
-              text: "",
-              time: new Date().toISOString(),
-              lastMessageId: null,
-              sender: null,
-              status: "sent",
-              attachments: [],
-              _updated: Date.now(),
-              isGroup: true,
-            },
-          };
-        }
-        return prev;
-      });
-
-      //  Clear unread count for this group
-      setUnreadCounts((prev) => {
-        const updated = { ...prev };
-        delete updated[data.groupId];
-        return updated;
-      });
-    });
-
-    //  CHAT CLEARED HANDLER
-    const handleChatCleared = (data) => {
-      console.log(" [DASHBOARD] Chat cleared event received:", data);
-
-      if (data.clearedFor !== currentUserId) {
-        console.log(" Chat cleared for OTHER user, ignoring:", data.clearedFor);
-        return;
-      }
-
-      console.log("This is MY clear chat event, updating UI...");
-
-      // Baaki code same rahega...
-      if (!data.conversationId) {
-        console.log(" No conversationId in event");
-        return;
-      }
-
-      let foundUserId = null;
-      for (const [userId, msgData] of Object.entries(lastMessages)) {
-        if (msgData?.conversationId === data.conversationId) {
-          foundUserId = userId;
-          break;
-        }
-      }
-
-      if (foundUserId) {
-        setLastMessages((prev) => ({
-          ...prev,
-          [foundUserId]: {
-            ...prev[foundUserId],
-            text: "",
-            time: new Date().toISOString(),
-            lastMessageId: null,
-            sender: null,
-            status: "sent",
-            attachments: [],
-            _updated: Date.now(),
-          },
-        }));
-
-        setUnreadCounts((prev) => {
-          const updated = { ...prev };
-          delete updated[foundUserId];
-          return updated;
-        });
-      }
-    };
-
-    // Register all socket listeners
-    socket.on("receiveGroupMessage", (msg) => {
-      console.log(" Group msg received:", msg);
-
-      if (msg.groupId) {
-        const messageText = msg.text || formatAttachmentText(msg.attachments);
-
-        setLastMessages((prev) => ({
-          ...prev,
-          [msg.groupId]: {
-            text: messageText,
-            time: msg.createdAt || new Date().toISOString(),
-            sender: msg.sender._id || msg.sender,
-            status: msg.status || "sent",
-            conversationId: msg.groupId,
-            lastMessageId: msg._id,
-            attachments: msg.attachments,
-            _updated: Date.now(),
-            isGroup: true,
-          },
-        }));
-      }
-    });
-
-    socket.on("newStatus", (data) => {
-      console.log(" New status received:", data);
-      const loadStatuses = async () => {
-        try {
-          const response = await axiosInstance.get(
-            `${API_BASE_URL}/api/status`,
-          );
-          setAllStatuses(response.data);
-        } catch (err) {
-          console.error("Reload statuses error:", err);
-        }
-      };
-      loadStatuses();
-    });
-
-    socket.on("statusViewed", (data) => {
-      console.log(" Status viewed:", data);
-      setAllStatuses((prev) => {
-        return prev.map((userStatus) => ({
-          ...userStatus,
-          statuses: userStatus.statuses.map((status) => {
-            if (status._id === data.statusId) {
-              return {
-                ...status,
-                viewedBy: [
-                  ...status.viewedBy,
-                  {
-                    userId: { _id: data.viewerId },
-                    viewedAt: data.viewedAt,
-                  },
-                ],
-              };
-            }
-            return status;
-          }),
-        }));
-      });
-    });
-
-    socket.on("receiveMessage", handleNewMessage);
-    socket.on("messageStatusUpdate", handleStatusUpdate);
-    socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
-    socket.on("conversationDeleted", handleConversationDeletedSocket);
-    socket.on("chatCleared", handleChatCleared);
-    socket.on("messageEdited", handleMessageEdited);
-    console.log(" Socket listeners registered");
-
-    return () => {
-      socket.off("receiveGroupMessage");
-      socket.off("receiveMessage", handleNewMessage);
-      socket.off("messageStatusUpdate", handleStatusUpdate);
-      socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
-      socket.off("messageEdited", handleMessageEdited);
-      socket.off("newStatus");
-      socket.off("statusViewed");
-      socket.off("groupChatCleared");
-      socket.off("chatCleared", handleChatCleared);
-      socket.off("conversationDeleted", handleConversationDeletedSocket);
-
-      console.log(" Socket listeners removed");
-    };
-  }, [socket, currentUserId, lastMessages]);
+  }, [socket, currentUserId]);
   // Get conversation
   useEffect(() => {
     if (!selectedUser || !selectedUser._id) {
@@ -1126,25 +787,18 @@ export default function Dashboard() {
 
     const getConversation = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
+        const result = await dispatch(
+          fetchConversation({ otherUserId: selectedUser._id }),
+        ).unwrap();
 
-        const res = await axiosInstance.post(
-          `${API_BASE_URL}/api/messages/conversation`,
-          { otherUserId: selectedUser._id },
-        );
-
-        setConversationId(res.data._id);
-
-        setUnreadCounts((prev) => ({
-          ...prev,
-          [selectedUser._id]: 0,
-        }));
+        setConversationId(result._id);
+        dispatch(clearUnreadCount(selectedUser._id));
 
         if (socket) {
-          socket.emit("markAsRead", { conversationId: res.data._id });
+          socket.emit("markAsRead", { conversationId: result._id });
         }
       } catch (err) {
-        console.error(" Get conversation error:", err);
+        console.error("Get conversation error:", err);
       }
     };
 
@@ -1153,9 +807,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!socket) return;
 
-    console.log("🔌 Socket connected:", socket.id);
+    console.log(" Socket connected:", socket.id);
     console.log(
-      "🔌 Socket status:",
+      " Socket status:",
       socket.connected ? "CONNECTED" : "DISCONNECTED",
     );
 
@@ -1174,11 +828,7 @@ export default function Dashboard() {
     };
   }, [socket]);
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("username");
-    localStorage.removeItem("profileImage");
-    if (socket) socket.disconnect();
+    dispatch(logout());
     navigate("/login", { replace: true });
   };
   const handleClearChat = async () => {
@@ -1210,7 +860,7 @@ export default function Dashboard() {
         type: "success",
       });
 
-      // No need to manually update state here - socket listener will do it
+      // No need to manually update state - socket listener will do it
       console.log(" Waiting for socket event to update UI...");
     } catch (err) {
       console.error(" Clear error:", err);
@@ -1332,32 +982,25 @@ export default function Dashboard() {
         )}
 
         {/*  RESPONSIVE SIDEBAR */}
+
         <Sidebar
-          users={users}
-          groups={groups}
           selectedUserId={selectedUser?._id}
           onSelectUser={(user) => {
             if (user.isGroup) {
-              // Group selected
               setSelectedGroup(user);
               setSelectedUser(null);
               setIsGroupChat(true);
               setConversationId(null);
             } else {
-              // Individual user selected
               setSelectedUser(user);
               setSelectedGroup(null);
               setIsGroupChat(false);
             }
-
             setIsMobileSidebarOpen(false);
           }}
-          onlineUsers={onlineUsers}
-          currentUsername={username}
+          currentUsername={currentUser?.username || ""}
           currentUserId={currentUserId}
           onLogout={handleLogout}
-          unreadCounts={unreadCounts}
-          lastMessages={lastMessages}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
           onOpenProfileSettings={(view = "all") => {
@@ -1372,12 +1015,7 @@ export default function Dashboard() {
           showArchived={showArchived}
           onToggleArchived={(show) => setShowArchived(show)}
           onGroupUpdate={(updatedGroup) => {
-            setGroups((prev) => {
-              const updated = prev.map((g) =>
-                g._id === updatedGroup._id ? updatedGroup : g,
-              );
-              return updated;
-            });
+            dispatch(updateGroup(updatedGroup));
           }}
           onConversationDeleted={handleConversationDeleted}
           onOpenStatusManager={handleOpenStatusManager}
@@ -1679,37 +1317,7 @@ export default function Dashboard() {
                     currentUserId={currentUserId}
                     searchQuery={searchInChat}
                     selectedUser={selectedUser}
-                    onUpdateLastMessageStatus={(updateData) => {
-                      if (
-                        updateData &&
-                        updateData.status &&
-                        updateData.conversationId
-                      ) {
-                        setLastMessages((prev) => {
-                          let targetUserId = null;
-                          for (const [userId, msgData] of Object.entries(
-                            prev,
-                          )) {
-                            if (
-                              msgData?.conversationId ===
-                              updateData.conversationId
-                            ) {
-                              targetUserId = userId;
-                              break;
-                            }
-                          }
-                          if (!targetUserId) return prev;
-                          return {
-                            ...prev,
-                            [targetUserId]: {
-                              ...prev[targetUserId],
-                              status: updateData.status,
-                              _updated: Date.now(),
-                            },
-                          };
-                        });
-                      }
-                    }}
+                    onUpdateLastMessageStatus={(updateData) => {}}
                   />
                   <MessageInput conversationId={conversationId} />
                 </>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSocket } from "../context/SocketContext";
+import { useSelector } from "react-redux";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 export default function Message({
@@ -9,7 +9,6 @@ export default function Message({
   isSelected,
   onToggleSelect,
 }) {
-  const { socket } = useSocket();
   const [imageUrls, setImageUrls] = useState({});
   const [imageLoading, setImageLoading] = useState({});
   const [playingAudio, setPlayingAudio] = useState(null);
@@ -18,9 +17,11 @@ export default function Message({
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-const [editedText, setEditedText] = useState(message.text || "");
+  const [editedText, setEditedText] = useState(message.text || "");
   const audioRefs = React.useRef({});
-
+  const socket = useSelector((state) => state.socket.socket);
+  const connected = useSelector((state) => state.socket.connected);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString("en-US", {
       hour: "numeric",
@@ -39,7 +40,7 @@ const [editedText, setEditedText] = useState(message.text || "");
   const getSenderName = () => {
     return message.sender?.username || "Unknown";
   };
-    const canEdit = () => {
+  const canEdit = () => {
     if (!isOwn) return false;
     const messageAge = Date.now() - new Date(message.createdAt).getTime();
     const threeHours = 3 * 60 * 60 * 1000;
@@ -54,13 +55,21 @@ const [editedText, setEditedText] = useState(message.text || "");
 
   const handleSaveEdit = () => {
     if (!editedText.trim()) return;
-    
-    socket?.emit("editMessage", {
-      messageId: message._id,
-      text: editedText,
-      conversationId: message.conversationId
-    });
-    
+
+    if (message.isGroupMessage && message.groupId) {
+      socket?.emit("editGroupMessage", {
+        messageId: message._id,
+        text: editedText,
+        groupId: message.groupId,
+      });
+    } else {
+      socket?.emit("editMessage", {
+        messageId: message._id,
+        text: editedText,
+        conversationId: message.conversationId,
+      });
+    }
+
     setIsEditing(false);
   };
 
@@ -206,8 +215,7 @@ const [editedText, setEditedText] = useState(message.text || "");
       }
 
       // Local file - fetch from backend with auth
-      fetch(`${API_BASE_URL}${audioUrl}`, {
-      })
+      fetch(`${API_BASE_URL}${audioUrl}`, {})
         .then((res) => res.blob())
         .then((blob) => {
           const url = URL.createObjectURL(blob);
@@ -534,27 +542,27 @@ const [editedText, setEditedText] = useState(message.text || "");
                   ></div>
 
                   <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
-                     {isOwn && canEdit() && !isEditing && (
-        <button
-          onClick={handleEditMessage}
-          className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
-          </svg>
-          Edit Message
-        </button>
-      )}
+                    {isOwn && canEdit() && !isEditing && (
+                      <button
+                        onClick={handleEditMessage}
+                        className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                        Edit Message
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowDeleteModal(true);
@@ -777,53 +785,47 @@ const [editedText, setEditedText] = useState(message.text || "");
             </div>
           )}
 
-         {message.text && (
-  isEditing ? (
-    //  EDIT MODE UI
-    <div className="space-y-2">
-      <textarea
-        value={editedText}
-        onChange={(e) => setEditedText(e.target.value)}
-        className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${
-          isOwn 
-            ? "bg-white/10 border border-white/20 text-white" 
-            : "bg-gray-100 border border-gray-300 text-gray-900"
-        }`}
-        rows={3}
-        autoFocus
-      />
-      <div className="flex gap-2">
-        <button
-          onClick={handleSaveEdit}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium"
-        >
-          Save
-        </button>
-        <button
-          onClick={handleCancelEdit}
-          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  ) : (
-    //  NORMAL VIEW MODE 
-    <>
-      <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
-        {message.text}
-      </p>
-      {message.isEdited && (
-        <p className="text-xs opacity-70 italic mt-1">
-           Edited
-        </p>
-      )}
-    </>
-  )
-)}
-
-
-
+          {message.text &&
+            (isEditing ? (
+              //  EDIT MODE UI
+              <div className="space-y-2">
+                <textarea
+                  value={editedText}
+                  onChange={(e) => setEditedText(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${
+                    isOwn
+                      ? "bg-white/10 border border-white/20 text-white"
+                      : "bg-gray-100 border border-gray-300 text-gray-900"
+                  }`}
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-xs font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              //  NORMAL VIEW MODE
+              <>
+                <p className="text-[11px] sm:text-xs md:text-sm leading-relaxed break-words whitespace-pre-wrap">
+                  {message.text}
+                </p>
+                {message.isEdited && (
+                  <p className="text-xs opacity-70 italic mt-1">Edited</p>
+                )}
+              </>
+            ))}
 
           <div
             className={`flex items-center gap-1 mt-1 ${

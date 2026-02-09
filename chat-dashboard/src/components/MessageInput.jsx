@@ -1,20 +1,24 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSocket } from "../context/SocketContext";
+import { useSelector } from "react-redux";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
+import { useDispatch } from "react-redux";
+import { sendMessage } from "../store/slices/chatSlice";
 export default function MessageInput({
   conversationId,
   groupId,
   isGroup = false,
 }) {
-  const { socket } = useSocket();
+  const dispatch = useDispatch();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-
+  const socket = useSelector((state) => state.socket.socket);
+  const connected = useSelector((state) => state.socket.connected);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -145,45 +149,39 @@ export default function MessageInput({
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
 
-  // Send message for both group and individual
-  const sendMessage = (attachments = []) => {
+  const handleSendMessage = (attachments = []) => {
     if (!socket || (!text.trim() && attachments.length === 0) || sending)
       return;
 
     setSending(true);
 
-    //  Stop typing indicator
+    // Stop typing indicator
     if (isGroup && groupId) {
       socket.emit("groupTyping", { groupId, isTyping: false });
     } else if (conversationId) {
       socket.emit("typing", { conversationId, isTyping: false });
     }
 
-    //  Send group message
+    const messageData = {
+      conversationId: isGroup ? groupId : conversationId,
+      text: text.trim(),
+      attachments,
+    };
+
+    // Redux dispatch (only for individual chats)
+    if (!isGroup && conversationId) {
+      dispatch(sendMessage(messageData));
+    }
+
+    // Socket emit (for real-time)
     if (isGroup && groupId) {
-      console.log(" Sending group message:", {
-        groupId,
-        text: text.trim(),
-        attachments,
-      });
       socket.emit("sendGroupMessage", {
         groupId,
         text: text.trim(),
         attachments,
       });
-    }
-    //  Send individual message
-    else if (conversationId) {
-      console.log(" Sending individual message:", {
-        conversationId,
-        text: text.trim(),
-        attachments,
-      });
-      socket.emit("sendMessage", {
-        conversationId,
-        text: text.trim(),
-        attachments,
-      });
+    } else if (conversationId) {
+      socket.emit("sendMessage", messageData);
     }
 
     setText("");
@@ -254,7 +252,7 @@ export default function MessageInput({
       );
 
       console.log(" File uploaded:", response.data);
-      sendMessage([response.data]);
+      handleSendMessage([response.data]);
     } catch (error) {
       console.error(" Upload error:", error);
       alert(
@@ -369,7 +367,7 @@ export default function MessageInput({
         },
       );
 
-      sendMessage([{ ...response.data, duration }]);
+      handleSendMessage([{ ...response.data, duration }]);
     } catch (error) {
       console.error("Voice upload error:", error);
       alert(
@@ -524,7 +522,7 @@ export default function MessageInput({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    sendMessage();
+                    handleSendMessage();
                   }
                 }}
                 placeholder={
@@ -592,7 +590,7 @@ export default function MessageInput({
 
             {text.trim() ? (
               <button
-                onClick={() => sendMessage()}
+                onClick={() => handleSendMessage()}
                 disabled={sending || uploading}
                 className="p-2 md:p-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-medium transition-all shadow-lg hover:shadow-blue-500 hover:shadow-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0 transform hover:scale-105 active:scale-95"
                 title="Send message"
