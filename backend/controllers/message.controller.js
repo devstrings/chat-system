@@ -1,6 +1,7 @@
 
 import * as messageService from "../services/message.service.js";
 import * as messageValidation from "../validations/message.validation.js";
+import Message from "../models/message.js";
 
 // GET OR CREATE CONVERSATION CONTROLLER
 export const getOrCreateConversation = async (req, res) => {
@@ -61,6 +62,113 @@ export const getOrCreateConversation = async (req, res) => {
   } catch (err) {
     console.error("Get/Create conversation error:", err);
     res.status(500).json({ message: "Failed to get conversation", error: err.message });
+  }
+};
+
+
+// SEND MESSAGE CONTROLLER
+export const sendMessage = async (req, res) => {
+  try {
+    const { conversationId, text, attachments } = req.body;
+    const currentUserId = req.user.id;
+
+    console.log(" Send message request:", {
+      conversationId,
+      hasText: !!text,
+      attachmentsCount: attachments?.length || 0,
+      userId: currentUserId
+    });
+
+    // Validation - Conversation exists
+    const conversation = await messageService.fetchConversationById(conversationId);
+    const convValidation = messageValidation.validateConversationExists(conversation);
+    if (!convValidation.isValid) {
+      return res.status(convValidation.statusCode).json({ 
+        message: convValidation.message 
+      });
+    }
+
+    // Validation - User is participant
+    const participantValidation = messageValidation.validateIsParticipant(
+      conversation, 
+      currentUserId
+    );
+    if (!participantValidation.isValid) {
+      return res.status(participantValidation.statusCode).json({ 
+        message: participantValidation.message 
+      });
+    }
+
+    // Validation - Message has content
+    if (!text && (!attachments || attachments.length === 0)) {
+      return res.status(400).json({ 
+        message: "Message must contain text or attachments" 
+      });
+    }
+
+    //  Extract only attachment IDs
+    const attachmentIds = attachments?.map(att => att.attachmentId) || [];
+
+    // Create message
+    const message = await Message.create({
+      conversationId,
+      sender: currentUserId,
+      text: text || "",
+      attachments: attachmentIds, 
+      status: "sent",
+      isGroupMessage: false,
+    });
+
+    // Populate sender info
+    await message.populate("sender", "username email profileImage");
+    await message.populate({
+      path: "attachments",
+      select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+    });
+
+    // Update conversation last message
+    conversation.lastMessage = text || "📎 Attachment";
+    conversation.lastMessageTime = new Date();
+    conversation.lastMessageSender = currentUserId;
+    await conversation.save();
+
+    console.log(" Message created:", message._id);
+
+    // Transform message for response
+    const messageObj = message.toObject();
+    if (messageObj.attachments && messageObj.attachments.length > 0) {
+      messageObj.attachments = messageObj.attachments.map((att) => ({
+        url: `/api/file/get/${att.serverFileName}`,
+        filename: att.fileName,
+        fileType: att.fileType,
+        fileSize: att.sizeInKilobytes * 1024,
+        attachmentId: att._id,
+        duration: att.duration || 0,
+        isVoiceMessage: att.isVoiceMessage || false,
+      }));
+    }
+
+    // Emit socket event
+    const io = req.app.get("io");
+    if (io) {
+      // Send to other user
+      const otherUserId = conversation.participants.find(
+        (p) => p.toString() !== currentUserId
+      );
+
+      io.to(otherUserId.toString()).emit("receiveMessage", messageObj);
+      
+      console.log(" Socket event sent to:", otherUserId);
+    }
+
+    res.json(messageObj);
+
+  } catch (err) {
+    console.error(" Send message error:", err);
+    res.status(500).json({ 
+      message: "Failed to send message", 
+      error: err.message 
+    });
   }
 };
 // GET MESSAGES CONTROLLER

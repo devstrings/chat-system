@@ -21,7 +21,8 @@ import {
   AddFriendModal,
 } from "./ConfirmationDialog";
 import StatusRingsList from "./Status/StatusRingsList";
-
+import { addGroupMessage, updateGroupMessage } from "../store/slices/groupSlice";
+import { addMessage, updateMessageStatus, updateMessage } from "../store/slices/chatSlice";
 export default function Sidebar({
   selectedUserId,
   onSelectUser,
@@ -76,6 +77,118 @@ export default function Sidebar({
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
 
+  //  Socket listeners for sidebar
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
+
+    console.log(" Setting up sidebar socket listeners");
+
+const handleSidebarMessage = (msg) => {
+  console.log(" [SIDEBAR.JSX] Message received:", msg._id);
+  console.log(" [SIDEBAR.JSX] Full msg object:", JSON.stringify({
+    senderId: msg.sender?._id,
+    receiverId: msg.receiver?._id || msg.receiver,
+    conversationId: msg.conversationId,
+    currentUserId: currentUserId
+  }));
+  
+  //  Extract IDs properly
+  const senderId = msg.sender?._id || msg.sender;
+  const receiverId = msg.receiver?._id || msg.receiver;
+  
+  //  Determine otherUserId
+  let otherUserId;
+  
+  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
+    otherUserId = receiverId;
+    console.log(" [SIDEBAR.JSX] I'm SENDER, otherUser:", otherUserId);
+  } else {
+    otherUserId = senderId;
+    console.log(" [SIDEBAR.JSX] I'm RECEIVER, otherUser:", otherUserId);
+  }
+  
+  //  Convert to string
+  if (otherUserId && typeof otherUserId === 'object') {
+    otherUserId = otherUserId._id || otherUserId.toString();
+  }
+  otherUserId = otherUserId?.toString();
+  
+  console.log(` [SIDEBAR.JSX] Final userId for dispatch: "${otherUserId}"`);
+  
+  // BEFORE dispatch
+  console.log(" [SIDEBAR.JSX] BEFORE dispatch - lastMessages:", Object.keys(lastMessages));
+  
+  dispatch(addMessage({
+    conversationId: msg.conversationId,
+    message: msg,
+    userId: otherUserId,  
+    isGroup: false
+  }));
+  
+  console.log(" [SIDEBAR.JSX] Dispatched addMessage");
+}; const handleSidebarGroupMessage = (msg) => {
+      console.log(" [SIDEBAR] Group message:", msg._id);
+      
+      dispatch(addGroupMessage({
+        groupId: msg.groupId,
+        message: msg
+      }));
+
+      dispatch(addMessage({
+        conversationId: msg.groupId,
+        message: msg,
+        userId: msg.groupId,
+        isGroup: true
+      }));
+    };
+
+    const handleSidebarStatus = (data) => {
+      console.log(" [SIDEBAR] Status update:", data.messageId);
+      
+      dispatch(updateMessageStatus({
+        conversationId: data.conversationId,
+        messageId: data.messageId,
+        status: data.status
+      }));
+    };
+
+    const handleSidebarEdit = (data) => {
+      console.log(" [SIDEBAR] Message edited:", data.messageId);
+      
+      dispatch(updateMessage({
+        conversationId: data.conversationId,
+        messageId: data.messageId,
+        text: data.text,
+        editedAt: data.editedAt
+      }));
+    };
+
+    const handleSidebarGroupEdit = (data) => {
+      console.log(" [SIDEBAR] Group message edited:", data.messageId);
+      
+      dispatch(updateGroupMessage({
+        groupId: data.groupId,
+        messageId: data.messageId,
+        text: data.text,
+        editedAt: data.editedAt
+      }));
+    };
+
+    socket.on("receiveMessage", handleSidebarMessage);
+    socket.on("receiveGroupMessage", handleSidebarGroupMessage);
+    socket.on("messageStatusUpdate", handleSidebarStatus);
+    socket.on("messageEdited", handleSidebarEdit);
+    socket.on("groupMessageEdited", handleSidebarGroupEdit);
+
+    return () => {
+      console.log(" Cleaning up sidebar socket listeners");
+      socket.off("receiveMessage", handleSidebarMessage);
+      socket.off("receiveGroupMessage", handleSidebarGroupMessage);
+      socket.off("messageStatusUpdate", handleSidebarStatus);
+      socket.off("messageEdited", handleSidebarEdit);
+      socket.off("groupMessageEdited", handleSidebarGroupEdit);
+    };
+  }, [socket, currentUserId, dispatch]);
   //  Debug logs
   console.log(" Sidebar Redux Data:", {
     usersCount: users?.length || 0,
@@ -209,46 +322,50 @@ export default function Sidebar({
 
     const allItems = [...filteredGroups, ...filteredUsers];
 
-    return allItems.sort((a, b) => {
-      if (!showArchived) {
-        let convIdA, convIdB, aPinned, bPinned;
+return allItems.sort((a, b) => {
+  if (!showArchived) {
+    let convIdA, convIdB, aPinned, bPinned;
 
-        if (a.isGroup) {
-          convIdA = a._id;
-          aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
-        } else {
-          convIdA = lastMessages[a._id]?.conversationId;
-          aPinned = convIdA && pinnedConversations.has(convIdA);
-        }
+    if (a.isGroup) {
+      convIdA = a._id;
+      aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
+    } else {
+      convIdA = lastMessages[a._id]?.conversationId;
+      aPinned = convIdA && pinnedConversations.has(convIdA);
+    }
 
-        if (b.isGroup) {
-          convIdB = b._id;
-          bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
-        } else {
-          convIdB = lastMessages[b._id]?.conversationId;
-          bPinned = convIdB && pinnedConversations.has(convIdB);
-        }
+    if (b.isGroup) {
+      convIdB = b._id;
+      bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
+    } else {
+      convIdB = lastMessages[b._id]?.conversationId;
+      bPinned = convIdB && pinnedConversations.has(convIdB);
+    }
 
-        if (aPinned && !bPinned) return -1;
-        if (!aPinned && bPinned) return 1;
-      }
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+  }
 
-      const updatedA = lastMessages[a._id]?._updated || 0;
-      const updatedB = lastMessages[b._id]?._updated || 0;
+  // : Use _updated for BOTH groups and individuals
+  const updatedA = lastMessages[a._id]?._updated || 0;
+  const updatedB = lastMessages[b._id]?._updated || 0;
 
-      if (updatedA !== updatedB) {
-        return updatedB - updatedA;
-      }
+  console.log(` Sorting: ${a.username || a.name} (_updated: ${updatedA}) vs ${b.username || b.name} (_updated: ${updatedB})`);
 
-      const timeA = lastMessages[a._id]?.time
-        ? new Date(lastMessages[a._id].time).getTime()
-        : 0;
-      const timeB = lastMessages[b._id]?.time
-        ? new Date(lastMessages[b._id].time).getTime()
-        : 0;
+  if (updatedA !== updatedB) {
+    return updatedB - updatedA; // Latest first
+  }
 
-      return timeB - timeA;
-    });
+  // Fallback to message time
+  const timeA = lastMessages[a._id]?.time 
+    ? new Date(lastMessages[a._id].time).getTime() 
+    : 0;
+  const timeB = lastMessages[b._id]?.time 
+    ? new Date(lastMessages[b._id].time).getTime() 
+    : 0;
+
+  return timeB - timeA;
+});
   }, [
     users,
     groups,

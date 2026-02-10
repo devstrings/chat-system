@@ -223,99 +223,90 @@ const chatSlice = createSlice({
       state.selectedConversationId = action.payload;
     },
 
-    addMessage: (state, action) => {
-      const { conversationId, message, userId, isGroup } = action.payload;
+  addMessage: (state, action) => {
+  const { conversationId, message, userId, isGroup } = action.payload;
 
-      if (!state.conversations[conversationId]) {
-        state.conversations[conversationId] = { messages: [], loading: false };
+  if (!state.conversations[conversationId]) {
+    state.conversations[conversationId] = { messages: [], loading: false };
+  }
+
+  const exists = state.conversations[conversationId].messages.some(
+    (m) => m._id === message._id,
+  );
+
+  if (!exists) {
+    state.conversations[conversationId].messages.push(message);
+  }
+
+  const formatAttachmentText = (attachments) => {
+    if (!attachments || attachments.length === 0) return "";
+    const file = attachments[0];
+
+    if (file.isVoiceMessage) {
+      const duration = file.duration || 0;
+      if (duration > 0) {
+        const mins = Math.floor(duration / 60);
+        const secs = Math.floor(duration % 60);
+        return ` Voice (${mins}:${secs.toString().padStart(2, "0")})`;
       }
+      return " Voice message";
+    }
 
-      const exists = state.conversations[conversationId].messages.some(
-        (m) => m._id === message._id,
-      );
+    const fileType = file.fileType || file.type || "";
+    if (fileType.startsWith("image/")) return "📷 Photo";
+    if (fileType.startsWith("video/")) return "🎥 Video";
+    if (fileType === "application/pdf") return "📕 PDF";
+    if (fileType.startsWith("audio/")) return "🎵 Audio";
+    if (fileType.includes("word")) return "📄 Document";
+    if (fileType === "text/plain") return "📝 Text file";
+    return "📎 File";
+  };
 
-      if (!exists) {
-        state.conversations[conversationId].messages.push(message);
-      }
+  const messageText = message.text || formatAttachmentText(message.attachments);
+  const senderId = message.sender?._id || message.sender;
+  const timestamp = Date.now(); //  Current timestamp for sorting
 
-      const formatAttachmentText = (attachments) => {
-        if (!attachments || attachments.length === 0) return "";
-        const file = attachments[0];
+  // : Same logic for BOTH group and individual
+  const targetKey = isGroup ? conversationId : userId;
 
-        if (file.isVoiceMessage) {
-          const duration = file.duration || 0;
-          if (duration > 0) {
-            const mins = Math.floor(duration / 60);
-            const secs = Math.floor(duration % 60);
-            return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
-          }
-          return "🎤 Voice message";
-        }
+  state.lastMessages[targetKey] = {
+    text: messageText,
+    time: message.createdAt || new Date().toISOString(),
+    sender: senderId,
+    status: message.status || "sent",
+    conversationId: conversationId,
+    lastMessageId: message._id,
+    attachments: message.attachments || [],
+    _updated: timestamp, // Same timestamp logic
+    isGroup: isGroup || false,
+  };
 
-        const fileType = file.fileType || file.type || "";
-        if (fileType.startsWith("image/")) return "📷 Photo";
-        if (fileType.startsWith("video/")) return "🎥 Video";
-        if (fileType === "application/pdf") return "📕 PDF";
-        if (fileType.startsWith("audio/")) return "🎵 Audio";
-        if (fileType.includes("word")) return "📄 Document";
-        if (fileType === "text/plain") return "📝 Text file";
-        return "📎 File";
-      };
+  console.log(` Updated lastMessages[${targetKey}] with _updated:`, timestamp);
+},
 
-      const messageText =
-        message.text || formatAttachmentText(message.attachments);
-      const senderId = message.sender?._id || message.sender;
-      const timestamp = Date.now();
+updateMessageStatus: (state, action) => {
+  const { conversationId, messageId, status } = action.payload;
 
-      if (isGroup) {
-        state.lastMessages[conversationId] = {
-          text: messageText,
-          time: message.createdAt || new Date().toISOString(),
-          sender: senderId,
-          status: message.status || "sent",
-          conversationId,
-          lastMessageId: message._id,
-          attachments: message.attachments || [],
-          _updated: timestamp,
-          isGroup: true,
-        };
-      } else {
-        state.lastMessages[userId] = {
-          text: messageText,
-          time: message.createdAt || new Date().toISOString(),
-          sender: senderId,
-          status: message.status || "sent",
-          conversationId,
-          lastMessageId: message._id,
-          attachments: message.attachments || [],
-          _updated: timestamp,
-        };
-      }
-    },
+  if (state.conversations[conversationId]) {
+    const message = state.conversations[conversationId].messages.find(
+      (m) => m._id === messageId,
+    );
+    if (message) {
+      message.status = status;
+    }
+  }
 
-    updateMessageStatus: (state, action) => {
-      const { conversationId, messageId, status } = action.payload;
-
-      if (state.conversations[conversationId]) {
-        const message = state.conversations[conversationId].messages.find(
-          (m) => m._id === messageId,
-        );
-        if (message) {
-          message.status = status;
-        }
-      }
-
-      // Update in lastMessages
-      Object.keys(state.lastMessages).forEach((userId) => {
-        if (
-          state.lastMessages[userId].lastMessageId === messageId &&
-          state.lastMessages[userId].conversationId === conversationId
-        ) {
-          state.lastMessages[userId].status = status;
-          state.lastMessages[userId]._updated = Date.now();
-        }
-      });
-    },
+  // Update in lastMessages
+  Object.keys(state.lastMessages).forEach((userId) => {
+    if (
+      state.lastMessages[userId].lastMessageId === messageId &&
+      state.lastMessages[userId].conversationId === conversationId
+    ) {
+      state.lastMessages[userId].status = status;
+      state.lastMessages[userId]._updated = Date.now(); 
+    }
+  });
+},
 
     deleteMessage: (state, action) => {
       const { conversationId, messageId } = action.payload;

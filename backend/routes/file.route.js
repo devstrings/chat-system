@@ -63,8 +63,11 @@ router.post("/upload", verifyToken, uploadLimiter, uploadMessage.single("file"),
  *       200:
  *         description: File downloaded successfully
  */
-router.get("/get/:filename", verifyToken, downloadLimiter, downloadFile);
-
+router.get("/get/:filename", 
+  verifyToken,      // ✅ Directly verify token - no condition
+  downloadLimiter, 
+  downloadFile
+);
 /**
  * @swagger
  * /files/profile/{filename}:
