@@ -8,6 +8,7 @@ import {
   clearChat,
   addMessage,
   updateMessageStatus,
+   bulkDeleteMessages,
 } from "../store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -284,29 +285,30 @@ export default function ChatWindow({
     });
   };
 
-  const confirmBulkDelete = async () => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      const messageIds = Array.from(selectedMessages);
+ const confirmBulkDelete = async () => {
+  try {
+    const messageIds = Array.from(selectedMessages);
 
-      await axiosInstance.post(
-        `${API_BASE_URL}/api/messages/messages/bulk-delete`,
-        { messageIds },
-      );
+    // ✅ Redux async thunk use karo
+    await dispatch(
+      bulkDeleteMessages({
+        messageIds,
+        conversationId,
+        deleteForEveryone: false, // For me only
+      })
+    ).unwrap();
 
-      setMessages((prev) =>
-        prev.filter((msg) => !selectedMessages.has(msg._id)),
-      );
+    // Clear selection
+    setIsSelectionMode(false);
+    setSelectedMessages(new Set());
+    setDeleteDialog({ isOpen: false, count: 0 });
 
-      setIsSelectionMode(false);
-      setSelectedMessages(new Set());
-
-      setDeleteDialog({ isOpen: false, count: 0 });
-    } catch (err) {
-      console.error("Bulk delete error:", err);
-      alert("Failed to delete messages");
-    }
-  };
+    console.log(`✅ Deleted ${messageIds.length} messages`);
+  } catch (err) {
+    console.error("❌ Bulk delete error:", err);
+    alert("Failed to delete messages");
+  }
+};
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>

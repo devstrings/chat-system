@@ -116,37 +116,55 @@ export function handleMessage(io, socket) {
         : [];
 
       // Prepare message data WITH receiver field
-      const messageData = {
-        _id: msg._id,
-        conversationId: msg.conversationId,
-        sender: {
-          _id: msg.sender._id,
-          username: msg.sender.username,
-          email: msg.sender.email,
-        },
-        receiver: receiverId,
-        text: msg.text,
-        attachments: transformedAttachments, 
-        status: msg.status,
-        createdAt: msg.createdAt,
-      };
+  // Prepare message data WITH receiver field
+const messageData = {
+  _id: msg._id,
+  conversationId: msg.conversationId,
+  sender: {
+    _id: msg.sender._id,
+    username: msg.sender.username,
+    email: msg.sender.email,
+  },
+  receiver: receiverId ? { _id: receiverId } : null,
+    text: msg.text,
+  attachments: transformedAttachments, 
+  status: msg.status,
+  createdAt: msg.createdAt,
+};
 
-      console.log(" Broadcasting message to both users");
-      console.log(" Attachments with duration:", transformedAttachments); 
+console.log(" Broadcasting message:", JSON.stringify({
+  messageId: msg._id,
+  conversationId: msg.conversationId,
+  senderId: msg.sender._id,
+  receiverId: receiverId,
+  hasReceiver: !!receiverId
+}));
 
-      // Emit to BOTH sender and receiver explicitly
-      socket.emit("receiveMessage", messageData);
+// Add receiver as object (not just ID)
+const enhancedMessageData = {
+  ...messageData,
+  receiver: receiverId ? { _id: receiverId } : null  
+};
 
-      // Emit to receiver (if online)
-      if (receiverId) {
-        const receiverSocket = [...io.sockets.sockets.values()].find(
-          (s) => s.user && s.user.id === receiverId.toString()
-        );
+console.log(" Enhanced message data:", JSON.stringify({
+  hasReceiver: !!enhancedMessageData.receiver,
+  receiverId: enhancedMessageData.receiver?._id
+}));
 
-        if (receiverSocket) {
-          console.log(`Receiver ONLINE, sending message`);
-          receiverSocket.emit("receiveMessage", messageData);
+//   Emit to sender FIRST with enhanced data
+socket.emit("receiveMessage", enhancedMessageData);
+console.log(" Message sent to SENDER socket:", socket.id);
 
+// Emit to receiver (if online)
+if (receiverId) {
+  const receiverSocket = [...io.sockets.sockets.values()].find(
+    (s) => s.user && s.user.id === receiverId.toString()
+  );
+
+  if (receiverSocket) {
+    console.log(` Receiver ONLINE, sending to socket:`, receiverSocket.id);
+    receiverSocket.emit("receiveMessage", enhancedMessageData);  
+    console.log(" Message broadcasted to RECEIVER");
           // Mark as delivered after 500ms
           setTimeout(async () => {
             try {

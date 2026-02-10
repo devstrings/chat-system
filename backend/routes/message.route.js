@@ -4,6 +4,7 @@ import {
   getMessages,
   getUserConversations,
   clearChat,
+   sendMessage, 
   deleteConversation,
   deleteMessageForMe,
   deleteMessageForEveryone,
@@ -136,7 +137,34 @@ router.get("/group/:groupId", verifyToken, getGroupMessages);
  *         description: Conversation created or retrieved
  */
 router.post("/conversation", verifyToken, getOrCreateConversation);
-
+/**
+ * @swagger
+ * /messages/send:
+ *   post:
+ *     summary: Send a message
+ *     tags: [Messages]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               conversationId:
+ *                 type: string
+ *               text:
+ *                 type: string
+ *               attachments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Message sent successfully
+ */
+router.post("/send", verifyToken, sendMessage);
 /**
  * @swagger
  * /messages/messages/bulk-delete:

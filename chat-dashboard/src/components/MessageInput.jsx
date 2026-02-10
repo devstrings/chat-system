@@ -3,7 +3,6 @@ import { useSelector } from "react-redux";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 import { useDispatch } from "react-redux";
-import { sendMessage } from "../store/slices/chatSlice";
 export default function MessageInput({
   conversationId,
   groupId,
@@ -149,44 +148,50 @@ export default function MessageInput({
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
 
-  const handleSendMessage = (attachments = []) => {
-    if (!socket || (!text.trim() && attachments.length === 0) || sending)
-      return;
+const handleSendMessage = (attachments = []) => {
+  if (!socket || (!text.trim() && attachments.length === 0) || sending)
+    return;
 
-    setSending(true);
+  setSending(true);
 
-    // Stop typing indicator
-    if (isGroup && groupId) {
-      socket.emit("groupTyping", { groupId, isTyping: false });
-    } else if (conversationId) {
-      socket.emit("typing", { conversationId, isTyping: false });
-    }
+  // Stop typing indicator
+  if (isGroup && groupId) {
+    socket.emit("groupTyping", { groupId, isTyping: false });
+  } else if (conversationId) {
+    socket.emit("typing", { conversationId, isTyping: false });
+  }
 
-    const messageData = {
-      conversationId: isGroup ? groupId : conversationId,
+  const messageData = {
+    conversationId: isGroup ? groupId : conversationId,
+    text: text.trim(),
+    attachments,
+  };
+
+  //  FOR INDIVIDUAL CHATS - Use socket emit instead of Redux thunk
+  if (!isGroup && conversationId) {
+    socket.emit("sendMessage", {
+      conversationId,
       text: text.trim(),
       attachments,
-    };
+    });
+    
+    console.log(" [MESSAGEINPUT] Individual message sent via socket");
+  }
 
-    // Redux dispatch (only for individual chats)
-    if (!isGroup && conversationId) {
-      dispatch(sendMessage(messageData));
-    }
+  // Socket emit for group chats
+  if (isGroup && groupId) {
+    socket.emit("sendGroupMessage", {
+      groupId,
+      text: text.trim(),
+      attachments,
+    });
+    
+    console.log(" [MESSAGEINPUT] Group message sent via socket");
+  }
 
-    // Socket emit (for real-time)
-    if (isGroup && groupId) {
-      socket.emit("sendGroupMessage", {
-        groupId,
-        text: text.trim(),
-        attachments,
-      });
-    } else if (conversationId) {
-      socket.emit("sendMessage", messageData);
-    }
-
-    setText("");
-    setTimeout(() => setSending(false), 100);
-  };
+  setText("");
+  setTimeout(() => setSending(false), 100);
+};
 
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);

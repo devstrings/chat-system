@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import Message from "../Message";
-import API_BASE_URL from "../../config/api";
-import axiosInstance from "../../utils/axiosInstance";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchGroupMessages,
@@ -10,7 +8,8 @@ import {
   clearGroupChatMessages,
   updateGroupMessage,
 } from "../../store/slices/groupSlice";
-
+import API_BASE_URL from "../../config/api";
+import axiosInstance from "../../utils/axiosInstance";
 export default function GroupChatWindow({
   group,
   currentUserId,
@@ -200,16 +199,10 @@ export default function GroupChatWindow({
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <svg
               className="w-10 h-10 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              fill="currentColor"
+              viewBox="0 0 20 20"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
+              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
             </svg>
           </div>
           <p className="text-gray-400 text-lg mb-1">No messages yet</p>

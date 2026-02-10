@@ -101,22 +101,62 @@ export default function Dashboard() {
 
     console.log(" Setting up sidebar socket listeners");
 
-    //  Individual message received
-    const handleSidebarMessage = (msg) => {
-      console.log(" [SIDEBAR] Individual message:", msg._id);
+ //  Individual message received
+const handleSidebarMessage = (msg) => {
+  console.log(" [SIDEBAR] Individual message received");
+  console.log(" Message data:", {
+    id: msg._id,
+    conversationId: msg.conversationId,
+    senderId: msg.sender?._id || msg.sender,
+    receiverId: msg.receiver?._id || msg.receiver,
+    currentUserId: currentUserId,
+    text: msg.text?.substring(0, 30)
+  });
 
-      dispatch(
-        addMessage({
-          conversationId: msg.conversationId,
-          message: msg,
-          userId:
-            msg.sender._id === currentUserId
-              ? selectedUser?._id || msg.conversationId
-              : msg.sender._id,
-          isGroup: false,
-        }),
-      );
-    };
+  // Properly determine otherUserId
+  let otherUserId;
+  const senderId = msg.sender?._id || msg.sender;
+  const receiverId = msg.receiver?._id || msg.receiver;
+
+  // Case 1: I'm the sender
+  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
+    otherUserId = receiverId?.toString() || receiverId;
+    console.log(" I'm SENDER, otherUser (receiver):", otherUserId);
+  } 
+  // Case 2: I'm the receiver
+  else if (receiverId === currentUserId || receiverId?.toString() === currentUserId) {
+    otherUserId = senderId?.toString() || senderId;
+    console.log(" I'm RECEIVER, otherUser (sender):", otherUserId);
+  }
+  // Case 3: Fallback
+  else {
+    console.warn(" Cannot determine sender/receiver relationship!");
+    otherUserId = senderId === currentUserId ? receiverId : senderId;
+  }
+
+  //  Convert to string for consistency
+  if (otherUserId && typeof otherUserId === 'object') {
+    otherUserId = otherUserId._id || otherUserId.toString();
+  }
+  otherUserId = otherUserId?.toString();
+
+  if (!otherUserId) {
+    console.error(" CRITICAL: Could not determine otherUserId!");
+    return;
+  }
+
+  console.log(` Final userId for sidebar: "${otherUserId}"`);
+
+  //  Update Redux
+  dispatch(addMessage({
+    conversationId: msg.conversationId,
+    message: msg,
+    userId: otherUserId,
+    isGroup: false
+  }));
+
+  console.log(" Sidebar updated for individual chat!");
+};
 
     //  Group message received
     const handleSidebarGroupMessage = (msg) => {
@@ -195,7 +235,7 @@ export default function Dashboard() {
       socket.off("messageEdited", handleSidebarEdit);
       socket.off("groupMessageEdited", handleSidebarGroupEdit);
     };
-  }, [socket, currentUserId, dispatch, selectedUser]);
+  }, [socket, currentUserId, dispatch]);
   // Load all statuses
   useEffect(() => {
     const loadAllStatuses = async () => {
