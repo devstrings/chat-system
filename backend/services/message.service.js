@@ -1,4 +1,3 @@
-// messageService.js - All business logic and database operations
 
 import Message from "../models/message.js";
 import Conversation from "../models/Conversation.js";

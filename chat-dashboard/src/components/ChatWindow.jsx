@@ -289,7 +289,7 @@ export default function ChatWindow({
   try {
     const messageIds = Array.from(selectedMessages);
 
-    // ✅ Redux async thunk use karo
+    //  Redux async thunk use karo
     await dispatch(
       bulkDeleteMessages({
         messageIds,
@@ -303,9 +303,9 @@ export default function ChatWindow({
     setSelectedMessages(new Set());
     setDeleteDialog({ isOpen: false, count: 0 });
 
-    console.log(`✅ Deleted ${messageIds.length} messages`);
+    console.log(` Deleted ${messageIds.length} messages`);
   } catch (err) {
-    console.error("❌ Bulk delete error:", err);
+    console.error(" Bulk delete error:", err);
     alert("Failed to delete messages");
   }
 };

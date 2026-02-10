@@ -1,4 +1,3 @@
-// authValidation.js - All validation logic
 
 export const validateRegister = (username, email, password) => {
   if (!username || !email || !password) {

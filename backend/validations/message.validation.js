@@ -1,4 +1,3 @@
-// messageValidation.js - All validation logic
 
 export const validateOtherUserId = (otherUserId) => {
   if (!otherUserId) {

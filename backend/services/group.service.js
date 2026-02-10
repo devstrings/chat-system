@@ -1,4 +1,3 @@
-// groupService.js - All business logic and database operations
 
 import Group from "../models/Group.js";
 import user from "../models/user.js";

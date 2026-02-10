@@ -1,4 +1,3 @@
-// authService.js - All business logic and database operations
 
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";

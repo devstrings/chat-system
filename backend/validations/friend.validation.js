@@ -1,4 +1,3 @@
-// friendValidation.js - All validation logic
 
 export const validateSendFriendRequest = (senderId, receiverId) => {
   if (!receiverId) {

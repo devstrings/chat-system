@@ -1,4 +1,3 @@
-// statusValidation.js - All validation logic
 
 export const validateStatusType = (type) => {
   if (!["image", "video", "text"].includes(type)) {

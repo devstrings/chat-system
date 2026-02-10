@@ -1,4 +1,3 @@
-// groupValidation.js - All validation logic
 
 export const validateCreateGroup = (name, memberIds) => {
   if (!name || !name.trim()) {
