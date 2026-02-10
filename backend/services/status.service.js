@@ -1,4 +1,3 @@
-// statusService.js - All business logic and database operations
 
 import Status from "../models/Status.js";
 import User from "../models/user.js";

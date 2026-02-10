@@ -1,4 +1,3 @@
-// fileValidation.js - All file validation logic
 
 export const validateDownloadRequest = (filename) => {
   // Prevent path traversal

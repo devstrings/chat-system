@@ -1,4 +1,3 @@
-// userValidation.js - All validation logic
 
 export const validateSearchQuery = (searchQuery) => {
   if (!searchQuery || searchQuery.trim().length === 0) {

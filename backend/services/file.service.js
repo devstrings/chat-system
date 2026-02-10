@@ -1,4 +1,3 @@
-// fileService.js - All business logic and file operations
 
 import path from "path";
 import fs from "fs";

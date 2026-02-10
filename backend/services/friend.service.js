@@ -1,4 +1,3 @@
-// friendService.js - All business logic and database operations
 
 import FriendRequest from "../models/FriendRequest.js";
 import Friendship from "../models/Friendship.js";
