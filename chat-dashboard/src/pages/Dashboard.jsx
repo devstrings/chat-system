@@ -103,61 +103,47 @@ export default function Dashboard() {
 
  //  Individual message received
 const handleSidebarMessage = (msg) => {
-  console.log(" [SIDEBAR] Individual message received");
-  console.log(" Message data:", {
+  console.log("📩 [DASHBOARD] Individual message received:", {
     id: msg._id,
     conversationId: msg.conversationId,
-    senderId: msg.sender?._id || msg.sender,
-    receiverId: msg.receiver?._id || msg.receiver,
-    currentUserId: currentUserId,
-    text: msg.text?.substring(0, 30)
+    sender: msg.sender?._id,
+    receiver: msg.receiver?._id,
+    text: msg.text
   });
 
-  // Properly determine otherUserId
-  let otherUserId;
   const senderId = msg.sender?._id || msg.sender;
   const receiverId = msg.receiver?._id || msg.receiver;
 
-  // Case 1: I'm the sender
+  // ✅ FIND OTHER USER
+  let otherUserId;
+  
   if (senderId === currentUserId || senderId?.toString() === currentUserId) {
-    otherUserId = receiverId?.toString() || receiverId;
-    console.log(" I'm SENDER, otherUser (receiver):", otherUserId);
-  } 
-  // Case 2: I'm the receiver
-  else if (receiverId === currentUserId || receiverId?.toString() === currentUserId) {
-    otherUserId = senderId?.toString() || senderId;
-    console.log(" I'm RECEIVER, otherUser (sender):", otherUserId);
-  }
-  // Case 3: Fallback
-  else {
-    console.warn(" Cannot determine sender/receiver relationship!");
-    otherUserId = senderId === currentUserId ? receiverId : senderId;
+    otherUserId = receiverId;
+  } else {
+    otherUserId = senderId;
   }
 
-  //  Convert to string for consistency
-  if (otherUserId && typeof otherUserId === 'object') {
-    otherUserId = otherUserId._id || otherUserId.toString();
+  // ✅ CONVERT TO STRING
+  if (typeof otherUserId === 'object' && otherUserId?._id) {
+    otherUserId = otherUserId._id;
   }
   otherUserId = otherUserId?.toString();
 
   if (!otherUserId) {
-    console.error(" CRITICAL: Could not determine otherUserId!");
+    console.error("❌ Cannot determine otherUserId!");
     return;
   }
 
-  console.log(` Final userId for sidebar: "${otherUserId}"`);
+  console.log(`✅ Updating Redux for userId: "${otherUserId}"`);
 
-  //  Update Redux
+  // ✅ UPDATE REDUX
   dispatch(addMessage({
     conversationId: msg.conversationId,
     message: msg,
     userId: otherUserId,
     isGroup: false
   }));
-
-  console.log(" Sidebar updated for individual chat!");
 };
-
     //  Group message received
     const handleSidebarGroupMessage = (msg) => {
       console.log(" [SIDEBAR] Group message:", msg._id);
@@ -722,18 +708,23 @@ const handleSidebarMessage = (msg) => {
               (msg) => !msg.deletedFor?.includes(currentUserId),
             );
 
-            if (visibleMessages.length > 0) {
-              const lastMsg = visibleMessages[visibleMessages.length - 1];
+     if (visibleMessages.length > 0) {
+  const lastMsg = visibleMessages[visibleMessages.length - 1];
 
-              //  Update Redux
-              dispatch(
-                addMessage({
-                  conversationId,
-                  message: lastMsg,
-                  userId: user._id,
-                  isGroup: false,
-                }),
-              );
+  const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+
+  //  Update Redux with timestamp
+  dispatch(
+    addMessage({
+      conversationId,
+      message: {
+        ...lastMsg,
+        _loadedTimestamp: messageTimestamp 
+      },
+      userId: user._id,
+      isGroup: false,
+    }),
+  );
 
               // Update unread count
               const unreadCount = messages.filter(
@@ -776,29 +767,36 @@ const handleSidebarMessage = (msg) => {
           }
         }
 
-        //  Load messages for all groups
-        for (const group of groups) {
-          try {
-            const msgRes = await axiosInstance.get(
-              `${API_BASE_URL}/api/messages/group/${group._id}`,
-            );
 
-            const messages = msgRes.data;
-            const visibleMessages = messages.filter(
-              (msg) => !msg.deletedFor?.includes(currentUserId),
-            );
+  //  Load messages for all groups
+for (const group of groups) {
+  try {
+    const msgRes = await axiosInstance.get(
+      `${API_BASE_URL}/api/messages/group/${group._id}`,
+    );
 
-            if (visibleMessages.length > 0) {
-              const lastMsg = visibleMessages[visibleMessages.length - 1];
+    const messages = msgRes.data;
+    const visibleMessages = messages.filter(
+      (msg) => !msg.deletedFor?.includes(currentUserId),
+    );
 
-              dispatch(
-                addMessage({
-                  conversationId: group._id,
-                  message: lastMsg,
-                  isGroup: true,
-                }),
-              );
-            }
+    if (visibleMessages.length > 0) {
+      const lastMsg = visibleMessages[visibleMessages.length - 1];
+      
+      
+      const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+
+      dispatch(
+        addMessage({
+          conversationId: group._id,
+          message: {
+            ...lastMsg,
+            _loadedTimestamp: messageTimestamp 
+          },
+          isGroup: true,
+        }),
+      );
+    }
           } catch (err) {
             console.error(
               `Error loading messages for group ${group._id}:`,
@@ -1359,7 +1357,8 @@ const handleSidebarMessage = (msg) => {
                     selectedUser={selectedUser}
                     onUpdateLastMessageStatus={(updateData) => {}}
                   />
-                  <MessageInput conversationId={conversationId} />
+                  <MessageInput conversationId={conversationId}
+                    selectedUser={selectedUser} />
                 </>
               )}
             </>

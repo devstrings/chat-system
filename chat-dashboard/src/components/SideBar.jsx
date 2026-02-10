@@ -234,24 +234,27 @@ return allItems.sort((a, b) => {
     if (!aPinned && bPinned) return 1;
   }
 
-  // updated for BOTH groups and individuals
-  const updatedA = lastMessages[a._id]?._updated || 0;
-  const updatedB = lastMessages[b._id]?._updated || 0;
+  // Try multiple sources for timestamp
+  const getTimestamp = (item) => {
+    const lastMsg = lastMessages[item._id];
+    
+    // Priority 1: _updated timestamp (most reliable)
+    if (lastMsg?._updated) return lastMsg._updated;
+    
+    // Priority 2: message createdAt time
+    if (lastMsg?.time) return new Date(lastMsg.time).getTime();
+    
+    // Priority 3: Group/Conversation updatedAt
+    if (item.updatedAt) return new Date(item.updatedAt).getTime();
+    
+    // Fallback: 0 (push to bottom)
+    return 0;
+  };
 
+  const timestampA = getTimestamp(a);
+  const timestampB = getTimestamp(b);
 
-  if (updatedA !== updatedB) {
-    return updatedB - updatedA; // Latest first
-  }
-
-  // Fallback to message time
-  const timeA = lastMessages[a._id]?.time 
-    ? new Date(lastMessages[a._id].time).getTime() 
-    : 0;
-  const timeB = lastMessages[b._id]?.time 
-    ? new Date(lastMessages[b._id].time).getTime() 
-    : 0;
-
-  return timeB - timeA;
+  return timestampB - timestampA; // Latest first
 });
   }, [
     users,

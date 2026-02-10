@@ -247,9 +247,9 @@ const chatSlice = createSlice({
       if (duration > 0) {
         const mins = Math.floor(duration / 60);
         const secs = Math.floor(duration % 60);
-        return ` Voice (${mins}:${secs.toString().padStart(2, "0")})`;
+        return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
       }
-      return " Voice message";
+      return "🎤 Voice message";
     }
 
     const fileType = file.fileType || file.type || "";
@@ -261,29 +261,42 @@ const chatSlice = createSlice({
     if (fileType === "text/plain") return "📝 Text file";
     return "📎 File";
   };
+const messageText = message.text || formatAttachmentText(message.attachments);
+const senderId = message.sender?._id || message.sender;
 
-  const messageText = message.text || formatAttachmentText(message.attachments);
-  const senderId = message.sender?._id || message.sender;
-  const timestamp = Date.now(); //  Current timestamp for sorting
+//  USE MESSAGE CREATION TIME (not current time) for sorting
+const timestamp = message._loadedTimestamp 
+  || new Date(message.createdAt).getTime() 
+  || Date.now();
 
-  // : Same logic for BOTH group and individual
-  const targetKey = isGroup ? conversationId : userId;
+const targetKey = isGroup ? conversationId : userId;
 
-  state.lastMessages[targetKey] = {
-    text: messageText,
-    time: message.createdAt || new Date().toISOString(),
-    sender: senderId,
-    status: message.status || "sent",
-    conversationId: conversationId,
-    lastMessageId: message._id,
-    attachments: message.attachments || [],
-    _updated: timestamp, // Same timestamp logic
-    isGroup: isGroup || false,
-  };
+state.lastMessages[targetKey] = {
+  text: messageText,
+  time: message.createdAt || new Date().toISOString(),
+  sender: senderId,
+  status: message.status || "sent",
+  conversationId: conversationId,
+  lastMessageId: message._id,
+  attachments: message.attachments || [],
+  _updated: timestamp, 
+  isGroup: isGroup || false,
+};
 
-  console.log(` Updated lastMessages[${targetKey}] with _updated:`, timestamp);
+console.log(`[REDUX] Set _updated for ${targetKey}:`, {
+  timestamp,
+  messageCreatedAt: message.createdAt,
+  isNewMessage: !message._loadedTimestamp
+});
+
+  
+  console.log(` [REDUX] addMessage - Updated lastMessages["${targetKey}"]`, {
+    text: messageText.substring(0, 20),
+    timestamp,
+    conversationId,
+    isGroup
+  });
 },
-
 updateMessageStatus: (state, action) => {
   const { conversationId, messageId, status } = action.payload;
 
