@@ -88,12 +88,18 @@ export function handleMessage(io, socket) {
       });
 
       // Update conversation with last message
-      const lastMessageText = text || (attachmentIds.length > 0 ? "📎 Attachment" : "");
-      await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: lastMessageText,
-        lastMessageTime: Date.now(),
-        lastMessageSender: socket.user.id,
-      });
+  // Update conversation with last message
+const lastMessageText = text || (attachmentIds.length > 0 ? "📎 Attachment" : "");
+const now = Date.now(); // ✅ Store current timestamp
+
+await Conversation.findByIdAndUpdate(conversationId, {
+  lastMessage: lastMessageText,
+  lastMessageTime: now, // ✅ Use timestamp
+  lastMessageSender: socket.user.id,
+  updatedAt: new Date(now) // ✅ Also update updatedAt
+});
+
+console.log(`✅ Updated conversation ${conversationId} timestamp:`, now);
 
       // Transform attachments with complete data including duration
       const transformedAttachments = msg.attachments && msg.attachments.length > 0

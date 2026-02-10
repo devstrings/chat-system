@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSelector } from "react-redux";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { addMessage } from "../store/slices/chatSlice";
+import { addGroupMessage } from "../store/slices/groupSlice";
 export default function MessageInput({
   conversationId,
   groupId,
   isGroup = false,
+    selectedUser = null,
 }) {
   const dispatch = useDispatch();
+  const currentUserId = useSelector((state) => state.auth.currentUserId);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -148,7 +151,7 @@ export default function MessageInput({
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
 
-const handleSendMessage = (attachments = []) => {
+const handleSendMessage = async (attachments = []) => {
   if (!socket || (!text.trim() && attachments.length === 0) || sending)
     return;
 
@@ -161,13 +164,40 @@ const handleSendMessage = (attachments = []) => {
     socket.emit("typing", { conversationId, isTyping: false });
   }
 
-  const messageData = {
+  const tempMessage = {
+    _id: `temp-${Date.now()}`,
     conversationId: isGroup ? groupId : conversationId,
     text: text.trim(),
-    attachments,
+    attachments: attachments || [],
+    sender: {
+      _id: currentUserId,
+    },
+    status: "sending",
+    createdAt: new Date().toISOString(),
+    isGroupMessage: isGroup
   };
 
-  //  FOR INDIVIDUAL CHATS - Use socket emit instead of Redux thunk
+  if (!isGroup && conversationId && selectedUser) {
+    dispatch(addMessage({
+      conversationId,
+      message: tempMessage,
+      userId: selectedUser._id, 
+      isGroup: false
+    }));
+    
+    console.log(" [MESSAGEINPUT] Redux updated BEFORE socket emit");
+  }
+
+  if (isGroup && groupId) {
+    dispatch(addGroupMessage({
+      groupId,
+      message: tempMessage
+    }));
+    
+    console.log(" [MESSAGEINPUT] Group Redux updated BEFORE socket emit");
+  }
+
+  // Socket emit for real-time broadcasting
   if (!isGroup && conversationId) {
     socket.emit("sendMessage", {
       conversationId,
@@ -178,7 +208,6 @@ const handleSendMessage = (attachments = []) => {
     console.log(" [MESSAGEINPUT] Individual message sent via socket");
   }
 
-  // Socket emit for group chats
   if (isGroup && groupId) {
     socket.emit("sendGroupMessage", {
       groupId,
@@ -192,7 +221,6 @@ const handleSendMessage = (attachments = []) => {
   setText("");
   setTimeout(() => setSending(false), 100);
 };
-
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);
     setShowEmojiPicker(false);
