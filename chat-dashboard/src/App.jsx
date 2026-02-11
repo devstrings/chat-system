@@ -11,10 +11,10 @@ import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
-// ✅ GLOBAL FLAG - component ke bahar
+//  GLOBAL FLAG 
 let userFetchInitiated = false;
 
-// ✅ PROTECTED ROUTE - Simplified version
+// PROTECTED ROUTE 
 function ProtectedRoute({ children }) {
   const dispatch = useDispatch();
   const { isAuthenticated, loading, currentUser } = useSelector((state) => state.auth);
@@ -23,22 +23,20 @@ function ProtectedRoute({ children }) {
   const refreshToken = localStorage.getItem("refreshToken");
 
   useEffect(() => {
-    // ✅ Sirf ek baar fetch karo - global flag use karke
     if ((accessToken || refreshToken) && !currentUser && !userFetchInitiated) {
-      console.log("🔄 Fetching current user (one time only)...");
+      console.log("Fetching current user (one time only)...");
       userFetchInitiated = true;
       dispatch(fetchCurrentUser());
     }
-  }, [dispatch]); // ✅ Only dispatch in dependency
+  }, [dispatch]); // Only dispatch in dependency
 
-  // ✅ Agar tokens nahi hain, redirect karo
   if (!accessToken && !refreshToken) {
-    console.log("❌ No tokens found, redirecting to login");
+    console.log(" No tokens found, redirecting to login");
     userFetchInitiated = false; // Reset flag
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ Loading state
+  //  Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -50,19 +48,18 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // ✅ Agar user data nahi aaya aur loading bhi false hai
   if (!loading && !currentUser && userFetchInitiated) {
-    console.log("❌ User fetch failed, clearing tokens");
+    console.log(" User fetch failed, clearing tokens");
     localStorage.clear();
     userFetchInitiated = false; // Reset flag
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ Success - render children
+  //  Success - render children
   return children;
 }
 
-// ✅ ROOT REDIRECT
+// ROOT REDIRECT
 function RootRedirect() {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const accessToken = localStorage.getItem("accessToken");
