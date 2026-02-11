@@ -1,7 +1,7 @@
-// 📁 src/store/store.js
 
 import { configureStore } from '@reduxjs/toolkit';
 import { enableMapSet } from 'immer'; 
+import { injectStore } from '../utils/axiosInstance';
 
 enableMapSet();
 
@@ -69,5 +69,5 @@ export const store = configureStore({
       },
     }).concat(socketMiddleware),
 });
-
+injectStore(store);
 export default store;

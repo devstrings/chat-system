@@ -1,94 +1,105 @@
-
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axiosInstance from '../../utils/axiosInstance';
-import API_BASE_URL from '../../config/api';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axiosInstance from "../../utils/axiosInstance";
+import API_BASE_URL from "../../config/api";
 
 //  ASYNC THUNKS
 
 // Login
 export const login = createAsyncThunk(
-  'auth/login',
+  "auth/login",
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`${API_BASE_URL}/api/auth/login`, {
-        email,
-        password,
-      });
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/api/auth/login`,
+        {
+          email,
+          password,
+        },
+      );
 
-      const { accessToken, refreshToken, username, profileImage } = response.data;
+      const { refreshToken, username, profileImage } = response.data;
 
-      // Save to localStorage
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('username', username);
+      //  ONLY save refreshToken, username, profileImage
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("username", username);
       if (profileImage) {
-        localStorage.setItem('profileImage', profileImage);
+        localStorage.setItem("profileImage", profileImage);
       }
 
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      return rejectWithValue(error.response?.data?.message || "Login failed");
     }
-  }
+  },
 );
 
 // Register
 export const register = createAsyncThunk(
-  'auth/register',
+  "auth/register",
   async ({ username, email, password }, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`${API_BASE_URL}/api/auth/register`, {
-        username,
-        email,
-        password,
-      });
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/api/auth/register`,
+        {
+          username,
+          email,
+          password,
+        },
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+      return rejectWithValue(
+        error.response?.data?.message || "Registration failed",
+      );
     }
-  }
+  },
 );
 
 // Logout
 export const logout = createAsyncThunk(
-  'auth/logout',
+  "auth/logout",
   async (_, { dispatch }) => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('username');
-    localStorage.removeItem('profileImage');
-    
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("username");
+    localStorage.removeItem("profileImage");
+
     // Reset all slices
-    dispatch({ type: 'RESET_APP' });
-    
+    dispatch({ type: "RESET_APP" });
+
     return null;
-  }
+  },
 );
 
 // Fetch Current User
 export const fetchCurrentUser = createAsyncThunk(
-  'auth/fetchCurrentUser',
+  "auth/fetchCurrentUser",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get(`${API_BASE_URL}/api/users/auth/me`);
+      const response = await axiosInstance.get(
+        `${API_BASE_URL}/api/users/auth/me`,
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message);
+      console.error(" fetchCurrentUser failed:", error.response?.status);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch user",
+      );
     }
-  }
+  },
 );
 
 // Update Profile Image
 export const updateProfileImage = createAsyncThunk(
-  'auth/updateProfileImage',
+  "auth/updateProfileImage",
   async ({ imageFile, isCoverPhoto }, { rejectWithValue }) => {
     try {
       const formData = new FormData();
-      
+
       if (isCoverPhoto) {
-        formData.append('coverPhoto', imageFile);
+        formData.append("coverPhoto", imageFile);
       } else {
-        formData.append('image', imageFile);
+        formData.append("image", imageFile);
       }
 
       const uploadUrl = isCoverPhoto
@@ -107,52 +118,60 @@ export const updateProfileImage = createAsyncThunk(
         : `${API_BASE_URL}/api/users/profile/update-image`;
 
       const updateRes = await axiosInstance.put(updateUrl, {
-        [isCoverPhoto ? 'coverPhoto' : 'profileImage']: imageUrl,
+        [isCoverPhoto ? "coverPhoto" : "profileImage"]: imageUrl,
       });
 
       return { imageUrl, isCoverPhoto };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }
-  }
+  },
 );
 
 // Change Password
 export const changePassword = createAsyncThunk(
-  'auth/changePassword',
+  "auth/changePassword",
   async ({ oldPassword, newPassword }, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/auth/change-password`,
-        { oldPassword, newPassword }
+        { oldPassword, newPassword },
       );
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }
-  }
+  },
 );
 
-// SLICE 
+// SLICE
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState: {
     isAuthenticated: false,
     currentUser: null,
     currentUserId: null,
-    token: localStorage.getItem('accessToken') || null,
+    token: localStorage.getItem("accessToken") || null,
     loading: false,
     error: null,
+    userFetched: false,
   },
   reducers: {
     clearError: (state) => {
       state.error = null;
     },
-    
+
     setUser: (state, action) => {
       state.currentUser = action.payload;
       state.currentUserId = action.payload?._id;
+    },
+    updateToken: (state, action) => {
+      state.token = action.payload;
+      console.log(
+        " Token updated in Redux:",
+        action.payload.substring(0, 20) + "...",
+      );
     },
   },
   extraReducers: (builder) => {
@@ -175,7 +194,7 @@ const authSlice = createSlice({
         state.error = action.payload;
         state.isAuthenticated = false;
       })
-      
+
       // Register
       .addCase(register.pending, (state) => {
         state.loading = true;
@@ -189,7 +208,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Logout
       .addCase(logout.fulfilled, (state) => {
         state.isAuthenticated = false;
@@ -199,7 +218,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = null;
       })
-      
+
       // Fetch Current User
       .addCase(fetchCurrentUser.pending, (state) => {
         state.loading = true;
@@ -209,12 +228,14 @@ const authSlice = createSlice({
         state.currentUser = action.payload;
         state.currentUserId = action.payload._id;
         state.isAuthenticated = true;
+        state.error = null;
+        state.userFetched = true;
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.loading = false;
         state.isAuthenticated = false;
       })
-      
+
       // Update Profile Image
       .addCase(updateProfileImage.fulfilled, (state, action) => {
         const { imageUrl, isCoverPhoto } = action.payload;
@@ -226,7 +247,7 @@ const authSlice = createSlice({
           }
         }
       })
-      
+
       // Change Password
       .addCase(changePassword.pending, (state) => {
         state.loading = true;
@@ -240,9 +261,9 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Reset on RESET_APP
-      .addCase('RESET_APP', () => {
+      .addCase("RESET_APP", () => {
         return {
           isAuthenticated: false,
           currentUser: null,
@@ -255,6 +276,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUser } = authSlice.actions;
+export const { clearError, setUser, updateToken } = authSlice.actions;
 
 export default authSlice.reducer;

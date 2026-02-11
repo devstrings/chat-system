@@ -32,7 +32,6 @@ export default function Sidebar({
   isMobileSidebarOpen = false,
   profileImageUrl,
   onCloseMobileSidebar = () => {},
-  currentUser = null,
   onOpenProfileSettings = (view = "all") => {},
   pinnedConversations = new Set(),
   onPinConversation = () => {},
@@ -69,10 +68,13 @@ export default function Sidebar({
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeTab, setActiveTab] = useState("chats");
-  const { imageSrc: profilePreview, loading: imageLoading } =
-    useAuthImage(profileImageUrl);
+const { currentUser } = useSelector((state) => state.auth);
+const { imageSrc: profilePreview, loading: imageLoading } =
+    useAuthImage(currentUser?.profileImage);
+
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
+  const { currentUser: currentUserFromRedux } = useSelector((state) => state.auth);
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);

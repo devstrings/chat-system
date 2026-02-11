@@ -20,37 +20,84 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-//  STORE INITIAL TOKEN TO DETECT MODIFICATION
-let storedAccessToken = localStorage.getItem("accessToken");
+//  REDUX STORE INJECT
+let store;
+export const injectStore = (_store) => {
+  store = _store;
+  console.log(' Store injected successfully');
+};
 
-//  CHECK TOKEN MODIFICATION BEFORE EACH REQUEST
+// TRACK LAST VALID TOKEN - Initialize AFTER login
+let lastValidToken = null;
+
+//  LOGOUT HELPER
+const performLogout = (reason = "Token invalid") => {
+  console.error(` PERFORMING LOGOUT: ${reason}`);
+  
+  localStorage.clear();
+  lastValidToken = null;
+  
+  if (store) {
+    console.log(' Dispatching logout action to Redux...');
+    store.dispatch({ type: 'auth/logout/fulfilled' });
+  }
+  
+  console.log(' Redirecting to /login...');
+  setTimeout(() => {
+    window.location.href = "/login";
+  }, 100);
+};
+
+//  CHECK TOKEN MODIFICATION
 const checkTokenModification = () => {
   const currentToken = localStorage.getItem("accessToken");
   
-  //  SKIP CHECK IF NO TOKEN (for login/register)
-  if (!currentToken && !storedAccessToken) {
+  //  Initialize lastValidToken if not set yet (first request after login)
+  if (!lastValidToken && currentToken) {
+    console.log(' Initializing lastValidToken on first request');
+    lastValidToken = currentToken;
     return true;
   }
   
-  if (currentToken && storedAccessToken && currentToken !== storedAccessToken) {
-    console.error(" Token has been manually modified! Logging out...");
-    localStorage.clear();
-    window.location.href = "/login";
+  console.log(' Checking token modification...');
+  console.log('  Current:', currentToken?.substring(0, 30));
+  console.log('  Last Valid:', lastValidToken?.substring(0, 30));
+  
+  // Skip check if no tokens exist
+  if (!currentToken && !lastValidToken) {
+    console.log(' No tokens - skipping check');
+    return true;
+  }
+  
+  // Token manually changed
+  if (lastValidToken && currentToken && currentToken !== lastValidToken) {
+    console.error("TOKEN MISMATCH DETECTED!");
+    console.log("Expected:", lastValidToken.substring(0, 30) + "...");
+    console.log("Found:", currentToken.substring(0, 30) + "...");
+    performLogout("Token has been manually modified");
     return false;
   }
   
+  console.log(' Token check passed');
   return true;
+};
+
+//  UPDATE TOKEN REFERENCE
+const updateTokenReference = (newToken) => {
+  if (newToken) {
+    console.log(" Updating token reference:", newToken.substring(0, 30) + "...");
+    lastValidToken = newToken;
+    localStorage.setItem("accessToken", newToken);
+  }
 };
 
 // REQUEST INTERCEPTOR
 axiosInstance.interceptors.request.use(
   (config) => {
-    //  Skip token check for login/register/public routes
     const publicRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh-token'];
     const isPublicRoute = publicRoutes.some(route => config.url?.includes(route));
     
     if (!isPublicRoute) {
-      // Only check token modification for protected routes
       if (!checkTokenModification()) {
         return Promise.reject(new Error("Token modified"));
       }
@@ -58,44 +105,61 @@ axiosInstance.interceptors.request.use(
     
     const accessToken = localStorage.getItem("accessToken");
     
-    //  Only add Authorization header if token exists AND not a public route
     if (accessToken && !isPublicRoute) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
     
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error(" Request interceptor error:", error);
+    return Promise.reject(error);
+  }
 );
 
 // RESPONSE INTERCEPTOR
 axiosInstance.interceptors.response.use(
   (response) => {
-    //  Update stored token when new token is received (like after login)
+    //  Update token reference when new token is received
     if (response.data?.accessToken) {
-      storedAccessToken = response.data.accessToken;
+      console.log(' New token received in response');
+      updateTokenReference(response.data.accessToken);
+      
+      if (store) {
+        store.dispatch({
+          type: 'auth/updateToken',
+          payload: response.data.accessToken,
+        });
+      }
     }
+    
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
+    const status = error.response?.status;
 
-    //  Handle 401/403 errors (including modified tokens)
-    if (
-      (error.response?.status === 401 || error.response?.status === 403) &&
-      !originalRequest._retry
-    ) {
-      // If token was modified, logout immediately
+    console.error(`Response error: ${status} ${originalRequest?.url}`);
+
+    if (status === 401 || status === 403) {
+      console.log(' 401/403 Error detected');
+      
+      // Check token modification
       const currentToken = localStorage.getItem("accessToken");
-      if (currentToken && storedAccessToken && currentToken !== storedAccessToken) {
-        console.error(" Token modified detected on 403. Logging out...");
-        localStorage.clear();
-        window.location.href = "/login";
+      
+      if (lastValidToken && currentToken && currentToken !== lastValidToken) {
+        console.error(' TOKEN MODIFIED - IMMEDIATE LOGOUT');
+        performLogout("Token modified detected on 403/401");
+        return Promise.reject(error);
+      }
+
+      if (originalRequest._retry) {
+        console.error(" Already retried - LOGOUT");
+        performLogout("Authentication retry failed");
         return Promise.reject(error);
       }
 
       if (isRefreshing) {
-        // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -103,7 +167,10 @@ axiosInstance.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return axiosInstance(originalRequest);
           })
-          .catch((err) => Promise.reject(err));
+          .catch((err) => {
+            performLogout("Token refresh queue failed");
+            return Promise.reject(err);
+          });
       }
 
       originalRequest._retry = true;
@@ -112,14 +179,12 @@ axiosInstance.interceptors.response.use(
       const refreshToken = localStorage.getItem("refreshToken");
 
       if (!refreshToken) {
-        console.error(" No refresh token found");
-        localStorage.clear();
-        window.location.href = "/login";
+        performLogout("No refresh token found");
         return Promise.reject(error);
       }
 
       try {
-        console.log(" Refreshing access token...");
+        console.log("Calling refresh token API...");
 
         const { data } = await axios.post(
           `${API_BASE_URL}/api/auth/refresh-token`,
@@ -128,17 +193,19 @@ axiosInstance.interceptors.response.use(
 
         if (data.accessToken) {
           console.log(" New access token received");
-          localStorage.setItem("accessToken", data.accessToken);
           
-          //  Update stored token reference
-          storedAccessToken = data.accessToken;
+          updateTokenReference(data.accessToken);
 
-          // Update the failed request with new token
+          if (store) {
+            store.dispatch({
+              type: 'auth/updateToken',
+              payload: data.accessToken,
+            });
+          }
+
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-
-          // Process queued requests
           processQueue(null, data.accessToken);
-
+          
           return axiosInstance(originalRequest);
         } else {
           throw new Error("No access token in response");
@@ -146,8 +213,7 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         console.error(" Token refresh failed:", refreshError.message);
         processQueue(refreshError, null);
-        localStorage.clear();
-        window.location.href = "/login";
+        performLogout("Token refresh failed");
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -158,5 +224,22 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-export default axiosInstance;
+// Debug helper
+window.debugAxios = {
+  getCurrentToken: () => localStorage.getItem("accessToken"),
+  getLastValidToken: () => lastValidToken,
+  checkMatch: () => {
+    const current = localStorage.getItem("accessToken");
+    const last = lastValidToken;
+    console.log('🔍 Token Match Check:');
+    console.log('  Current:', current?.substring(0, 30));
+    console.log('  Last Valid:', last?.substring(0, 30));
+    console.log('  Match?', current === last);
+    return current === last;
+  },
+  forceLogout: () => {
+    performLogout("Manual logout via debugAxios");
+  }
+};
 
+export default axiosInstance;
