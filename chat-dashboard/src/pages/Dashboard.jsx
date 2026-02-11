@@ -101,49 +101,54 @@ export default function Dashboard() {
 
     console.log(" Setting up sidebar socket listeners");
 
- //  Individual message received
-const handleSidebarMessage = (msg) => {
-  console.log("📩 [DASHBOARD] Individual message received:", {
-    id: msg._id,
-    conversationId: msg.conversationId,
-    sender: msg.sender?._id,
-    receiver: msg.receiver?._id,
-    text: msg.text
-  });
+    //  Individual message received
+    const handleSidebarMessage = (msg) => {
+      console.log(" [DASHBOARD] Individual message received:", {
+        id: msg._id,
+        conversationId: msg.conversationId,
+        sender: msg.sender?._id,
+        receiver: msg.receiver?._id,
+        text: msg.text,
+      });
 
-  const senderId = msg.sender?._id || msg.sender;
-  const receiverId = msg.receiver?._id || msg.receiver;
+      const senderId = msg.sender?._id || msg.sender;
+      const receiverId = msg.receiver?._id || msg.receiver;
 
-  // ✅ FIND OTHER USER
-  let otherUserId;
-  
-  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
-    otherUserId = receiverId;
-  } else {
-    otherUserId = senderId;
-  }
+      //  FIND OTHER USER
+      let otherUserId;
 
-  // ✅ CONVERT TO STRING
-  if (typeof otherUserId === 'object' && otherUserId?._id) {
-    otherUserId = otherUserId._id;
-  }
-  otherUserId = otherUserId?.toString();
+      if (
+        senderId === currentUserId ||
+        senderId?.toString() === currentUserId
+      ) {
+        otherUserId = receiverId;
+      } else {
+        otherUserId = senderId;
+      }
 
-  if (!otherUserId) {
-    console.error("❌ Cannot determine otherUserId!");
-    return;
-  }
+      //  CONVERT TO STRING
+      if (typeof otherUserId === "object" && otherUserId?._id) {
+        otherUserId = otherUserId._id;
+      }
+      otherUserId = otherUserId?.toString();
 
-  console.log(`✅ Updating Redux for userId: "${otherUserId}"`);
+      if (!otherUserId) {
+        console.error(" Cannot determine otherUserId!");
+        return;
+      }
 
-  // ✅ UPDATE REDUX
-  dispatch(addMessage({
-    conversationId: msg.conversationId,
-    message: msg,
-    userId: otherUserId,
-    isGroup: false
-  }));
-};
+      console.log(` Updating Redux for userId: "${otherUserId}"`);
+
+      //  UPDATE REDUX
+      dispatch(
+        addMessage({
+          conversationId: msg.conversationId,
+          message: msg,
+          userId: otherUserId,
+          isGroup: false,
+        }),
+      );
+    };
     //  Group message received
     const handleSidebarGroupMessage = (msg) => {
       console.log(" [SIDEBAR] Group message:", msg._id);
@@ -250,33 +255,6 @@ const handleSidebarMessage = (msg) => {
   useEffect(() => {
     lastMessagesRef.current = lastMessages;
   }, [lastMessages]);
-
-  //Load current user and set shared state
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/users/auth/me`,
-          {},
-        );
-        dispatch(setUser(response.data));
-        if (response.data.profileImage) {
-          setSharedProfileImage(response.data.profileImage);
-        }
-
-        // Set cover photo state
-        if (response.data.coverPhoto) {
-          setSharedCoverPhoto(response.data.coverPhoto);
-          setCurrentUserCoverPhoto(response.data.coverPhoto);
-        }
-      } catch (err) {
-        console.error("Failed to load current user:", err);
-      }
-    };
-
-    loadCurrentUser();
-  }, []);
 
   // Load pinned conversations
   useEffect(() => {
@@ -658,7 +636,6 @@ const handleSidebarMessage = (msg) => {
 
     const loadInitialData = async () => {
       try {
-        await dispatch(fetchCurrentUser()).unwrap();
         await dispatch(fetchFriendsList()).unwrap();
         await dispatch(fetchGroups()).unwrap();
       } catch (err) {
@@ -708,23 +685,23 @@ const handleSidebarMessage = (msg) => {
               (msg) => !msg.deletedFor?.includes(currentUserId),
             );
 
-     if (visibleMessages.length > 0) {
-  const lastMsg = visibleMessages[visibleMessages.length - 1];
+            if (visibleMessages.length > 0) {
+              const lastMsg = visibleMessages[visibleMessages.length - 1];
 
-  const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+              const messageTimestamp = new Date(lastMsg.createdAt).getTime();
 
-  //  Update Redux with timestamp
-  dispatch(
-    addMessage({
-      conversationId,
-      message: {
-        ...lastMsg,
-        _loadedTimestamp: messageTimestamp 
-      },
-      userId: user._id,
-      isGroup: false,
-    }),
-  );
+              //  Update Redux with timestamp
+              dispatch(
+                addMessage({
+                  conversationId,
+                  message: {
+                    ...lastMsg,
+                    _loadedTimestamp: messageTimestamp,
+                  },
+                  userId: user._id,
+                  isGroup: false,
+                }),
+              );
 
               // Update unread count
               const unreadCount = messages.filter(
@@ -767,36 +744,34 @@ const handleSidebarMessage = (msg) => {
           }
         }
 
+        //  Load messages for all groups
+        for (const group of groups) {
+          try {
+            const msgRes = await axiosInstance.get(
+              `${API_BASE_URL}/api/messages/group/${group._id}`,
+            );
 
-  //  Load messages for all groups
-for (const group of groups) {
-  try {
-    const msgRes = await axiosInstance.get(
-      `${API_BASE_URL}/api/messages/group/${group._id}`,
-    );
+            const messages = msgRes.data;
+            const visibleMessages = messages.filter(
+              (msg) => !msg.deletedFor?.includes(currentUserId),
+            );
 
-    const messages = msgRes.data;
-    const visibleMessages = messages.filter(
-      (msg) => !msg.deletedFor?.includes(currentUserId),
-    );
+            if (visibleMessages.length > 0) {
+              const lastMsg = visibleMessages[visibleMessages.length - 1];
 
-    if (visibleMessages.length > 0) {
-      const lastMsg = visibleMessages[visibleMessages.length - 1];
-      
-      
-      const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+              const messageTimestamp = new Date(lastMsg.createdAt).getTime();
 
-      dispatch(
-        addMessage({
-          conversationId: group._id,
-          message: {
-            ...lastMsg,
-            _loadedTimestamp: messageTimestamp 
-          },
-          isGroup: true,
-        }),
-      );
-    }
+              dispatch(
+                addMessage({
+                  conversationId: group._id,
+                  message: {
+                    ...lastMsg,
+                    _loadedTimestamp: messageTimestamp,
+                  },
+                  isGroup: true,
+                }),
+              );
+            }
           } catch (err) {
             console.error(
               `Error loading messages for group ${group._id}:`,
@@ -1357,8 +1332,10 @@ for (const group of groups) {
                     selectedUser={selectedUser}
                     onUpdateLastMessageStatus={(updateData) => {}}
                   />
-                  <MessageInput conversationId={conversationId}
-                    selectedUser={selectedUser} />
+                  <MessageInput
+                    conversationId={conversationId}
+                    selectedUser={selectedUser}
+                  />
                 </>
               )}
             </>
