@@ -1,6 +1,4 @@
-// userService.js - All business logic and database operations
-
-import User from "../models/user.js";
+import User from "../models/User.js";
 import BlockedUser from "../models/BlockedUser.js";
 import fs from "fs";
 import path from "path";
@@ -26,7 +24,10 @@ export const getBlockedUserIds = (blockedRelationships, currentUserId) => {
 };
 
 // FETCH ALL USERS EXCEPT BLOCKED SERVICE
-export const fetchAllUsersExceptBlocked = async (currentUserId, blockedUserIds) => {
+export const fetchAllUsersExceptBlocked = async (
+  currentUserId,
+  blockedUserIds,
+) => {
   const users = await User.find({
     _id: { $ne: currentUserId, $nin: blockedUserIds },
   })
@@ -37,7 +38,11 @@ export const fetchAllUsersExceptBlocked = async (currentUserId, blockedUserIds) 
 };
 
 // SEARCH USERS SERVICE
-export const searchUsersExceptBlocked = async (searchQuery, currentUserId, blockedUserIds) => {
+export const searchUsersExceptBlocked = async (
+  searchQuery,
+  currentUserId,
+  blockedUserIds,
+) => {
   const users = await User.find({
     _id: { $ne: currentUserId, $nin: blockedUserIds },
     $or: [

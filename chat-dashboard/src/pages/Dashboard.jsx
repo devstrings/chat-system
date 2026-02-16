@@ -29,8 +29,9 @@ import {
   deleteConversation,
   updateMessageStatus,
   updateMessage,
+  updateGroupMessageInSidebar,  
 } from "../store/slices/chatSlice";
-import { addGroupMessage, updateGroup } from "../store/slices/groupSlice";
+import { addGroupMessage, updateGroup, updateGroupMessage } from "../store/slices/groupSlice";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -95,138 +96,185 @@ export default function Dashboard() {
     type: "info",
   });
 
-  //SOCKET LISTENERS FOR SIDEBAR UPDATES
-  useEffect(() => {
-    if (!socket || !currentUserId) return;
+//SOCKET LISTENERS FOR SIDEBAR UPDATES
+useEffect(() => {
+  if (!socket || !currentUserId) return;
 
-    console.log(" Setting up sidebar socket listeners");
+  console.log("🔌 Setting up sidebar socket listeners");
 
-    //  Individual message received
-    const handleSidebarMessage = (msg) => {
-      console.log(" [DASHBOARD] Individual message received:", {
-        id: msg._id,
+  //  Individual message received
+  const handleSidebarMessage = (msg) => {
+    console.log(" [DASHBOARD] Individual message received:", {
+      id: msg._id,
+      conversationId: msg.conversationId,
+      sender: msg.sender?._id,
+      receiver: msg.receiver?._id,
+      text: msg.text,
+    });
+
+    const senderId = msg.sender?._id || msg.sender;
+    const receiverId = msg.receiver?._id || msg.receiver;
+
+    //  FIND OTHER USER
+    let otherUserId;
+
+    if (
+      senderId === currentUserId ||
+      senderId?.toString() === currentUserId
+    ) {
+      otherUserId = receiverId;
+    } else {
+      otherUserId = senderId;
+    }
+
+    //  CONVERT TO STRING
+    if (typeof otherUserId === "object" && otherUserId?._id) {
+      otherUserId = otherUserId._id;
+    }
+    otherUserId = otherUserId?.toString();
+
+    if (!otherUserId) {
+      console.error(" Cannot determine otherUserId!");
+      return;
+    }
+
+    console.log(` Updating Redux for userId: "${otherUserId}"`);
+
+    //  UPDATE REDUX
+    dispatch(
+      addMessage({
         conversationId: msg.conversationId,
-        sender: msg.sender?._id,
-        receiver: msg.receiver?._id,
-        text: msg.text,
-      });
+        message: msg,
+        userId: otherUserId,
+        isGroup: false,
+      }),
+    );
+  };
 
-      const senderId = msg.sender?._id || msg.sender;
-      const receiverId = msg.receiver?._id || msg.receiver;
+  //  Group message received
+  const handleSidebarGroupMessage = (msg) => {
+    console.log(" [SIDEBAR] Group message:", msg._id);
 
-      //  FIND OTHER USER
-      let otherUserId;
+    // Update group messages in groupSlice
+    dispatch(
+      addGroupMessage({
+        groupId: msg.groupId,
+        message: msg,
+      }),
+    );
 
-      if (
-        senderId === currentUserId ||
-        senderId?.toString() === currentUserId
-      ) {
-        otherUserId = receiverId;
-      } else {
-        otherUserId = senderId;
-      }
+    // Also update lastMessages for sidebar
+    dispatch(
+      addMessage({
+        conversationId: msg.groupId,
+        message: msg,
+        userId: msg.groupId,
+        isGroup: true,
+      }),
+    );
+  };
 
-      //  CONVERT TO STRING
-      if (typeof otherUserId === "object" && otherUserId?._id) {
-        otherUserId = otherUserId._id;
-      }
-      otherUserId = otherUserId?.toString();
+  //  Status update
+  const handleSidebarStatus = (data) => {
+    console.log("[SIDEBAR] Status update:", data.messageId);
 
-      if (!otherUserId) {
-        console.error(" Cannot determine otherUserId!");
-        return;
-      }
+    dispatch(
+      updateMessageStatus({
+        conversationId: data.conversationId,
+        messageId: data.messageId,
+        status: data.status,
+      }),
+    );
+  };
 
-      console.log(` Updating Redux for userId: "${otherUserId}"`);
+  //  Message edited (individual)
+  const handleSidebarEdit = (data) => {
+    console.log(" [SIDEBAR] Message edited:", data.messageId);
 
-      //  UPDATE REDUX
-      dispatch(
-        addMessage({
-          conversationId: msg.conversationId,
-          message: msg,
-          userId: otherUserId,
-          isGroup: false,
-        }),
-      );
-    };
-    //  Group message received
-    const handleSidebarGroupMessage = (msg) => {
-      console.log(" [SIDEBAR] Group message:", msg._id);
+    dispatch(
+      updateMessage({
+        conversationId: data.conversationId,
+        messageId: data.messageId,
+        text: data.text,
+        editedAt: data.editedAt,
+      }),
+    );
+  };
 
-      // Update group messages in groupSlice
-      dispatch(
-        addGroupMessage({
-          groupId: msg.groupId,
-          message: msg,
-        }),
-      );
+  //   Group message edited (NEW HANDLER - ADD THIS)
+  const handleSidebarGroupEdit = (data) => {
+    console.log(" [SIDEBAR] Group message edited:", data);
 
-      // Also update lastMessages for sidebar
-      dispatch(
-        addMessage({
-          conversationId: msg.groupId,
-          message: msg,
-          userId: msg.groupId,
-          isGroup: true,
-        }),
-      );
-    };
+    // Update in groupSlice (chat window)
+    dispatch(
+      updateGroupMessage({
+        groupId: data.groupId,
+        messageId: data.messageId,
+        text: data.text,
+        editedAt: data.editedAt,
+      }),
+    );
 
-    //  Status update
-    const handleSidebarStatus = (data) => {
-      console.log(" [SIDEBAR] Status update:", data.messageId);
+    //  Update in chatSlice (sidebar lastMessage)
+    dispatch(
+      updateGroupMessageInSidebar({
+        groupId: data.groupId,
+        messageId: data.messageId,
+        text: data.text,
+        editedAt: data.editedAt,
+      }),
+    );
+  };
 
-      dispatch(
-        updateMessageStatus({
-          conversationId: data.conversationId,
-          messageId: data.messageId,
-          status: data.status,
-        }),
-      );
-    };
+  socket.on("receiveMessage", handleSidebarMessage);
+  socket.on("receiveGroupMessage", handleSidebarGroupMessage);
+  socket.on("messageStatusUpdate", handleSidebarStatus);
+  socket.on("messageEdited", handleSidebarEdit);
+  socket.on("groupMessageEdited", handleSidebarGroupEdit); 
 
-    //  Message edited
-    const handleSidebarEdit = (data) => {
-      console.log(" [SIDEBAR] Message edited:", data.messageId);
+  const handleConversationUpdated = (data) => {
+  console.log(" [SIDEBAR] conversationUpdated received:", data);
 
-      dispatch(
-        updateMessage({
-          conversationId: data.conversationId,
-          messageId: data.messageId,
-          text: data.text,
-          editedAt: data.editedAt,
-        }),
-      );
-    };
-    //  ADD THIS - Group message edited
-    const handleSidebarGroupEdit = (data) => {
-      console.log(" [SIDEBAR] Group message edited:", data.messageId);
+  // lastMessages mein se sahi userId dhundo
+  const otherUserId = Object.keys(lastMessages).find(
+    (uid) => lastMessages[uid]?.conversationId === data.conversationId
+  );
 
-      dispatch(
-        updateGroupMessage({
-          groupId: data.groupId,
-          messageId: data.messageId,
-          text: data.text,
-          editedAt: data.editedAt,
-        }),
-      );
-    };
+  if (!otherUserId) {
+    console.warn(" Could not find userId for conversationId:", data.conversationId);
+    return;
+  }
 
-    socket.on("receiveMessage", handleSidebarMessage);
-    socket.on("receiveGroupMessage", handleSidebarGroupMessage);
-    socket.on("messageStatusUpdate", handleSidebarStatus);
-    socket.on("messageEdited", handleSidebarEdit);
-    socket.on("groupMessageEdited", handleSidebarGroupEdit);
+  dispatch(
+    addMessage({
+      conversationId: data.conversationId,
+      message: {
+        _id: `update-${Date.now()}`,
+        text: data.lastMessage ?? "",
+        createdAt: new Date(data.lastMessageTime || Date.now()).toISOString(),
+        sender: currentUserId,
+        status: "sent",
+        attachments: [],
+        _updated: Date.now(),
+      },
+      userId: otherUserId, 
+      isGroup: false,
+    })
+  );
+};
 
-    return () => {
-      console.log(" Cleaning up sidebar socket listeners");
-      socket.off("receiveMessage", handleSidebarMessage);
-      socket.off("receiveGroupMessage", handleSidebarGroupMessage);
-      socket.off("messageStatusUpdate", handleSidebarStatus);
-      socket.off("messageEdited", handleSidebarEdit);
-      socket.off("groupMessageEdited", handleSidebarGroupEdit);
-    };
-  }, [socket, currentUserId, dispatch]);
+socket.on("conversationUpdated", handleConversationUpdated);
+
+return () => {
+  console.log(" Cleaning up sidebar socket listeners");
+  socket.off("receiveMessage", handleSidebarMessage);
+  socket.off("receiveGroupMessage", handleSidebarGroupMessage);
+  socket.off("messageStatusUpdate", handleSidebarStatus);
+  socket.off("messageEdited", handleSidebarEdit);
+  socket.off("groupMessageEdited", handleSidebarGroupEdit);
+  socket.off("conversationUpdated", handleConversationUpdated); 
+};
+}, [socket, currentUserId, dispatch]);
   // Load all statuses
   useEffect(() => {
     const loadAllStatuses = async () => {
@@ -1112,7 +1160,7 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {!isGroupChat && onlineUsers.has(selectedUser._id) && (
+                      {!isGroupChat && onlineUsers.includes(selectedUser._id) && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                       )}
                     </div>
@@ -1128,7 +1176,7 @@ export default function Dashboard() {
                         {isGroupChat ? (
                           //  GROUP MEMBER COUNT
                           `${selectedGroup.members?.length || 0} members`
-                        ) : onlineUsers.has(selectedUser._id) ? (
+                        ) : onlineUsers.includes(selectedUser._id) ? (
                           //  USER ONLINE
                           <>
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -1205,7 +1253,7 @@ export default function Dashboard() {
                                     message: ` ${selectedUser.username}\n📧 ${
                                       selectedUser.email
                                     }\n${
-                                      onlineUsers.has(selectedUser._id)
+                                  onlineUsers.includes(selectedUser._id)
                                         ? " Online"
                                         : " Offline"
                                     }`,

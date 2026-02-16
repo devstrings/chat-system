@@ -1,12 +1,16 @@
-
 import Group from "../models/Group.js";
-import user from "../models/user.js";
-import Message from "../models/message.js";
+import user from "../models/User.js";
+import Message from "../models/Message.js";
 import fs from "fs";
 import path from "path";
 
 // CREATE GROUP SERVICE
-export const processCreateGroup = async (name, description, memberIds, creatorId) => {
+export const processCreateGroup = async (
+  name,
+  description,
+  memberIds,
+  creatorId,
+) => {
   const group = await Group.create({
     name: name.trim(),
     description: description?.trim() || "",
@@ -56,10 +60,7 @@ export const processUpdateGroup = async (groupId, name, description) => {
   }
 
   await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  await group.populate("members admins creator", "username email profileImage");
 
   console.log(` Updated group ${groupId}`);
   return group;
@@ -70,7 +71,7 @@ export const deleteOldGroupImage = (oldImagePath) => {
   if (oldImagePath) {
     const imagePath = path.join(
       "uploads/groupImages/",
-      path.basename(oldImagePath)
+      path.basename(oldImagePath),
     );
     if (fs.existsSync(imagePath)) {
       fs.unlinkSync(imagePath);
@@ -90,10 +91,7 @@ export const processUpdateGroupImage = async (groupId, file) => {
   // Save new image path
   group.groupImage = `/uploads/groupImages/${file.filename}`;
   await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  await group.populate("members admins creator", "username email profileImage");
 
   console.log(` Updated group image ${groupId}`);
   return group;
@@ -110,10 +108,7 @@ export const processRemoveGroupImage = async (groupId) => {
 
   group.groupImage = null;
   await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  await group.populate("members admins creator", "username email profileImage");
 
   console.log(` Removed group image ${groupId}`);
   return group;
@@ -125,7 +120,7 @@ export const processAddGroupMembers = async (groupId, memberIds) => {
 
   // Simply add new members without checking if they exist
   const newMembers = memberIds.filter(
-    (id) => !group.members.some((m) => m.toString() === id)
+    (id) => !group.members.some((m) => m.toString() === id),
   );
 
   if (newMembers.length === 0) {
@@ -135,10 +130,7 @@ export const processAddGroupMembers = async (groupId, memberIds) => {
   // Add members back (even if previously removed)
   group.members.push(...newMembers);
   await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  await group.populate("members admins creator", "username email profileImage");
 
   console.log(` Added ${newMembers.length} members to group ${groupId}`);
   return group;
@@ -152,10 +144,7 @@ export const processRemoveGroupMember = async (groupId, memberId) => {
   group.admins = group.admins.filter((a) => a.toString() !== memberId);
 
   await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  await group.populate("members admins creator", "username email profileImage");
 
   console.log(` Removed member ${memberId} from group ${groupId}`);
   return group;
@@ -199,14 +188,17 @@ export const processLeaveGroup = async (groupId, userId) => {
 export const processMakeAdmin = async (groupId, memberId) => {
   const group = await Group.findById(groupId);
 
-  group.admins.push(memberId);
-  await group.save();
-  await group.populate(
-    "members admins creator",
-    "username email profileImage"
-  );
+  //  Check if already admin (safety check)
+  const isAlreadyAdmin = group.admins.some((a) => a.toString() === memberId);
 
-  console.log(`Made ${memberId} admin in group ${groupId}`);
+  if (!isAlreadyAdmin) {
+    group.admins.push(memberId);
+  }
+
+  await group.save();
+  await group.populate("members admins creator", "username email profileImage");
+
+  console.log(` Made ${memberId} admin in group ${groupId}`);
   return group;
 };
 
@@ -216,7 +208,7 @@ export const processRemoveAdmin = async (groupId, memberId) => {
 
   // Remove from admins array (demote to regular member)
   group.admins = group.admins.filter((a) => a.toString() !== memberId);
-  
+
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
@@ -257,9 +249,7 @@ export const processPinGroup = async (groupId, userId) => {
 export const processUnpinGroup = async (groupId, userId) => {
   const group = await Group.findById(groupId);
 
-  group.pinnedBy = group.pinnedBy.filter(
-    (p) => p.userId.toString() !== userId
-  );
+  group.pinnedBy = group.pinnedBy.filter((p) => p.userId.toString() !== userId);
   await group.save();
 
   console.log(` Group unpinned: ${groupId} by ${userId}`);
@@ -282,7 +272,7 @@ export const processUnarchiveGroup = async (groupId, userId) => {
   const group = await Group.findById(groupId);
 
   group.archivedBy = group.archivedBy.filter(
-    (a) => a.userId.toString() !== userId
+    (a) => a.userId.toString() !== userId,
   );
   await group.save();
 
@@ -297,11 +287,11 @@ export const processClearGroupChat = async (groupId, userId) => {
     {
       groupId,
       isGroupMessage: true,
-      deletedFor: { $ne: userId }
+      deletedFor: { $ne: userId },
     },
     {
-      $addToSet: { deletedFor: userId }
-    }
+      $addToSet: { deletedFor: userId },
+    },
   );
 
   await Group.findByIdAndUpdate(groupId, {
@@ -311,14 +301,14 @@ export const processClearGroupChat = async (groupId, userId) => {
   });
 
   console.log(
-    ` Marked ${result.modifiedCount} messages as deleted for user ${userId} in group ${groupId}`
+    ` Marked ${result.modifiedCount} messages as deleted for user ${userId} in group ${groupId}`,
   );
 
   return {
     message: "Group chat cleared for you",
     deletedCount: result.modifiedCount,
     groupId,
-    userId
+    userId,
   };
 };
 

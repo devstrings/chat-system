@@ -149,20 +149,18 @@ const groupSlice = createSlice({
 
     updateGroupTyping: (state, action) => {
       const { groupId, userId, isTyping } = action.payload;
-
       if (!state.typingUsers[groupId]) {
-        state.typingUsers[groupId] = new Set();
+        state.typingUsers[groupId] = [];
       }
-
-      const typingSet = new Set(state.typingUsers[groupId]);
-
       if (isTyping) {
-        typingSet.add(userId);
+        if (!state.typingUsers[groupId].includes(userId)) {
+          state.typingUsers[groupId].push(userId);
+        }
       } else {
-        typingSet.delete(userId);
+        state.typingUsers[groupId] = state.typingUsers[groupId].filter(
+          (id) => id !== userId,
+        );
       }
-
-      state.typingUsers[groupId] = typingSet;
     },
 
     updateGroup: (state, action) => {

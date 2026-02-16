@@ -1,4 +1,3 @@
-
 import FriendRequest from "../models/FriendRequest.js";
 import Friendship from "../models/Friendship.js";
 import BlockedUser from "../models/BlockedUser.js";
@@ -59,21 +58,25 @@ export const checkOppositeRequest = async (senderId, receiverId) => {
   return oppositeRequest;
 };
 
-// CHECK EXISTING REQUEST SERVICE
+//  CHECK EXISTING REQUEST SERVICE (Only pending requests)
 export const checkExistingRequest = async (senderId, receiverId) => {
+  // Check if ANY PENDING request exists between these users (either direction)
   const existingRequest = await FriendRequest.findOne({
-    sender: senderId,
-    receiver: receiverId
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId }
+    ],
+    status: "pending"  
   });
-
+  
+  console.log(" checkExistingRequest result:", existingRequest ? `Found: ${existingRequest.sender} → ${existingRequest.receiver} (${existingRequest.status})` : "Not found");
+  
   return existingRequest;
 };
 
 // AUTO ACCEPT AND CREATE FRIENDSHIP SERVICE
 export const autoAcceptAndCreateFriendship = async (oppositeRequest, senderId, receiverId) => {
-  //  AUTO-ACCEPT: Both users want to be friends
-  oppositeRequest.status = "accepted";
-  await oppositeRequest.save();
+  console.log(" Auto-accepting friend request:", { senderId, receiverId });
 
   //  Create friendship
   await Friendship.create({
@@ -81,44 +84,82 @@ export const autoAcceptAndCreateFriendship = async (oppositeRequest, senderId, r
     user2: receiverId
   });
 
+  //  DELETE the opposite request after accepting (cleanup)
+  await FriendRequest.findByIdAndDelete(oppositeRequest._id);
+
+  console.log(" Auto-accept completed, old request deleted");
+
   return { 
     message: "You are now friends!", 
     autoAccepted: true 
   };
 };
 
-// SEND FRIEND REQUEST SERVICE
+//  SEND FRIEND REQUEST SERVICE
 export const processSendFriendRequest = async (senderId, receiverId) => {
+  console.log(" Processing friend request:", { senderId, receiverId });
+
   // Check if blocked
   const isBlocked = await checkIfBlocked(senderId, receiverId);
   if (isBlocked) {
+    console.log(" Cannot send: Users blocked");
     throw new Error("Cannot send request");
   }
 
   // Check if already friends
   const alreadyFriends = await checkIfAlreadyFriends(senderId, receiverId);
   if (alreadyFriends) {
+    console.log(" Already friends");
     throw new Error("Already friends");
   }
 
-  //  CHECK: Opposite request exists? (User B already sent request to User A)
-  const oppositeRequest = await checkOppositeRequest(senderId, receiverId);
-  if (oppositeRequest) {
-    return await autoAcceptAndCreateFriendship(oppositeRequest, senderId, receiverId);
+  //  Check for ONLY PENDING requests (ignore accepted/rejected ones)
+  const existingPendingRequest = await FriendRequest.findOne({
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId }
+    ],
+    status: "pending"
+  });
+  
+  if (existingPendingRequest) {
+    const isSameDirection = 
+      existingPendingRequest.sender.toString() === senderId && 
+      existingPendingRequest.receiver.toString() === receiverId;
+    
+    const isOppositeDirection = 
+      existingPendingRequest.sender.toString() === receiverId && 
+      existingPendingRequest.receiver.toString() === senderId;
+    
+    if (isSameDirection) {
+      console.log(" Request already exists (same direction):", existingPendingRequest._id);
+      throw new Error("Request already sent");
+    }
+    
+    if (isOppositeDirection) {
+      console.log("Opposite request found, auto-accepting");
+      return await autoAcceptAndCreateFriendship(existingPendingRequest, senderId, receiverId);
+    }
   }
 
-  //  CHECK: Same direction request already sent?
-  const existingRequest = await checkExistingRequest(senderId, receiverId);
-  if (existingRequest) {
-    throw new Error("Request already sent");
-  }
+  //  Clean up any old non-pending requests before creating new one
+  await FriendRequest.deleteMany({
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId }
+    ],
+    status: { $ne: "pending" }  // Delete accepted/rejected requests
+  });
 
   // Create new request
+  console.log(" Creating new friend request");
   const friendRequest = await FriendRequest.create({
     sender: senderId,
     receiver: receiverId,
     status: "pending"
   });
+
+  console.log(" Friend request created:", friendRequest._id);
 
   return { 
     message: "Friend request sent", 
@@ -126,17 +167,18 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
   };
 };
 
-// ACCEPT FRIEND REQUEST SERVICE
+//  ACCEPT FRIEND REQUEST SERVICE (Delete request after accepting)
 export const processAcceptFriendRequest = async (friendRequest) => {
-  // Update request status
-  friendRequest.status = "accepted";
-  await friendRequest.save();
-
   // Create friendship
   await Friendship.create({
     user1: friendRequest.sender,
     user2: friendRequest.receiver
   });
+
+  //  DELETE the request (don't just update status)
+  await FriendRequest.findByIdAndDelete(friendRequest._id);
+  
+  console.log(" Friend request deleted after accepting:", friendRequest._id);
 
   return { message: "Friend request accepted" };
 };
@@ -185,8 +227,11 @@ export const fetchSentRequests = async (currentUserId) => {
   return formattedRequests;
 };
 
-// UNFRIEND SERVICE
+//  UNFRIEND SERVICE
 export const processUnfriend = async (currentUserId, friendId) => {
+  console.log(" Unfriend request:", { currentUserId, friendId });
+
+  // Delete friendship
   const friendship = await Friendship.findOneAndDelete({
     $or: [
       { user1: currentUserId, user2: friendId },
@@ -195,8 +240,21 @@ export const processUnfriend = async (currentUserId, friendId) => {
   });
 
   if (!friendship) {
+    console.log(" Friendship not found");
     throw new Error("Friendship not found");
   }
+
+  console.log(" Friendship deleted:", friendship._id);
+
+  //  DELETE ALL friend requests (ALL statuses) - Complete cleanup
+  const deletedRequests = await FriendRequest.deleteMany({
+    $or: [
+      { sender: currentUserId, receiver: friendId },
+      { sender: friendId, receiver: currentUserId }
+    ]
+  });
+
+  console.log(" Deleted ALL friend requests:", deletedRequests.deletedCount);
 
   return { message: "Unfriended successfully" };
 };

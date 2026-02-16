@@ -1,14 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import Message from "./Message";
-import axiosInstance from "../utils/axiosInstance";
 import ConfirmationDialog from "./ConfirmationDialog";
-import API_BASE_URL from "../config/api";
 import {
   fetchMessages,
   clearChat,
   addMessage,
   updateMessageStatus,
-   bulkDeleteMessages,
+  bulkDeleteMessages,
 } from "../store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -60,16 +58,31 @@ export default function ChatWindow({
     if (!socket || !conversationId) return;
 
     const handleChatCleared = (data) => {
-      console.log(" [CHATWINDOW] Chat cleared event:", data);
+      console.log(" [CHATWINDOW] chatCleared received:", data);
 
       if (
         data.conversationId === conversationId &&
         data.clearedFor === currentUserId
       ) {
-        console.log("Clearing MY chat from UI");
+        console.log(" Clearing chat window");
         dispatch(clearChat.fulfilled(conversationId));
-      } else {
-        console.log(" Not my chat clear event, ignoring");
+
+        dispatch(
+          addMessage({
+            conversationId: data.conversationId,
+            message: {
+              _id: `cleared-${Date.now()}`,
+              text: "",
+              createdAt: new Date().toISOString(),
+              sender: currentUserId,
+              status: "sent",
+              attachments: [],
+              _updated: Date.now(),
+            },
+            userId: selectedUser?._id ?? "",
+            isGroup: false,
+          }),
+        );
       }
     };
 
@@ -80,169 +93,42 @@ export default function ChatWindow({
     };
   }, [socket, conversationId, currentUserId, dispatch]);
 
+  // YEH LAGAO
   useEffect(() => {
     if (!socket) return;
-
-    const handleReceiveMessage = (msg) => {
-      if (msg.conversationId === conversationIdRef.current) {
-        const processedMsg = {
-          ...msg,
-          attachments:
-            msg.attachments?.map((att) => ({
-              ...att,
-              duration: att.duration ?? 0,
-              isVoiceMessage: att.isVoiceMessage ?? false,
-            })) || [],
-        };
-
-        //  Redux update
-        dispatch(
-          addMessage({
-            conversationId: msg.conversationId,
-            message: processedMsg,
-            userId:
-              msg.sender._id === currentUserId
-                ? selectedUser?._id
-                : msg.sender._id,
-            isGroup: false,
-          }),
-        );
-
-        if (onUpdateLastMessageStatus) {
-          onUpdateLastMessageStatus({
-            status: processedMsg.status || "sent",
-            messageId: msg._id,
-            conversationId: msg.conversationId,
-            text:
-              msg.text || (msg.attachments?.length > 0 ? "📎 Attachment" : ""),
-            senderId: msg.sender?._id || msg.sender,
-          });
-        }
-
-        if (socket && msg.sender._id !== currentUserId) {
-          setTimeout(() => {
-            socket.emit("markAsRead", { conversationId: msg.conversationId });
-          }, 300);
-        }
-      }
-    };
 
     const handleStatusUpdate = (data) => {
       const msgId = data.messageId || data._id;
       const status = data.status;
-      const conversationId = data.conversationId;
-
-      if (!msgId || !status) {
-        return;
-      }
-
-      //  Redux update
+      const convId = data.conversationId;
+      if (!msgId || !status) return;
       dispatch(
         updateMessageStatus({
-          conversationId,
+          conversationId: convId,
           messageId: msgId,
           status,
         }),
       );
-
-      if (onUpdateLastMessageStatus) {
-        const currentMessages = messagesRef.current;
-        const lastMsg = currentMessages[currentMessages.length - 1];
-
-        if (lastMsg?._id === msgId) {
-          onUpdateLastMessageStatus({
-            status: status,
-            messageId: msgId,
-            conversationId: conversationId,
-          });
-        }
-      }
-    };
-
-    const handleMessagesRead = (data) => {
-      if (data.conversationId === conversationIdRef.current) {
-        if (onUpdateLastMessageStatus) {
-          onUpdateLastMessageStatus({
-            status: "read",
-            conversationId: data.conversationId,
-          });
-        }
-      }
-    };
-
-    const handleMessageDeleted = (data) => {
-      if (data.messageId) {
-        // Redux will handle this via deleteMessage action
-      }
-    };
-
-    const handleMessageDeletedForEveryone = (data) => {
-      if (data.messageId && data.conversationId === conversationIdRef.current) {
-        // Redux will handle this
-      }
-    };
-
-    const handleMessageEdited = (data) => {
-      console.log(" Message edited event:", data);
-
-      if (data.conversationId === conversationIdRef.current) {
-        // Redux will handle via updateMessage action
-      }
     };
 
     const handleTyping = ({ userId, isTyping, conversationId }) => {
-      console.log("⌨ TYPING EVENT RECEIVED:", {
-        userId,
-        isTyping,
-        conversationId,
-        currentConversation: conversationIdRef.current,
-        selectedUser: selectedUser?._id,
-        matches: conversationId === conversationIdRef.current,
-      });
-
-      if (conversationId !== conversationIdRef.current) {
-        console.log(" Wrong conversation, ignoring");
-        return;
-      }
-
-      console.log(` ${isTyping ? "ADDING" : "REMOVING"} userId: ${userId}`);
-
+      if (conversationId !== conversationIdRef.current) return;
       setTypingUsers((prev) => {
         const newSet = new Set(prev);
-        if (isTyping) {
-          newSet.add(userId);
-        } else {
-          newSet.delete(userId);
-        }
-        console.log(" Updated typing users:", Array.from(newSet));
+        if (isTyping) newSet.add(userId);
+        else newSet.delete(userId);
         return newSet;
       });
     };
 
-    socket.on("receiveMessage", handleReceiveMessage);
     socket.on("messageStatusUpdate", handleStatusUpdate);
-    socket.on("messagesMarkedRead", handleMessagesRead);
-    socket.on("messageDeleted", handleMessageDeleted);
-    socket.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     socket.on("userTyping", handleTyping);
-    socket.on("messageEdited", handleMessageEdited);
 
     return () => {
-      socket.off("receiveMessage", handleReceiveMessage);
       socket.off("messageStatusUpdate", handleStatusUpdate);
-      socket.off("messagesMarkedRead", handleMessagesRead);
-      socket.off("messageDeleted", handleMessageDeleted);
-      socket.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
       socket.off("userTyping", handleTyping);
-      socket.off("messageEdited", handleMessageEdited);
     };
-  }, [
-    socket,
-    currentUserId,
-    onUpdateLastMessageStatus,
-    selectedUser,
-    dispatch,
-  ]);
+  }, [socket, dispatch]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -285,30 +171,30 @@ export default function ChatWindow({
     });
   };
 
- const confirmBulkDelete = async () => {
-  try {
-    const messageIds = Array.from(selectedMessages);
+  const confirmBulkDelete = async () => {
+    try {
+      const messageIds = Array.from(selectedMessages);
 
-    //  Redux async thunk use karo
-    await dispatch(
-      bulkDeleteMessages({
-        messageIds,
-        conversationId,
-        deleteForEveryone: false, // For me only
-      })
-    ).unwrap();
+      //  Redux async thunk use karo
+      await dispatch(
+        bulkDeleteMessages({
+          messageIds,
+          conversationId,
+          deleteForEveryone: false, // For me only
+        }),
+      ).unwrap();
 
-    // Clear selection
-    setIsSelectionMode(false);
-    setSelectedMessages(new Set());
-    setDeleteDialog({ isOpen: false, count: 0 });
+      // Clear selection
+      setIsSelectionMode(false);
+      setSelectedMessages(new Set());
+      setDeleteDialog({ isOpen: false, count: 0 });
 
-    console.log(` Deleted ${messageIds.length} messages`);
-  } catch (err) {
-    console.error(" Bulk delete error:", err);
-    alert("Failed to delete messages");
-  }
-};
+      console.log(` Deleted ${messageIds.length} messages`);
+    } catch (err) {
+      console.error(" Bulk delete error:", err);
+      alert("Failed to delete messages");
+    }
+  };
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>

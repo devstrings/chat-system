@@ -1,39 +1,38 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice } from "@reduxjs/toolkit";
 
 const socketSlice = createSlice({
-  name: 'socket',
+  name: "socket",
   initialState: {
     socket: null,
     connected: false,
-    onlineUsers: new Set(),
+    onlineUsers: [],
   },
   reducers: {
     setSocket: (state, action) => {
       state.socket = action.payload;
     },
-    
+
     setConnected: (state, action) => {
       state.connected = action.payload;
     },
-    
+
     setOnlineUsers: (state, action) => {
-      state.onlineUsers = new Set(action.payload);
+      state.onlineUsers = action.payload;
     },
-    
     addOnlineUser: (state, action) => {
-      state.onlineUsers = new Set([...state.onlineUsers, action.payload]);
+      if (!state.onlineUsers.includes(action.payload)) {
+        state.onlineUsers.push(action.payload);
+      }
     },
-    
     removeOnlineUser: (state, action) => {
-      const newSet = new Set(state.onlineUsers);
-      newSet.delete(action.payload);
-      state.onlineUsers = newSet;
+      state.onlineUsers = state.onlineUsers.filter(
+        (id) => id !== action.payload,
+      );
     },
-    
     clearSocket: (state) => {
       state.socket = null;
       state.connected = false;
-      state.onlineUsers = new Set();
+      state.onlineUsers = [];
     },
   },
 });

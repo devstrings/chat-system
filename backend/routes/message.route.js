@@ -4,7 +4,7 @@ import {
   getMessages,
   getUserConversations,
   clearChat,
-   sendMessage, 
+  sendMessage,
   deleteConversation,
   deleteMessageForMe,
   deleteMessageForEveryone,
@@ -16,10 +16,33 @@ import {
   unarchiveConversation,
   getArchivedConversations,
   getGroupMessages,
-   editMessage
+  editMessage,
 } from "../controllers/message.controller.js";
-import Conversation from "../models/Conversation.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { validate } from "../validators/middleware/validate.js";
+import {
+  getOrCreateConversationValidation,
+  sendMessageValidation,
+  editMessageValidation,
+  bulkDeleteValidation,
+} from "../validators/index.js";
+import {
+  validateFriendship,
+  validateConversationExists,
+  validateConversationParticipant,
+  validateMessageContent,
+  validateConversationPinLimit,
+  validateConversationArchive,
+  validateMessageExists,
+  validateMessageSender,
+  validateMessageEditTime,
+  validateMessageDeleteTime,
+  validateMessageParticipant,
+  validateBulkMessageIds,
+  validateGroupExists,
+  validateGroupMember,
+} from "../validators/middleware/validation.middleware.js";
+
 const router = express.Router();
 
 /**
@@ -28,11 +51,6 @@ const router = express.Router();
  *   get:
  *     summary: Get all conversations of the user
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of conversations
  */
 router.get("/conversations", verifyToken, getUserConversations);
 
@@ -42,11 +60,6 @@ router.get("/conversations", verifyToken, getUserConversations);
  *   get:
  *     summary: Get pinned conversations
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of pinned conversations
  */
 router.get("/pinned", verifyToken, getPinnedConversations);
 
@@ -56,63 +69,45 @@ router.get("/pinned", verifyToken, getPinnedConversations);
  *   get:
  *     summary: Get archived conversations
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of archived conversations
  */
 router.get("/archived", verifyToken, getArchivedConversations);
+
 /**
  * @swagger
  * /messages/conversation/{conversationId}/exists:
  *   get:
  *     summary: Check if conversation exists
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Returns whether conversation exists
  */
-router.get("/conversation/:conversationId/exists", verifyToken, async (req, res) => {
-  try {
-    const Conversation = (await import("../models/Conversation.js")).default;
-    const { conversationId } = req.params;
-    const conversation = await Conversation.findById(conversationId);
-    
-    res.json({ exists: !!conversation });
-  } catch (err) {
-    res.json({ exists: false });
+router.get(
+  "/conversation/:conversationId/exists",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const Conversation = (await import("../models/Conversation.js")).default;
+      const { conversationId } = req.params;
+      const conversation = await Conversation.findById(conversationId);
+      res.json({ exists: !!conversation });
+    } catch (err) {
+      res.json({ exists: false });
+    }
   }
-});
+);
+
 /**
  * @swagger
  * /messages/group/{groupId}:
  *   get:
  *     summary: Get messages of a group
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: groupId
- *         required: true
- *         schema:
- *           type: string
- *         description: Group ID
- *     responses:
- *       200:
- *         description: List of group messages
  */
-router.get("/group/:groupId", verifyToken, getGroupMessages);
+router.get(
+  "/group/:groupId",
+  verifyToken,
+  validateGroupExists,
+  validateGroupMember,
+  getGroupMessages
+);
 
 /**
  * @swagger
@@ -120,124 +115,83 @@ router.get("/group/:groupId", verifyToken, getGroupMessages);
  *   post:
  *     summary: Get or create a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *                 description: User ID to chat with
- *     responses:
- *       200:
- *         description: Conversation created or retrieved
  */
-router.post("/conversation", verifyToken, getOrCreateConversation);
+router.post(
+  "/conversation",
+  verifyToken,
+  getOrCreateConversationValidation,
+  validate,
+  validateFriendship,
+  getOrCreateConversation
+);
+
 /**
  * @swagger
  * /messages/send:
  *   post:
  *     summary: Send a message
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               conversationId:
- *                 type: string
- *               text:
- *                 type: string
- *               attachments:
- *                 type: array
- *                 items:
- *                   type: object
- *     responses:
- *       200:
- *         description: Message sent successfully
  */
-router.post("/send", verifyToken, sendMessage);
+router.post(
+  "/send",
+  verifyToken,
+  sendMessageValidation,
+  validate,
+  validateConversationExists,
+  validateConversationParticipant,
+  validateMessageContent,
+  sendMessage
+);
+
 /**
  * @swagger
  * /messages/messages/bulk-delete:
  *   post:
  *     summary: Bulk delete messages
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               messageIds:
- *                 type: array
- *                 items:
- *                   type: string
- *     responses:
- *       200:
- *         description: Messages deleted successfully
  */
-router.post("/messages/bulk-delete", verifyToken, bulkDeleteMessages);
+router.post(
+  "/messages/bulk-delete",
+  verifyToken,
+  bulkDeleteValidation,
+  validate,
+  validateBulkMessageIds,
+  bulkDeleteMessages
+);
+
 /**
  * @swagger
  * /messages/message/{messageId}/edit:
  *   patch:
  *     summary: Edit a message
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: messageId
- *         required: true
- *         schema:
- *           type: string
- *         description: Message ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               text:
- *                 type: string
- *     responses:
- *       200:
- *         description: Message edited successfully
  */
-router.patch("/message/:messageId/edit", verifyToken, editMessage);
+router.patch(
+  "/message/:messageId/edit",
+  verifyToken,
+  editMessageValidation,
+  validate,
+  validateMessageExists,
+  validateMessageSender,
+  validateMessageEditTime,
+  editMessage
+);
+
 /**
  * @swagger
  * /messages/conversation/{conversationId}/pin:
  *   post:
  *     summary: Pin a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation pinned
  */
-router.post("/conversation/:conversationId/pin", verifyToken, pinConversation);
+router.post(
+  "/conversation/:conversationId/pin",
+  verifyToken,
+  validateConversationExists,
+  validateConversationParticipant,
+  validateConversationPinLimit,
+  pinConversation
+);
 
 /**
  * @swagger
@@ -245,20 +199,13 @@ router.post("/conversation/:conversationId/pin", verifyToken, pinConversation);
  *   delete:
  *     summary: Unpin a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation unpinned
  */
-router.delete("/conversation/:conversationId/unpin", verifyToken, unpinConversation);
+router.delete(
+  "/conversation/:conversationId/unpin",
+  verifyToken,
+  validateConversationExists,
+  unpinConversation
+);
 
 /**
  * @swagger
@@ -266,20 +213,15 @@ router.delete("/conversation/:conversationId/unpin", verifyToken, unpinConversat
  *   post:
  *     summary: Archive a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation archived
  */
-router.post("/conversation/:conversationId/archive", verifyToken, archiveConversation);
+router.post(
+  "/conversation/:conversationId/archive",
+  verifyToken,
+  validateConversationExists,
+  validateConversationParticipant,
+  validateConversationArchive,
+  archiveConversation
+);
 
 /**
  * @swagger
@@ -287,20 +229,13 @@ router.post("/conversation/:conversationId/archive", verifyToken, archiveConvers
  *   delete:
  *     summary: Unarchive a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation unarchived
  */
-router.delete("/conversation/:conversationId/unarchive", verifyToken, unarchiveConversation);
+router.delete(
+  "/conversation/:conversationId/unarchive",
+  verifyToken,
+  validateConversationExists,
+  unarchiveConversation
+);
 
 /**
  * @swagger
@@ -308,20 +243,14 @@ router.delete("/conversation/:conversationId/unarchive", verifyToken, unarchiveC
  *   patch:
  *     summary: Clear a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation cleared
  */
-router.patch("/conversation/:conversationId/clear", verifyToken, clearChat);
+router.patch(
+  "/conversation/:conversationId/clear",
+  verifyToken,
+  validateConversationExists,
+  validateConversationParticipant,
+  clearChat
+);
 
 /**
  * @swagger
@@ -329,20 +258,12 @@ router.patch("/conversation/:conversationId/clear", verifyToken, clearChat);
  *   delete:
  *     summary: Delete a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: Conversation deleted
  */
-router.delete("/conversation/:conversationId/delete", verifyToken, deleteConversation);
+router.delete(
+  "/conversation/:conversationId/delete",
+  verifyToken,
+  deleteConversation
+);
 
 /**
  * @swagger
@@ -350,20 +271,14 @@ router.delete("/conversation/:conversationId/delete", verifyToken, deleteConvers
  *   delete:
  *     summary: Delete a message for me
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: messageId
- *         required: true
- *         schema:
- *           type: string
- *         description: Message ID
- *     responses:
- *       200:
- *         description: Message deleted for current user
  */
-router.delete("/message/:messageId/for-me", verifyToken, deleteMessageForMe);
+router.delete(
+  "/message/:messageId/for-me",
+  verifyToken,
+  validateMessageExists,
+  validateMessageParticipant,
+  deleteMessageForMe
+);
 
 /**
  * @swagger
@@ -371,20 +286,15 @@ router.delete("/message/:messageId/for-me", verifyToken, deleteMessageForMe);
  *   delete:
  *     summary: Delete a message for everyone
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: messageId
- *         required: true
- *         schema:
- *           type: string
- *         description: Message ID
- *     responses:
- *       200:
- *         description: Message deleted for everyone
  */
-router.delete("/message/:messageId/for-everyone", verifyToken, deleteMessageForEveryone);
+router.delete(
+  "/message/:messageId/for-everyone",
+  verifyToken,
+  validateMessageExists,
+  validateMessageSender,
+  validateMessageDeleteTime,
+  deleteMessageForEveryone
+);
 
 /**
  * @swagger
@@ -392,19 +302,13 @@ router.delete("/message/:messageId/for-everyone", verifyToken, deleteMessageForE
  *   get:
  *     summary: Get messages for a conversation
  *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *         description: Conversation ID
- *     responses:
- *       200:
- *         description: List of messages
  */
-router.get("/:conversationId", verifyToken, getMessages);
+router.get(
+  "/:conversationId",
+  verifyToken,
+  validateConversationExists,
+  validateConversationParticipant,
+  getMessages
+);
 
 export default router;

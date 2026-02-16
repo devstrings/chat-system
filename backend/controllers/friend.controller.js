@@ -1,25 +1,26 @@
-
 import * as friendService from "../services/friend.service.js";
-import * as friendValidation from "../validations/friend.validation.js";
 
 // SEND FRIEND REQUEST CONTROLLER
 export const sendFriendRequest = async (req, res) => {
   try {
+    console.log(" [CONTROLLER] Friend request received:", {
+      senderId: req.user.id,
+      receiverId: req.body.receiverId
+    });
+
     const senderId = req.user.id;
     const { receiverId } = req.body;
-
-    // Validation
-    const validation = friendValidation.validateSendFriendRequest(senderId, receiverId);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
 
     // Service call
     const result = await friendService.processSendFriendRequest(senderId, receiverId);
 
+    console.log("[CONTROLLER] Friend request successful:", result.message);
     res.json(result);
   } catch (err) {
-    console.error("Send friend request error:", err);
+    console.error(" [CONTROLLER] Friend request error:", {
+      message: err.message,
+      stack: err.stack
+    });
     
     if (err.message === "Cannot send request") {
       return res.status(403).json({ message: err.message });
@@ -33,24 +34,17 @@ export const sendFriendRequest = async (req, res) => {
       return res.status(400).json({ message: err.message });
     }
     
-    res.status(500).json({ message: "Failed to send request", error: err.message });
+    res.status(500).json({ 
+      message: "Failed to send request", 
+      error: err.message 
+    });
   }
 };
 
-//  ACCEPT FRIEND REQUEST CONTROLLER
+// ACCEPT FRIEND REQUEST CONTROLLER
 export const acceptFriendRequest = async (req, res) => {
   try {
-    const currentUserId = req.user.id;
-    const { requestId } = req.params;
-
-    // Fetch friend request
-    const friendRequest = await friendService.fetchFriendRequestById(requestId);
-
-    // Validation
-    const validation = friendValidation.validateAcceptRequest(friendRequest, currentUserId);
-    if (!validation.isValid) {
-      return res.status(validation.statusCode).json({ message: validation.message });
-    }
+    const friendRequest = req.validatedFriendRequest; 
 
     // Service call
     const result = await friendService.processAcceptFriendRequest(friendRequest);
@@ -62,20 +56,10 @@ export const acceptFriendRequest = async (req, res) => {
   }
 };
 
-//  REJECT FRIEND REQUEST CONTROLLER
+// REJECT FRIEND REQUEST CONTROLLER
 export const rejectFriendRequest = async (req, res) => {
   try {
-    const currentUserId = req.user.id;
     const { requestId } = req.params;
-
-    // Fetch friend request
-    const friendRequest = await friendService.fetchFriendRequestById(requestId);
-
-    // Validation
-    const validation = friendValidation.validateRejectRequest(friendRequest, currentUserId);
-    if (!validation.isValid) {
-      return res.status(validation.statusCode).json({ message: validation.message });
-    }
 
     // Service call
     const result = await friendService.processRejectFriendRequest(requestId);
@@ -87,7 +71,7 @@ export const rejectFriendRequest = async (req, res) => {
   }
 };
 
-//  GET PENDING FRIEND REQUESTS (RECEIVED) CONTROLLER
+// GET PENDING FRIEND REQUESTS (RECEIVED) CONTROLLER
 export const getPendingRequests = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -102,7 +86,7 @@ export const getPendingRequests = async (req, res) => {
   }
 };
 
-//  GET SENT FRIEND REQUESTS CONTROLLER
+// GET SENT FRIEND REQUESTS CONTROLLER
 export const getSentRequests = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -117,7 +101,7 @@ export const getSentRequests = async (req, res) => {
   }
 };
 
-//  UNFRIEND CONTROLLER
+// UNFRIEND CONTROLLER
 export const unfriend = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -138,17 +122,11 @@ export const unfriend = async (req, res) => {
   }
 };
 
-//  BLOCK USER CONTROLLER
+// BLOCK USER CONTROLLER
 export const blockUser = async (req, res) => {
   try {
     const blockerId = req.user.id;
     const { userId } = req.body;
-
-    // Validation
-    const validation = friendValidation.validateBlockUser(blockerId, userId);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
 
     // Service call
     const result = await friendService.processBlockUser(blockerId, userId);
@@ -186,7 +164,7 @@ export const unblockUser = async (req, res) => {
   }
 };
 
-//  GET BLOCKED USERS CONTROLLER
+// GET BLOCKED USERS CONTROLLER
 export const getBlockedUsers = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -201,7 +179,7 @@ export const getBlockedUsers = async (req, res) => {
   }
 };
 
-//  CHECK RELATIONSHIP STATUS CONTROLLER
+// CHECK RELATIONSHIP STATUS CONTROLLER
 export const getRelationshipStatus = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -217,7 +195,7 @@ export const getRelationshipStatus = async (req, res) => {
   }
 };
 
-//  GET ALL FRIENDS CONTROLLER
+// GET ALL FRIENDS CONTROLLER
 export const getFriends = async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -227,7 +205,7 @@ export const getFriends = async (req, res) => {
 
     res.json(friends);
   } catch (err) {
-    console.error(" Get friends error:", err);
+    console.error("Get friends error:", err);
     res.status(500).json({ 
       message: "Failed to fetch friends", 
       error: err.message 

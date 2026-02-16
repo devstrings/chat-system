@@ -1,6 +1,5 @@
 import { io } from "socket.io-client";
-import API_BASE_URL from "../../config/api";
-import {
+import { SOCKET_URL } from "../../config/api";import {
   setSocket,
   setConnected,
   setOnlineUsers,
@@ -33,10 +32,14 @@ const socketMiddleware = (store) => {
     const currentUserId = state.auth.currentUserId;
 
     // Initialize socket on login
+
     if (
       action.type === "auth/login/fulfilled" ||
-      (isAuthenticated && !socket)
+      (isAuthenticated && !socket && action.type !== "auth/logout/fulfilled")
     ) {
+      if (socket) {
+        return next(action);
+      }
       const accessToken = localStorage.getItem("accessToken");
       const refreshToken = localStorage.getItem("refreshToken");
 
@@ -44,15 +47,17 @@ const socketMiddleware = (store) => {
         return next(action);
       }
 
-      console.log("🔌 Initializing socket connection...");
-
-      socket = io(API_BASE_URL, {
-        auth: { token: accessToken },
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-      });
+      console.log(" Initializing socket connection...");
+socket = io(SOCKET_URL, {
+  auth: { token: accessToken },
+  transports: ["websocket"],
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  reconnectionAttempts: Infinity,
+  timeout: 20000,
+  upgrade: false,
+});
 
       tokenRef = accessToken;
 
@@ -84,7 +89,7 @@ const socketMiddleware = (store) => {
         }
       });
 
-      // ========== ONLINE USERS ==========
+      // ONLINE USERS
       socket.on("onlineUsersList", (data) => {
         console.log(" Online users list:", data.onlineUsers?.length || 0);
         if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
@@ -103,23 +108,31 @@ const socketMiddleware = (store) => {
         store.dispatch(removeOnlineUser(data.userId));
       });
 
-      // ========== INDIVIDUAL CHAT MESSAGES ==========
+      // INDIVIDUAL CHAT MESSAGES
       socket.on("receiveMessage", (msg) => {
-        console.log(" Received message:", msg._id);
+        console.log("Received message:", msg._id);
 
         const senderId = msg.sender?._id || msg.sender;
+        const receiverId = msg.receiver?._id || msg.receiver;
 
+        const otherUserId =
+          senderId?.toString() === currentUserId
+            ? receiverId?.toString()
+            : senderId?.toString();
+
+        // Conversation messages update
         store.dispatch(
           addMessage({
             conversationId: msg.conversationId,
             message: msg,
-            currentUserId,
+            userId: otherUserId,
+            isGroup: false,
           }),
         );
 
-        // Increment unread if not from current user
-        if (senderId !== currentUserId) {
-          store.dispatch(incrementUnreadCount(senderId));
+        // Unread sirf receiver ke liye
+        if (senderId?.toString() !== currentUserId) {
+          store.dispatch(incrementUnreadCount(senderId?.toString()));
         }
       });
 
@@ -132,6 +145,7 @@ const socketMiddleware = (store) => {
         console.log(" Messages marked read:", data.conversationId);
       });
 
+      // NAYA CODE
       socket.on("messageDeleted", (data) => {
         console.log(" Message deleted:", data.messageId);
         store.dispatch(
@@ -140,6 +154,42 @@ const socketMiddleware = (store) => {
             messageId: data.messageId,
           }),
         );
+
+        const state = store.getState();
+        const messages =
+          state.chat.conversations[data.conversationId]?.messages || [];
+
+        const remaining = messages.filter(
+          (m) => m._id !== data.messageId && !m.deletedForEveryone,
+        );
+
+        const newLast =
+          remaining.length > 0 ? remaining[remaining.length - 1] : null;
+
+        const otherUserId = Object.keys(state.chat.lastMessages).find(
+          (uid) =>
+            state.chat.lastMessages[uid]?.conversationId ===
+            data.conversationId,
+        );
+
+        if (otherUserId) {
+          store.dispatch(
+            addMessage({
+              conversationId: data.conversationId,
+              message: {
+                _id: `sidebar-update-${Date.now()}`,
+                text: newLast?.text ?? "",
+                createdAt: newLast?.createdAt ?? new Date().toISOString(),
+                sender: newLast?.sender ?? currentUserId,
+                status: newLast?.status ?? "sent",
+                attachments: newLast?.attachments ?? [],
+                _updated: Date.now(),
+              },
+              userId: otherUserId,
+              isGroup: false,
+            }),
+          );
+        }
       });
 
       socket.on("messageDeletedForEveryone", (data) => {
@@ -150,6 +200,42 @@ const socketMiddleware = (store) => {
             messageId: data.messageId,
           }),
         );
+
+        const state = store.getState();
+        const messages =
+          state.chat.conversations[data.conversationId]?.messages || [];
+
+        const remaining = messages.filter(
+          (m) => m._id !== data.messageId && !m.deletedForEveryone,
+        );
+
+        const newLast =
+          remaining.length > 0 ? remaining[remaining.length - 1] : null;
+
+        const otherUserId = Object.keys(state.chat.lastMessages).find(
+          (uid) =>
+            state.chat.lastMessages[uid]?.conversationId ===
+            data.conversationId,
+        );
+
+        if (otherUserId) {
+          store.dispatch(
+            addMessage({
+              conversationId: data.conversationId,
+              message: {
+                _id: `sidebar-update-${Date.now()}`,
+                text: newLast?.text ?? "",
+                createdAt: newLast?.createdAt ?? new Date().toISOString(),
+                sender: newLast?.sender ?? currentUserId,
+                status: newLast?.status ?? "sent",
+                attachments: newLast?.attachments ?? [],
+                _updated: Date.now(),
+              },
+              userId: otherUserId,
+              isGroup: false,
+            }),
+          );
+        }
       });
       socket.on("groupMessageEdited", (data) => {
         console.log(" Group message edited:", data.messageId);
@@ -186,10 +272,21 @@ const socketMiddleware = (store) => {
       socket.on("receiveGroupMessage", (msg) => {
         console.log(" Group message received:", msg._id);
 
+        // Group messages update
         store.dispatch(
           addGroupMessage({
             groupId: msg.groupId,
             message: msg,
+          }),
+        );
+
+        // Sidebar last message update
+        store.dispatch(
+          addMessage({
+            conversationId: msg.groupId,
+            message: msg,
+            userId: msg.groupId,
+            isGroup: true,
           }),
         );
       });

@@ -1,7 +1,7 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
-import User from "../models/user.js";
+import User from "../models/User.js";
 import AuthProvider from "../models/AuthProvider.js";
 import config from "./index.js"; 
 

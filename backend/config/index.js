@@ -1,4 +1,3 @@
-// backend/config/index.js
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,6 +9,7 @@ console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 const requiredEnvVars = [
   "MONGO_URI",
   "JWT_SECRET",
+  "SESSION_SECRET",  
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "FACEBOOK_APP_ID",
@@ -34,6 +34,7 @@ const config = {
   mongoUri: process.env.MONGO_URI,
 
   jwtSecret: process.env.JWT_SECRET,
+  sessionSecret: process.env.SESSION_SECRET,  
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
 
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
@@ -68,7 +69,6 @@ const config = {
     maxVoiceSize: parseInt(process.env.MAX_VOICE_SIZE) || 10 * 1024 * 1024,
   },
 
-  // Email Configuration
   email: {
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port: parseInt(process.env.EMAIL_PORT) || 587,
@@ -77,7 +77,6 @@ const config = {
     from: process.env.EMAIL_FROM || "Chat System <noreply@chatsystem.com>",
   },
 
-  // Reset Token Configuration
   resetToken: {
     expiryMinutes: parseInt(process.env.RESET_TOKEN_EXPIRY) || 15,
   },

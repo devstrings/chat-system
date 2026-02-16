@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { handleMessage } from "./messageHandler.js";
 import config from "../config/index.js"; 
 import { redisClient } from "../config/redis.js";
-import User from "../models/user.js";
+import User from "../models/User.js";
 import Conversation from "../models/Conversation.js"; 
 
 const userSockets = new Map(); 

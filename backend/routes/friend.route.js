@@ -13,6 +13,17 @@ import {
   getFriends,
 } from "../controllers/friend.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { validate } from "../validators/middleware/validate.js";
+import {
+  sendFriendRequestValidation,
+  blockUserValidation,
+} from "../validators/index.js";
+import {
+  validateNotSelf,
+  validateNotBlocked,
+  validateFriendRequest,
+  validateFriendRequestForReject,
+} from "../validators/middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -22,22 +33,16 @@ const router = express.Router();
  *   post:
  *     summary: Send a friend request
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               friendId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Friend request sent
  */
-router.post("/request/send", verifyToken, sendFriendRequest);
+router.post(
+  "/request/send",
+  verifyToken,
+  sendFriendRequestValidation,
+  validate,
+  validateNotSelf,
+  validateNotBlocked,
+  sendFriendRequest
+);
 
 /**
  * @swagger
@@ -45,19 +50,13 @@ router.post("/request/send", verifyToken, sendFriendRequest);
  *   post:
  *     summary: Accept a friend request
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Friend request accepted
  */
-router.post("/request/:requestId/accept", verifyToken, acceptFriendRequest);
+router.post(
+  "/request/:requestId/accept",
+  verifyToken,
+  validateFriendRequest,
+  acceptFriendRequest
+);
 
 /**
  * @swagger
@@ -65,19 +64,13 @@ router.post("/request/:requestId/accept", verifyToken, acceptFriendRequest);
  *   delete:
  *     summary: Reject a friend request
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Friend request rejected
  */
-router.delete("/request/:requestId/reject", verifyToken, rejectFriendRequest);
+router.delete(
+  "/request/:requestId/reject",
+  verifyToken,
+  validateFriendRequestForReject,
+  rejectFriendRequest
+);
 
 /**
  * @swagger
@@ -85,11 +78,6 @@ router.delete("/request/:requestId/reject", verifyToken, rejectFriendRequest);
  *   get:
  *     summary: Get pending friend requests
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of pending friend requests
  */
 router.get("/requests/pending", verifyToken, getPendingRequests);
 
@@ -99,11 +87,6 @@ router.get("/requests/pending", verifyToken, getPendingRequests);
  *   get:
  *     summary: Get sent friend requests
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of sent friend requests
  */
 router.get("/requests/sent", verifyToken, getSentRequests);
 
@@ -113,17 +96,6 @@ router.get("/requests/sent", verifyToken, getSentRequests);
  *   delete:
  *     summary: Unfriend a user
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: friendId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: User unfriended
  */
 router.delete("/unfriend/:friendId", verifyToken, unfriend);
 
@@ -133,22 +105,15 @@ router.delete("/unfriend/:friendId", verifyToken, unfriend);
  *   post:
  *     summary: Block a user
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *     responses:
- *       200:
- *         description: User blocked
  */
-router.post("/block", verifyToken, blockUser);
+router.post(
+  "/block",
+  verifyToken,
+  blockUserValidation,
+  validate,
+  validateNotSelf,
+  blockUser
+);
 
 /**
  * @swagger
@@ -156,17 +121,6 @@ router.post("/block", verifyToken, blockUser);
  *   delete:
  *     summary: Unblock a user
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: User unblocked
  */
 router.delete("/unblock/:userId", verifyToken, unblockUser);
 
@@ -176,11 +130,6 @@ router.delete("/unblock/:userId", verifyToken, unblockUser);
  *   get:
  *     summary: Get blocked users
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of blocked users
  */
 router.get("/blocked", verifyToken, getBlockedUsers);
 
@@ -190,17 +139,6 @@ router.get("/blocked", verifyToken, getBlockedUsers);
  *   get:
  *     summary: Get relationship status with a user
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Relationship status retrieved
  */
 router.get("/status/:userId", verifyToken, getRelationshipStatus);
 
@@ -210,11 +148,6 @@ router.get("/status/:userId", verifyToken, getRelationshipStatus);
  *   get:
  *     summary: Get friends list
  *     tags: [Friends]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of friends
  */
 router.get("/list", verifyToken, getFriends);
 

@@ -212,8 +212,8 @@ const chatSlice = createSlice({
     selectedConversationId: null,
     unreadCounts: {}, // { userId: count }
     lastMessages: {}, // { userId: { text, time, sender, status } }
-    pinnedConversations: new Set(),
-    archivedConversations: new Set(),
+    pinnedConversations: [],
+    archivedConversations: [],
     typingUsers: {}, // { conversationId: Set of userIds }
     loading: false,
     error: null,
@@ -223,103 +223,107 @@ const chatSlice = createSlice({
       state.selectedConversationId = action.payload;
     },
 
-  addMessage: (state, action) => {
-  const { conversationId, message, userId, isGroup } = action.payload;
+    addMessage: (state, action) => {
+      const { conversationId, message, userId, isGroup } = action.payload;
 
-  if (!state.conversations[conversationId]) {
-    state.conversations[conversationId] = { messages: [], loading: false };
-  }
-
-  const exists = state.conversations[conversationId].messages.some(
-    (m) => m._id === message._id,
-  );
-
-  if (!exists) {
-    state.conversations[conversationId].messages.push(message);
-  }
-
-  const formatAttachmentText = (attachments) => {
-    if (!attachments || attachments.length === 0) return "";
-    const file = attachments[0];
-
-    if (file.isVoiceMessage) {
-      const duration = file.duration || 0;
-      if (duration > 0) {
-        const mins = Math.floor(duration / 60);
-        const secs = Math.floor(duration % 60);
-        return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
+      if (!state.conversations[conversationId]) {
+        state.conversations[conversationId] = { messages: [], loading: false };
       }
-      return "🎤 Voice message";
-    }
 
-    const fileType = file.fileType || file.type || "";
-    if (fileType.startsWith("image/")) return "📷 Photo";
-    if (fileType.startsWith("video/")) return "🎥 Video";
-    if (fileType === "application/pdf") return "📕 PDF";
-    if (fileType.startsWith("audio/")) return "🎵 Audio";
-    if (fileType.includes("word")) return "📄 Document";
-    if (fileType === "text/plain") return "📝 Text file";
-    return "📎 File";
-  };
-const messageText = message.text || formatAttachmentText(message.attachments);
-const senderId = message.sender?._id || message.sender;
+      const exists = state.conversations[conversationId].messages.some(
+        (m) => m._id === message._id,
+      );
 
-//  USE MESSAGE CREATION TIME (not current time) for sorting
-const timestamp = message._loadedTimestamp 
-  || new Date(message.createdAt).getTime() 
-  || Date.now();
+      if (!exists) {
+        state.conversations[conversationId].messages.push(message);
+      }
 
-const targetKey = isGroup ? conversationId : userId;
+      const formatAttachmentText = (attachments) => {
+        if (!attachments || attachments.length === 0) return "";
+        const file = attachments[0];
 
-state.lastMessages[targetKey] = {
-  text: messageText,
-  time: message.createdAt || new Date().toISOString(),
-  sender: senderId,
-  status: message.status || "sent",
-  conversationId: conversationId,
-  lastMessageId: message._id,
-  attachments: message.attachments || [],
-  _updated: timestamp, 
-  isGroup: isGroup || false,
-};
+        if (file.isVoiceMessage) {
+          const duration = file.duration || 0;
+          if (duration > 0) {
+            const mins = Math.floor(duration / 60);
+            const secs = Math.floor(duration % 60);
+            return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
+          }
+          return "🎤 Voice message";
+        }
 
-console.log(`[REDUX] Set _updated for ${targetKey}:`, {
-  timestamp,
-  messageCreatedAt: message.createdAt,
-  isNewMessage: !message._loadedTimestamp
-});
+        const fileType = file.fileType || file.type || "";
+        if (fileType.startsWith("image/")) return "📷 Photo";
+        if (fileType.startsWith("video/")) return "🎥 Video";
+        if (fileType === "application/pdf") return "📕 PDF";
+        if (fileType.startsWith("audio/")) return "🎵 Audio";
+        if (fileType.includes("word")) return "📄 Document";
+        if (fileType === "text/plain") return "📝 Text file";
+        return "📎 File";
+      };
+      const messageText =
+        message.text || formatAttachmentText(message.attachments);
+      const senderId = message.sender?._id || message.sender;
 
-  
-  console.log(` [REDUX] addMessage - Updated lastMessages["${targetKey}"]`, {
-    text: messageText.substring(0, 20),
-    timestamp,
-    conversationId,
-    isGroup
-  });
-},
-updateMessageStatus: (state, action) => {
-  const { conversationId, messageId, status } = action.payload;
+      //  USE MESSAGE CREATION TIME (not current time) for sorting
+      const timestamp =
+        message._loadedTimestamp ||
+        new Date(message.createdAt).getTime() ||
+        Date.now();
 
-  if (state.conversations[conversationId]) {
-    const message = state.conversations[conversationId].messages.find(
-      (m) => m._id === messageId,
-    );
-    if (message) {
-      message.status = status;
-    }
-  }
+      const targetKey = isGroup ? conversationId : userId;
 
-  // Update in lastMessages
-  Object.keys(state.lastMessages).forEach((userId) => {
-    if (
-      state.lastMessages[userId].lastMessageId === messageId &&
-      state.lastMessages[userId].conversationId === conversationId
-    ) {
-      state.lastMessages[userId].status = status;
-      state.lastMessages[userId]._updated = Date.now(); 
-    }
-  });
-},
+      state.lastMessages[targetKey] = {
+        text: messageText,
+        time: message.createdAt || new Date().toISOString(),
+        sender: senderId,
+        status: message.status || "sent",
+        conversationId: conversationId,
+        lastMessageId: message._id,
+        attachments: message.attachments || [],
+        _updated: timestamp,
+        isGroup: isGroup || false,
+      };
+
+      console.log(`[REDUX] Set _updated for ${targetKey}:`, {
+        timestamp,
+        messageCreatedAt: message.createdAt,
+        isNewMessage: !message._loadedTimestamp,
+      });
+
+      console.log(
+        ` [REDUX] addMessage - Updated lastMessages["${targetKey}"]`,
+        {
+          text: messageText.substring(0, 20),
+          timestamp,
+          conversationId,
+          isGroup,
+        },
+      );
+    },
+    updateMessageStatus: (state, action) => {
+      const { conversationId, messageId, status } = action.payload;
+
+      if (state.conversations[conversationId]) {
+        const message = state.conversations[conversationId].messages.find(
+          (m) => m._id === messageId,
+        );
+        if (message) {
+          message.status = status;
+        }
+      }
+
+      // Update in lastMessages
+      Object.keys(state.lastMessages).forEach((userId) => {
+        if (
+          state.lastMessages[userId].lastMessageId === messageId &&
+          state.lastMessages[userId].conversationId === conversationId
+        ) {
+          state.lastMessages[userId].status = status;
+          state.lastMessages[userId]._updated = Date.now();
+        }
+      });
+    },
 
     deleteMessage: (state, action) => {
       const { conversationId, messageId } = action.payload;
@@ -363,7 +367,25 @@ updateMessageStatus: (state, action) => {
         }
       });
     },
+    updateGroupMessageInSidebar: (state, action) => {
+      const { groupId, messageId, text, editedAt } = action.payload;
 
+      // Update in lastMessages for sidebar
+      if (state.lastMessages[groupId]) {
+        if (state.lastMessages[groupId].lastMessageId === messageId) {
+          state.lastMessages[groupId].text = text;
+          state.lastMessages[groupId].isEdited = true;
+          state.lastMessages[groupId].editedAt = editedAt;
+          state.lastMessages[groupId]._updated = Date.now(); // Trigger re-sort
+
+          console.log(` [REDUX] Updated group message in sidebar:`, {
+            groupId,
+            messageId,
+            newText: text.substring(0, 30),
+          });
+        }
+      }
+    },
     clearUnreadCount: (state, action) => {
       const userId = action.payload;
       state.unreadCounts[userId] = 0;
@@ -374,22 +396,21 @@ updateMessageStatus: (state, action) => {
       state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
     },
 
+    // AFTER
     updateTyping: (state, action) => {
       const { conversationId, userId, isTyping } = action.payload;
-
       if (!state.typingUsers[conversationId]) {
-        state.typingUsers[conversationId] = new Set();
+        state.typingUsers[conversationId] = [];
       }
-
-      const typingSet = new Set(state.typingUsers[conversationId]);
-
       if (isTyping) {
-        typingSet.add(userId);
+        if (!state.typingUsers[conversationId].includes(userId)) {
+          state.typingUsers[conversationId].push(userId);
+        }
       } else {
-        typingSet.delete(userId);
+        state.typingUsers[conversationId] = state.typingUsers[
+          conversationId
+        ].filter((id) => id !== userId);
       }
-
-      state.typingUsers[conversationId] = typingSet;
     },
   },
   extraReducers: (builder) => {
@@ -429,21 +450,6 @@ updateMessageStatus: (state, action) => {
         state.error = action.payload;
       })
 
-      // Send Message
-      .addCase(sendMessage.fulfilled, (state, action) => {
-        const message = action.payload;
-        const conversationId = message.conversationId;
-
-        if (state.conversations[conversationId]) {
-          const exists = state.conversations[conversationId].messages.some(
-            (m) => m._id === message._id,
-          );
-          if (!exists) {
-            state.conversations[conversationId].messages.push(message);
-          }
-        }
-      })
-
       // Delete Message For Me
       .addCase(deleteMessageForMe.fulfilled, (state, action) => {
         const { messageId, conversationId } = action.payload;
@@ -479,42 +485,42 @@ updateMessageStatus: (state, action) => {
         delete state.lastMessages[otherUserId];
         delete state.unreadCounts[otherUserId];
 
-        state.pinnedConversations = new Set(
-          [...state.pinnedConversations].filter((id) => id !== conversationId),
+        state.pinnedConversations = state.pinnedConversations.filter(
+          (id) => id !== conversationId,
         );
-        state.archivedConversations = new Set(
-          [...state.archivedConversations].filter(
-            (id) => id !== conversationId,
-          ),
+        state.archivedConversations = state.archivedConversations.filter(
+          (id) => id !== conversationId,
         );
       })
 
       // Pin Conversation
+
       .addCase(pinConversation.fulfilled, (state, action) => {
         const { conversationId, isPinned } = action.payload;
-        const pinnedSet = new Set(state.pinnedConversations);
-
         if (isPinned) {
-          pinnedSet.add(conversationId);
+          if (!state.pinnedConversations.includes(conversationId)) {
+            state.pinnedConversations.push(conversationId);
+          }
         } else {
-          pinnedSet.delete(conversationId);
+          state.pinnedConversations = state.pinnedConversations.filter(
+            (id) => id !== conversationId,
+          );
         }
-
-        state.pinnedConversations = pinnedSet;
       })
 
       // Archive Conversation
+
       .addCase(archiveConversation.fulfilled, (state, action) => {
         const { conversationId, isArchived } = action.payload;
-        const archivedSet = new Set(state.archivedConversations);
-
         if (isArchived) {
-          archivedSet.add(conversationId);
+          if (!state.archivedConversations.includes(conversationId)) {
+            state.archivedConversations.push(conversationId);
+          }
         } else {
-          archivedSet.delete(conversationId);
+          state.archivedConversations = state.archivedConversations.filter(
+            (id) => id !== conversationId,
+          );
         }
-
-        state.archivedConversations = archivedSet;
       })
 
       // Reset on logout
@@ -524,8 +530,8 @@ updateMessageStatus: (state, action) => {
           selectedConversationId: null,
           unreadCounts: {},
           lastMessages: {},
-          pinnedConversations: new Set(),
-          archivedConversations: new Set(),
+          pinnedConversations: [],
+          archivedConversations: [],
           typingUsers: {},
           loading: false,
           error: null,
@@ -541,6 +547,7 @@ export const {
   deleteMessage,
   removeMessageForEveryone,
   updateMessage,
+  updateGroupMessageInSidebar,
   clearUnreadCount,
   incrementUnreadCount,
   updateTyping,

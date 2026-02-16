@@ -2,13 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
 import { useDispatch, useSelector } from "react-redux";
-import { addMessage } from "../store/slices/chatSlice";
-import { addGroupMessage } from "../store/slices/groupSlice";
 export default function MessageInput({
   conversationId,
   groupId,
   isGroup = false,
-    selectedUser = null,
+  selectedUser = null,
 }) {
   const dispatch = useDispatch();
   const currentUserId = useSelector((state) => state.auth.currentUserId);
@@ -151,76 +149,38 @@ export default function MessageInput({
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
 
-const handleSendMessage = async (attachments = []) => {
-  if (!socket || (!text.trim() && attachments.length === 0) || sending)
-    return;
+  const handleSendMessage = async (attachments = []) => {
+    if (!socket || (!text.trim() && attachments.length === 0) || sending)
+      return;
 
-  setSending(true);
+    setSending(true);
 
-  // Stop typing indicator
-  if (isGroup && groupId) {
-    socket.emit("groupTyping", { groupId, isTyping: false });
-  } else if (conversationId) {
-    socket.emit("typing", { conversationId, isTyping: false });
-  }
+    // Stop typing indicator
+    if (isGroup && groupId) {
+      socket.emit("groupTyping", { groupId, isTyping: false });
+    } else if (conversationId) {
+      socket.emit("typing", { conversationId, isTyping: false });
+    }
 
-  const tempMessage = {
-    _id: `temp-${Date.now()}`,
-    conversationId: isGroup ? groupId : conversationId,
-    text: text.trim(),
-    attachments: attachments || [],
-    sender: {
-      _id: currentUserId,
-    },
-    status: "sending",
-    createdAt: new Date().toISOString(),
-    isGroupMessage: isGroup
+    if (!isGroup && conversationId) {
+      socket.emit("sendMessage", {
+        conversationId,
+        text: text.trim(),
+        attachments,
+      });
+    }
+
+    if (isGroup && groupId) {
+      socket.emit("sendGroupMessage", {
+        groupId,
+        text: text.trim(),
+        attachments,
+      });
+    }
+
+    setText("");
+    setTimeout(() => setSending(false), 100);
   };
-
-  if (!isGroup && conversationId && selectedUser) {
-    dispatch(addMessage({
-      conversationId,
-      message: tempMessage,
-      userId: selectedUser._id, 
-      isGroup: false
-    }));
-    
-    console.log(" [MESSAGEINPUT] Redux updated BEFORE socket emit");
-  }
-
-  if (isGroup && groupId) {
-    dispatch(addGroupMessage({
-      groupId,
-      message: tempMessage
-    }));
-    
-    console.log(" [MESSAGEINPUT] Group Redux updated BEFORE socket emit");
-  }
-
-  // Socket emit for real-time broadcasting
-  if (!isGroup && conversationId) {
-    socket.emit("sendMessage", {
-      conversationId,
-      text: text.trim(),
-      attachments,
-    });
-    
-    console.log(" [MESSAGEINPUT] Individual message sent via socket");
-  }
-
-  if (isGroup && groupId) {
-    socket.emit("sendGroupMessage", {
-      groupId,
-      text: text.trim(),
-      attachments,
-    });
-    
-    console.log(" [MESSAGEINPUT] Group message sent via socket");
-  }
-
-  setText("");
-  setTimeout(() => setSending(false), 100);
-};
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);
     setShowEmojiPicker(false);

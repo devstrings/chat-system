@@ -1,18 +1,10 @@
-
 import * as fileService from "../services/file.service.js";
-import * as fileValidation from "../validations/file.validation.js";
 
-//  Download file controller (authenticated & authorized)
+// DOWNLOAD FILE CONTROLLER
 export const downloadFile = async (req, res) => {
   try {
     const filename = req.params.filename;
     const userId = req.user.userId || req.user.id;
-
-    // Validation
-    const validation = fileValidation.validateDownloadRequest(filename);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
 
     // Service call
     const { filePath, attachment } = await fileService.processFileDownload(filename, userId);
@@ -31,7 +23,7 @@ export const downloadFile = async (req, res) => {
     return res.sendFile(filePath);
 
   } catch (error) {
-    console.error(" File download error:", error);
+    console.error("File download error:", error);
     
     if (error.message === "File not found on server") {
       return res.status(404).json({ message: error.message });
@@ -45,19 +37,14 @@ export const downloadFile = async (req, res) => {
   }
 };
 
-// Upload file controller (authenticated & authorized)
+// UPLOAD FILE CONTROLLER
 export const uploadFile = async (req, res) => {
   try {
     const { conversationId } = req.body;
     const userId = req.user.userId || req.user.id;
 
-    // Validation
-    const validation = fileValidation.validateUploadRequest(req.file, conversationId);
-    if (!validation.isValid) {
-      if (req.file) {
-        fileService.cleanupFile(req.file.path);
-      }
-      return res.status(400).json({ message: validation.message });
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
     }
 
     // Verify user access to conversation/group
@@ -77,7 +64,7 @@ export const uploadFile = async (req, res) => {
       throw accessError;
     }
 
-    // Process file upload
+    // Service call - Process file upload
     const result = await fileService.processFileUpload(
       req.file, 
       conversationId, 
@@ -89,7 +76,7 @@ export const uploadFile = async (req, res) => {
 
   } catch (error) {
     console.error("Upload error:", error);
-    console.error(" Error details:", error.message);
+    console.error("Error details:", error.message);
 
     // Cleanup uploaded file on error
     if (req.file) {
@@ -98,7 +85,7 @@ export const uploadFile = async (req, res) => {
 
     // Handle duplicate key error
     if (error.code === 11000) {
-      console.log(" Duplicate key error");
+      console.log("Duplicate key error");
       return res.status(200).json({
         message: "File already exists in this conversation",
         isDuplicate: true,

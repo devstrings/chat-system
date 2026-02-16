@@ -5,7 +5,6 @@ const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
 });
 
-// Track if we're currently refreshing
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -20,72 +19,61 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-//  REDUX STORE INJECT
 let store;
 export const injectStore = (_store) => {
   store = _store;
-  console.log(' Store injected successfully');
+  console.log(" Store injected successfully");
 };
 
-// TRACK LAST VALID TOKEN - Initialize AFTER login
-let lastValidToken = null;
+let lastValidToken = localStorage.getItem("accessToken");
 
-//  LOGOUT HELPER
 const performLogout = (reason = "Token invalid") => {
   console.error(` PERFORMING LOGOUT: ${reason}`);
-  
+
   localStorage.clear();
   lastValidToken = null;
-  
+
   if (store) {
-    console.log(' Dispatching logout action to Redux...');
-    store.dispatch({ type: 'auth/logout/fulfilled' });
+    store.dispatch({ type: "auth/logout/fulfilled" });
   }
-  
-  console.log(' Redirecting to /login...');
+
   setTimeout(() => {
     window.location.href = "/login";
   }, 100);
 };
 
-//  CHECK TOKEN MODIFICATION
+//  Only check if token was manually changed
 const checkTokenModification = () => {
   const currentToken = localStorage.getItem("accessToken");
-  
-  //  Initialize lastValidToken if not set yet (first request after login)
-  if (!lastValidToken && currentToken) {
-    console.log(' Initializing lastValidToken on first request');
+
+  // Skip if no token
+  if (!currentToken) {
+    console.log(" No token - skipping check");
+    return true;
+  }
+
+  // Initialize if first time
+  if (!lastValidToken) {
+    console.log(" Initializing lastValidToken");
     lastValidToken = currentToken;
     return true;
   }
-  
-  console.log(' Checking token modification...');
-  console.log('  Current:', currentToken?.substring(0, 30));
-  console.log('  Last Valid:', lastValidToken?.substring(0, 30));
-  
-  // Skip check if no tokens exist
-  if (!currentToken && !lastValidToken) {
-    console.log(' No tokens - skipping check');
-    return true;
-  }
-  
-  // Token manually changed
-  if (lastValidToken && currentToken && currentToken !== lastValidToken) {
-    console.error("TOKEN MISMATCH DETECTED!");
+
+  // Check mismatch
+  if (currentToken !== lastValidToken) {
+    console.error(" TOKEN MISMATCH DETECTED!");
     console.log("Expected:", lastValidToken.substring(0, 30) + "...");
     console.log("Found:", currentToken.substring(0, 30) + "...");
-    performLogout("Token has been manually modified");
+    performLogout("Token manually modified");
     return false;
   }
-  
-  console.log(' Token check passed');
+
   return true;
 };
 
-//  UPDATE TOKEN REFERENCE
 const updateTokenReference = (newToken) => {
   if (newToken) {
-    console.log(" Updating token reference:", newToken.substring(0, 30) + "...");
+    console.log(" Updating token reference");
     lastValidToken = newToken;
     localStorage.setItem("accessToken", newToken);
   }
@@ -94,71 +82,67 @@ const updateTokenReference = (newToken) => {
 // REQUEST INTERCEPTOR
 axiosInstance.interceptors.request.use(
   (config) => {
-    const publicRoutes = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh-token'];
-    const isPublicRoute = publicRoutes.some(route => config.url?.includes(route));
-    
-    if (!isPublicRoute) {
-      if (!checkTokenModification()) {
-        return Promise.reject(new Error("Token modified"));
-      }
+    const publicRoutes = [
+      "/api/auth/login",
+      "/api/auth/register",
+      "/api/auth/refresh-token",
+    ];
+    const isPublicRoute = publicRoutes.some((route) =>
+      config.url?.includes(route),
+    );
+
+    //  SKIP check for public routes
+    if (!isPublicRoute && !checkTokenModification()) {
+      return Promise.reject(new Error("Token modified"));
     }
-    
+
     const accessToken = localStorage.getItem("accessToken");
-    
+
     if (accessToken && !isPublicRoute) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
-    
+
     return config;
   },
-  (error) => {
-    console.error(" Request interceptor error:", error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 // RESPONSE INTERCEPTOR
 axiosInstance.interceptors.response.use(
   (response) => {
-    //  Update token reference when new token is received
+    //  Update token reference on successful response with new token
     if (response.data?.accessToken) {
-      console.log(' New token received in response');
+      console.log(" New token received in response");
       updateTokenReference(response.data.accessToken);
-      
+
       if (store) {
         store.dispatch({
-          type: 'auth/updateToken',
+          type: "auth/updateToken",
           payload: response.data.accessToken,
         });
       }
     }
-    
+
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
     const status = error.response?.status;
 
-    console.error(`Response error: ${status} ${originalRequest?.url}`);
+    console.error(` Response error: ${status} ${originalRequest?.url}`);
 
-    if (status === 401 || status === 403) {
-      console.log(' 401/403 Error detected');
-      
-      // Check token modification
-      const currentToken = localStorage.getItem("accessToken");
-      
-      if (lastValidToken && currentToken && currentToken !== lastValidToken) {
-        console.error(' TOKEN MODIFIED - IMMEDIATE LOGOUT');
-        performLogout("Token modified detected on 403/401");
-        return Promise.reject(error);
-      }
+    //  ONLY handle 401 (not 403)
+    if (status === 401) {
+      console.log(" 401 Error - attempting token refresh");
 
+      // Prevent infinite loops
       if (originalRequest._retry) {
         console.error(" Already retried - LOGOUT");
         performLogout("Authentication retry failed");
         return Promise.reject(error);
       }
 
+      // Queue requests during refresh
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -184,28 +168,31 @@ axiosInstance.interceptors.response.use(
       }
 
       try {
-        console.log("Calling refresh token API...");
+        console.log(" Calling refresh token API...");
 
         const { data } = await axios.post(
           `${API_BASE_URL}/api/auth/refresh-token`,
-          { refreshToken }
+          { refreshToken },
         );
 
         if (data.accessToken) {
           console.log(" New access token received");
-          
+
+          //  Update reference FIRST
           updateTokenReference(data.accessToken);
 
           if (store) {
             store.dispatch({
-              type: 'auth/updateToken',
+              type: "auth/updateToken",
               payload: data.accessToken,
             });
           }
 
-          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          // Retry all queued requests
           processQueue(null, data.accessToken);
-          
+
+          // Retry original request
+          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           return axiosInstance(originalRequest);
         } else {
           throw new Error("No access token in response");
@@ -220,26 +207,13 @@ axiosInstance.interceptors.response.use(
       }
     }
 
-    return Promise.reject(error);
-  }
-);
+    //  For 403, don't auto-logout (might be permissions issue)
+    if (status === 403) {
+      console.error(" 403 Forbidden - Check backend permissions");
+    }
 
-// Debug helper
-window.debugAxios = {
-  getCurrentToken: () => localStorage.getItem("accessToken"),
-  getLastValidToken: () => lastValidToken,
-  checkMatch: () => {
-    const current = localStorage.getItem("accessToken");
-    const last = lastValidToken;
-    console.log('🔍 Token Match Check:');
-    console.log('  Current:', current?.substring(0, 30));
-    console.log('  Last Valid:', last?.substring(0, 30));
-    console.log('  Match?', current === last);
-    return current === last;
+    return Promise.reject(error);
   },
-  forceLogout: () => {
-    performLogout("Manual logout via debugAxios");
-  }
-};
+);
 
 export default axiosInstance;

@@ -1,18 +1,29 @@
 import express from "express";
-import { 
-  getUsers, 
-  searchUsers, 
+import {
+  getUsers,
+  searchUsers,
   getUserById,
   getCurrentUser,
   updateProfileImage,
   removeProfileImage,
   uploadProfileImage,
   serveProfileImage,
-  uploadCoverPhoto,      
-  removeCoverPhoto       
+  uploadCoverPhoto,
+  removeCoverPhoto,
 } from "../controllers/user.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import { uploadProfile } from "../config/multer.js"; 
+import { uploadProfile } from "../config/multer.js";
+import { validate } from "../validators/middleware/validate.js";  
+import {
+  searchQueryValidation,
+  profileImageUrlValidation,
+} from "../validators/index.js";
+import {
+  validateSearchQuery,
+  validateUserNotBlocked,
+  validateFileUploaded,
+  validateProfileImageUrl,  
+} from "../validators/middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -22,11 +33,6 @@ const router = express.Router();
  *   get:
  *     summary: Get all users
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of users
  */
 router.get("/", verifyToken, getUsers);
 
@@ -36,20 +42,8 @@ router.get("/", verifyToken, getUsers);
  *   get:
  *     summary: Search users by query
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: q
- *         required: true
- *         schema:
- *           type: string
- *         description: Search keyword
- *     responses:
- *       200:
- *         description: List of matching users
  */
-router.get("/search", verifyToken, searchUsers);
+router.get("/search", verifyToken, validateSearchQuery, searchUsers);
 
 /**
  * @swagger
@@ -57,11 +51,6 @@ router.get("/search", verifyToken, searchUsers);
  *   get:
  *     summary: Get current authenticated user
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Current user data
  */
 router.get("/auth/me", verifyToken, getCurrentUser);
 
@@ -71,43 +60,8 @@ router.get("/auth/me", verifyToken, getCurrentUser);
  *   get:
  *     summary: Serve user profile image
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: filename
- *         required: true
- *         schema:
- *           type: string
- *         description: Image filename
- *     responses:
- *       200:
- *         description: Image served
  */
 router.get("/image/:filename", verifyToken, serveProfileImage);
-
-/**
- * @swagger
- * /users/{id}:
- *   get:
- *     summary: Get user by ID
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User data retrieved successfully
- *       404:
- *         description: User not found
- */
-router.get("/:id", verifyToken, getUserById);
 
 /**
  * @swagger
@@ -115,23 +69,14 @@ router.get("/:id", verifyToken, getUserById);
  *   post:
  *     summary: Upload profile image
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               image:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Profile image uploaded
  */
-router.post("/profile/upload", verifyToken, uploadProfile.single("image"), uploadProfileImage);
+router.post(
+  "/profile/upload",
+  verifyToken,
+  uploadProfile.single("image"),
+  validateFileUploaded,
+  uploadProfileImage
+);
 
 /**
  * @swagger
@@ -139,13 +84,15 @@ router.post("/profile/upload", verifyToken, uploadProfile.single("image"), uploa
  *   put:
  *     summary: Update profile image
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Profile image updated
  */
-router.put("/profile/update-image", verifyToken, updateProfileImage);
+router.put(
+  "/profile/update-image",
+  verifyToken,
+  profileImageUrlValidation,  
+  validate,                    
+  validateProfileImageUrl,     
+  updateProfileImage
+);
 
 /**
  * @swagger
@@ -153,11 +100,6 @@ router.put("/profile/update-image", verifyToken, updateProfileImage);
  *   delete:
  *     summary: Remove profile image
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Profile image removed
  */
 router.delete("/profile/remove-image", verifyToken, removeProfileImage);
 
@@ -167,23 +109,14 @@ router.delete("/profile/remove-image", verifyToken, removeProfileImage);
  *   post:
  *     summary: Upload cover photo
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               coverPhoto:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Cover photo uploaded
  */
-router.post("/profile/upload-cover", verifyToken, uploadProfile.single("coverPhoto"), uploadCoverPhoto);
+router.post(
+  "/profile/upload-cover",
+  verifyToken,
+  uploadProfile.single("coverPhoto"),
+  validateFileUploaded,
+  uploadCoverPhoto
+);
 
 /**
  * @swagger
@@ -191,12 +124,16 @@ router.post("/profile/upload-cover", verifyToken, uploadProfile.single("coverPho
  *   delete:
  *     summary: Remove cover photo
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Cover photo removed
  */
 router.delete("/profile/remove-cover", verifyToken, removeCoverPhoto);
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     tags: [Users]
+ */
+router.get("/:id", verifyToken, validateUserNotBlocked, getUserById);
 
 export default router;

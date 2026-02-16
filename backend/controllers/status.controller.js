@@ -1,23 +1,9 @@
-
 import * as statusService from "../services/status.service.js";
-import * as statusValidation from "../validations/status.validation.js";
 
 // CREATE STATUS CONTROLLER
 export const createStatus = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { type } = req.body;
-
-    // Validation
-    const typeValidation = statusValidation.validateStatusType(type);
-    if (!typeValidation.isValid) {
-      return res.status(typeValidation.statusCode).json({ message: typeValidation.message });
-    }
-
-    const fileValidation = statusValidation.validateFileRequired(req.file, type);
-    if (!fileValidation.isValid) {
-      return res.status(fileValidation.statusCode).json({ message: fileValidation.message });
-    }
 
     // Service call
     const newStatus = await statusService.processCreateStatus(userId, req.body, req.file);
@@ -33,7 +19,7 @@ export const createStatus = async (req, res) => {
       status: newStatus,
     });
   } catch (err) {
-    console.error("❌ Create status error:", err);
+    console.error(" Create status error:", err);
     res.status(500).json({ message: "Failed to create status" });
   }
 };
@@ -54,7 +40,7 @@ export const getStatuses = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error("❌ Get statuses error:", err);
+    console.error(" Get statuses error:", err);
     res.status(500).json({ message: "Failed to fetch statuses" });
   }
 };
@@ -71,7 +57,7 @@ export const getUserStatuses = async (req, res) => {
 
     res.json(visibleStatuses);
   } catch (err) {
-    console.error("❌ Get user statuses error:", err);
+    console.error("Get user statuses error:", err);
     res.status(500).json({ message: "Failed to fetch user statuses" });
   }
 };
@@ -82,19 +68,7 @@ export const markAsViewed = async (req, res) => {
     const { statusId } = req.params;
     const viewerId = req.user.id;
 
-    // Fetch status
-    const status = await statusService.fetchStatusById(statusId);
-
-    // Validation
-    const statusValidationResult = statusValidation.validateStatusExists(status);
-    if (!statusValidationResult.isValid) {
-      return res.status(statusValidationResult.statusCode).json({ message: statusValidationResult.message });
-    }
-
-    const canViewValidation = statusValidation.validateCanViewStatus(status, viewerId);
-    if (!canViewValidation.isValid) {
-      return res.status(canViewValidation.statusCode).json({ message: canViewValidation.message });
-    }
+    const status = req.validatedStatus; 
 
     // Service call
     const result = await statusService.processMarkAsViewed(statusId, viewerId);
@@ -117,7 +91,7 @@ export const markAsViewed = async (req, res) => {
 
     res.json({ message: "Status marked as viewed" });
   } catch (err) {
-    console.error("❌ Mark viewed error:", err);
+    console.error(" Mark viewed error:", err);
     res.status(500).json({ message: "Failed to mark status as viewed" });
   }
 };
@@ -127,20 +101,6 @@ export const deleteStatus = async (req, res) => {
   try {
     const { statusId } = req.params;
     const userId = req.user.id;
-
-    // Fetch status
-    const status = await statusService.fetchStatusById(statusId);
-
-    // Validation
-    const statusValidationResult = statusValidation.validateStatusExists(status);
-    if (!statusValidationResult.isValid) {
-      return res.status(statusValidationResult.statusCode).json({ message: statusValidationResult.message });
-    }
-
-    const ownershipValidation = statusValidation.validateStatusOwnership(status, userId);
-    if (!ownershipValidation.isValid) {
-      return res.status(ownershipValidation.statusCode).json({ message: ownershipValidation.message });
-    }
 
     // Service call
     const result = await statusService.processDeleteStatus(statusId, userId);
@@ -153,7 +113,7 @@ export const deleteStatus = async (req, res) => {
 
     res.json({ message: "Status deleted successfully" });
   } catch (err) {
-    console.error("❌ Delete status error:", err);
+    console.error(" Delete status error:", err);
     res.status(500).json({ message: "Failed to delete status" });
   }
 };
@@ -162,28 +122,16 @@ export const deleteStatus = async (req, res) => {
 export const getStatusViewers = async (req, res) => {
   try {
     const { statusId } = req.params;
-    const userId = req.user.id;
 
     // Service call
     const status = await statusService.fetchStatusWithViewers(statusId);
-
-    // Validation
-    const statusValidationResult = statusValidation.validateStatusExists(status);
-    if (!statusValidationResult.isValid) {
-      return res.status(statusValidationResult.statusCode).json({ message: statusValidationResult.message });
-    }
-
-    const ownershipValidation = statusValidation.validateStatusOwnership(status, userId);
-    if (!ownershipValidation.isValid) {
-      return res.status(ownershipValidation.statusCode).json({ message: ownershipValidation.message });
-    }
 
     res.json({
       totalViews: status.viewedBy.length,
       viewers: status.viewedBy,
     });
   } catch (err) {
-    console.error("❌ Get viewers error:", err);
+    console.error(" Get viewers error:", err);
     res.status(500).json({ message: "Failed to fetch viewers" });
   }
 };
@@ -196,10 +144,8 @@ export const updateStatusPrivacy = async (req, res) => {
     // Service call
     const result = await statusService.processUpdatePrivacySettings(userId, req.body);
 
-    // Validation
-    const userValidation = statusValidation.validateUserExists(result);
-    if (!userValidation.isValid) {
-      return res.status(userValidation.statusCode).json({ message: userValidation.message });
+    if (!result) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     res.json({
@@ -208,7 +154,7 @@ export const updateStatusPrivacy = async (req, res) => {
       mutedStatuses: result.mutedStatuses,
     });
   } catch (err) {
-    console.error("❌ Update privacy error:", err);
+    console.error(" Update privacy error:", err);
     res.status(500).json({ message: "Failed to update privacy settings" });
   }
 };

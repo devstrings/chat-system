@@ -1,19 +1,29 @@
 import express from "express";
 import passport from "../config/passport.js";
-import { 
-  register, 
-  login, 
-  googleCallback, 
+import {
+  register,
+  login,
+  googleCallback,
   facebookCallback,
-  forgotPassword,    
-  resetPassword,     
+  forgotPassword,
+  resetPassword,
   setPassword,
   changePassword,
   getCurrentUser,
-  refreshToken    
+  refreshToken,
 } from "../controllers/auth.controller.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import config from "../config/index.js"; 
+import { validate } from "../validators//middleware/validate.js";
+import {
+  registerValidation,
+  loginValidation,
+  refreshTokenValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
+  setPasswordValidation,
+  changePasswordValidation,
+} from "../validators/index.js";
+import config from "../config/index.js";
 
 const router = express.Router();
 
@@ -23,24 +33,8 @@ const router = express.Router();
  *   post:
  *     summary: Register a new user
  *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       201:
- *         description: User registered successfully
  */
-router.post("/register", register);
+router.post("/register", registerValidation, validate, register);
 
 /**
  * @swagger
@@ -48,22 +42,8 @@ router.post("/register", register);
  *   post:
  *     summary: Login a user
  *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: User logged in successfully
  */
-router.post("/login", login);
+router.post("/login", loginValidation, validate, login);
 
 /**
  * @swagger
@@ -71,11 +51,8 @@ router.post("/login", login);
  *   post:
  *     summary: Refresh JWT token
  *     tags: [Auth]
- *     responses:
- *       200:
- *         description: Token refreshed successfully
  */
-router.post("/refresh-token", refreshToken);
+router.post("/refresh-token", refreshTokenValidation, validate, refreshToken);
 
 /**
  * @swagger
@@ -83,20 +60,13 @@ router.post("/refresh-token", refreshToken);
  *   post:
  *     summary: Request password reset
  *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *     responses:
- *       200:
- *         description: Password reset link sent
  */
-router.post("/forgot-password", forgotPassword);
+router.post(
+  "/forgot-password",
+  forgotPasswordValidation,
+  validate,
+  forgotPassword
+);
 
 /**
  * @swagger
@@ -104,22 +74,13 @@ router.post("/forgot-password", forgotPassword);
  *   post:
  *     summary: Reset password using token
  *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Password reset successfully
  */
-router.post("/reset-password", resetPassword);
+router.post(
+  "/reset-password",
+  resetPasswordValidation,
+  validate,
+  resetPassword
+);
 
 /**
  * @swagger
@@ -127,22 +88,14 @@ router.post("/reset-password", resetPassword);
  *   post:
  *     summary: Set password for authenticated user
  *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Password set successfully
  */
-router.post("/set-password", verifyToken, setPassword);
+router.post(
+  "/set-password",
+  verifyToken,
+  setPasswordValidation,
+  validate,
+  setPassword
+);
 
 /**
  * @swagger
@@ -150,24 +103,14 @@ router.post("/set-password", verifyToken, setPassword);
  *   post:
  *     summary: Change password for authenticated user
  *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               oldPassword:
- *                 type: string
- *               newPassword:
- *                 type: string
- *     responses:
- *       200:
- *         description: Password changed successfully
  */
-router.post("/change-password", verifyToken, changePassword);
+router.post(
+  "/change-password",
+  verifyToken,
+  changePasswordValidation,
+  validate,
+  changePassword
+);
 
 /**
  * @swagger
@@ -175,11 +118,6 @@ router.post("/change-password", verifyToken, changePassword);
  *   get:
  *     summary: Get current authenticated user
  *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Current user retrieved successfully
  */
 router.get("/me", verifyToken, getCurrentUser);
 
@@ -189,15 +127,12 @@ router.get("/me", verifyToken, getCurrentUser);
  *   get:
  *     summary: Google OAuth login
  *     tags: [Auth]
- *     responses:
- *       302:
- *         description: Redirect to Google login
  */
 router.get(
   "/google",
-  passport.authenticate("google", { 
+  passport.authenticate("google", {
     scope: ["profile", "email"],
-    session: false 
+    session: false,
   })
 );
 
@@ -207,15 +142,12 @@ router.get(
  *   get:
  *     summary: Google OAuth callback
  *     tags: [Auth]
- *     responses:
- *       302:
- *         description: Redirect after Google login
  */
 router.get(
   "/google/callback",
-  passport.authenticate("google", { 
-    session: false, 
-    failureRedirect: `${config.frontend.loginUrl}?error=google_auth_failed` 
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${config.frontend.loginUrl}?error=google_auth_failed`,
   }),
   googleCallback
 );
@@ -226,15 +158,12 @@ router.get(
  *   get:
  *     summary: Facebook OAuth login
  *     tags: [Auth]
- *     responses:
- *       302:
- *         description: Redirect to Facebook login
  */
 router.get(
   "/facebook",
-  passport.authenticate("facebook", { 
+  passport.authenticate("facebook", {
     scope: ["email"],
-    session: false 
+    session: false,
   })
 );
 
@@ -244,15 +173,12 @@ router.get(
  *   get:
  *     summary: Facebook OAuth callback
  *     tags: [Auth]
- *     responses:
- *       302:
- *         description: Redirect after Facebook login
  */
 router.get(
   "/facebook/callback",
-  passport.authenticate("facebook", { 
-    session: false, 
-    failureRedirect: `${config.frontend.loginUrl}?error=facebook_auth_failed` 
+  passport.authenticate("facebook", {
+    session: false,
+    failureRedirect: `${config.frontend.loginUrl}?error=facebook_auth_failed`,
   }),
   facebookCallback
 );
@@ -260,7 +186,9 @@ router.get(
 // ERROR HANDLER
 router.use((err, req, res, next) => {
   console.error(" OAuth error:", err.message);
-  res.redirect(`${config.frontend.loginUrl}?error=${encodeURIComponent(err.message)}`); 
+  res.redirect(
+    `${config.frontend.loginUrl}?error=${encodeURIComponent(err.message)}`
+  );
 });
 
 export default router;

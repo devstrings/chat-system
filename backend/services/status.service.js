@@ -1,6 +1,5 @@
-
 import Status from "../models/Status.js";
-import User from "../models/user.js";
+import User from "../models/User.js";
 import Friendship from "../models/Friendship.js";
 import fs from "fs";
 import path from "path";
@@ -171,11 +170,11 @@ export const fetchStatusById = async (statusId) => {
 // MARK STATUS AS VIEWED SERVICE
 export const processMarkAsViewed = async (statusId, viewerId) => {
   const status = await Status.findById(statusId);
-  
+
   if (status.userId.toString() === viewerId) {
     return {
       isOwnStatus: true,
-      message: "Own status, not marking as viewed"
+      message: "Own status, not marking as viewed",
     };
   }
 
@@ -184,12 +183,18 @@ export const processMarkAsViewed = async (statusId, viewerId) => {
   return {
     isOwnStatus: false,
     status,
-    viewCount: status.viewedBy.length
+    viewCount: status.viewedBy.length,
   };
 };
 
 // BROADCAST STATUS VIEWED SERVICE
-export const broadcastStatusViewed = (io, ownerId, statusId, viewerId, viewCount) => {
+export const broadcastStatusViewed = (
+  io,
+  ownerId,
+  statusId,
+  viewerId,
+  viewCount,
+) => {
   const ownerSockets = [...io.sockets.sockets.values()].filter(
     (s) => s.user && s.user.id === ownerId,
   );
@@ -231,7 +236,7 @@ export const processDeleteStatus = async (statusId, userId) => {
 
   return {
     statusId,
-    userId
+    userId,
   };
 };
 

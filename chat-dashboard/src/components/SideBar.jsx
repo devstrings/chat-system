@@ -20,9 +20,8 @@ import {
   NotificationModal,
   AddFriendModal,
 } from "./ConfirmationDialog";
+
 import StatusRingsList from "./Status/StatusRingsList";
-import { addGroupMessage, updateGroupMessage } from "../store/slices/groupSlice";
-import { addMessage, updateMessageStatus, updateMessage } from "../store/slices/chatSlice";
 export default function Sidebar({
   selectedUserId,
   onSelectUser,
@@ -68,13 +67,13 @@ export default function Sidebar({
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeTab, setActiveTab] = useState("chats");
-const { currentUser } = useSelector((state) => state.auth);
-const { imageSrc: profilePreview, loading: imageLoading } =
-    useAuthImage(currentUser?.profileImage);
+  const { currentUser } = useSelector((state) => state.auth);
+  const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
+    currentUser?.profileImage,
+  );
 
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
-  const { currentUser: currentUserFromRedux } = useSelector((state) => state.auth);
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
@@ -212,52 +211,52 @@ const { imageSrc: profilePreview, loading: imageLoading } =
 
     const allItems = [...filteredGroups, ...filteredUsers];
 
-return allItems.sort((a, b) => {
-  if (!showArchived) {
-    let convIdA, convIdB, aPinned, bPinned;
+    return allItems.sort((a, b) => {
+      if (!showArchived) {
+        let convIdA, convIdB, aPinned, bPinned;
 
-    if (a.isGroup) {
-      convIdA = a._id;
-      aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
-    } else {
-      convIdA = lastMessages[a._id]?.conversationId;
-      aPinned = convIdA && pinnedConversations.has(convIdA);
-    }
+        if (a.isGroup) {
+          convIdA = a._id;
+          aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
+        } else {
+          convIdA = lastMessages[a._id]?.conversationId;
+          aPinned = convIdA && pinnedConversations.has(convIdA);
+        }
 
-    if (b.isGroup) {
-      convIdB = b._id;
-      bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
-    } else {
-      convIdB = lastMessages[b._id]?.conversationId;
-      bPinned = convIdB && pinnedConversations.has(convIdB);
-    }
+        if (b.isGroup) {
+          convIdB = b._id;
+          bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
+        } else {
+          convIdB = lastMessages[b._id]?.conversationId;
+          bPinned = convIdB && pinnedConversations.has(convIdB);
+        }
 
-    if (aPinned && !bPinned) return -1;
-    if (!aPinned && bPinned) return 1;
-  }
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+      }
 
-  // Try multiple sources for timestamp
-  const getTimestamp = (item) => {
-    const lastMsg = lastMessages[item._id];
-    
-    // Priority 1: _updated timestamp (most reliable)
-    if (lastMsg?._updated) return lastMsg._updated;
-    
-    // Priority 2: message createdAt time
-    if (lastMsg?.time) return new Date(lastMsg.time).getTime();
-    
-    // Priority 3: Group/Conversation updatedAt
-    if (item.updatedAt) return new Date(item.updatedAt).getTime();
-    
-    // Fallback: 0 (push to bottom)
-    return 0;
-  };
+      // Try multiple sources for timestamp
+      const getTimestamp = (item) => {
+        const lastMsg = lastMessages[item._id];
 
-  const timestampA = getTimestamp(a);
-  const timestampB = getTimestamp(b);
+        // Priority 1: _updated timestamp (most reliable)
+        if (lastMsg?._updated) return lastMsg._updated;
 
-  return timestampB - timestampA; // Latest first
-});
+        // Priority 2: message createdAt time
+        if (lastMsg?.time) return new Date(lastMsg.time).getTime();
+
+        // Priority 3: Group/Conversation updatedAt
+        if (item.updatedAt) return new Date(item.updatedAt).getTime();
+
+        // Fallback: 0 (push to bottom)
+        return 0;
+      };
+
+      const timestampA = getTimestamp(a);
+      const timestampB = getTimestamp(b);
+
+      return timestampB - timestampA; // Latest first
+    });
   }, [
     users,
     groups,
@@ -270,7 +269,7 @@ return allItems.sort((a, b) => {
   ]);
 
   const onlineCount = memoizedItems.filter(
-    (item) => !item.isGroup && onlineUsers.has(item._id),
+    (item) => !item.isGroup && onlineUsers.includes(item._id),
   ).length;
 
   const totalUnread = Object.values(unreadCounts).reduce(
@@ -993,7 +992,8 @@ return allItems.sort((a, b) => {
                         user={item}
                         selected={item._id === selectedUserId}
                         onClick={() => onSelectUser(item)}
-                        isOnline={onlineUsers.has(item._id)}
+                        // AFTER
+                        isOnline={onlineUsers.includes(item._id)}
                         unreadCount={unreadCounts[item._id] || 0}
                         lastMessage={formattedText}
                         lastMessageTime={lastMsg?.time || null}
@@ -1033,8 +1033,8 @@ return allItems.sort((a, b) => {
           friends={users}
           currentUserId={currentUserId}
           onClose={() => setShowCreateGroup(false)}
+          // AFTER
           onSuccess={(newGroup) => {
-            setGroups((prev) => [newGroup, ...prev]);
             setShowCreateGroup(false);
             onSelectUser({ ...newGroup, isGroup: true });
           }}

@@ -3,7 +3,7 @@ import Message from "../Message";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchGroupMessages,
-  addGroupMessage,
+  // addGroupMessage,
   deleteGroupMessage,
   clearGroupChatMessages,
   updateGroupMessage,
@@ -37,13 +37,6 @@ export default function GroupChatWindow({
   useEffect(() => {
     if (!socket || !group?._id) return;
 
-    // Handler 1: Receive message
-    const handleReceiveGroupMessage = (msg) => {
-      if (msg.groupId === group._id) {
-        dispatch(addGroupMessage({ groupId: msg.groupId, message: msg }));
-      }
-    };
-
     // Handler 2: Typing indicator
     const handleGroupTyping = ({ userId, groupId, isTyping }) => {
       if (groupId === group._id && userId !== currentUserId) {
@@ -75,7 +68,7 @@ export default function GroupChatWindow({
 
     //  Handler 5: Clear chat
     const handleGroupChatCleared = (data) => {
-      console.log("🧹 [GROUP] Chat cleared event:", data);
+      console.log(" [GROUP] Chat cleared event:", data);
 
       if (data.groupId === group._id && data.clearedFor === currentUserId) {
         console.log("Clearing group chat from UI");
@@ -100,7 +93,6 @@ export default function GroupChatWindow({
     };
 
     //  Register ALL listeners
-    socket.on("receiveGroupMessage", handleReceiveGroupMessage);
     socket.on("groupUserTyping", handleGroupTyping);
     socket.on("groupMessageDeleted", handleGroupMessageDeleted);
     socket.on(
@@ -112,7 +104,6 @@ export default function GroupChatWindow({
 
     //  Cleanup ALL listeners
     return () => {
-      socket.off("receiveGroupMessage", handleReceiveGroupMessage);
       socket.off("groupUserTyping", handleGroupTyping);
       socket.off("groupMessageDeleted", handleGroupMessageDeleted);
       socket.off(

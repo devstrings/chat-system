@@ -1,6 +1,5 @@
 
 import * as authService from "../services/auth.service.js";
-import * as authValidation from "../validations/auth.validation.js";
 import config from "../config/index.js";
 
 // REGISTER CONTROLLER
@@ -8,11 +7,7 @@ export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Validation
-    const validation = authValidation.validateRegister(username, email, password);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
+  
 
     // Service call
     const user = await authService.registerUser(username, email, password);
@@ -35,11 +30,7 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
-    const validation = authValidation.validateLogin(email, password);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
+   
 
     // Service call
     const result = await authService.loginUser(email, password);
@@ -92,18 +83,12 @@ export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Validation
-    const validation = authValidation.validateForgotPassword(email);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
 
     // Service call
     const result = await authService.processForgotPassword(email);
 
     res.json({
       message: result.message,
-      //  ONLY FOR DEVELOPMENT - Remove in production
       ...(result.resetUrl && {
         resetUrl: result.resetUrl,
         expiresIn: result.expiresIn,
@@ -123,11 +108,7 @@ export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
-    // Validation
-    const validation = authValidation.validateResetPassword(token, newPassword);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
+  
 
     // Service call
     const result = await authService.processResetPassword(token, newPassword);
@@ -151,11 +132,7 @@ export const setPassword = async (req, res) => {
     const { newPassword } = req.body;
     const userId = req.user.id || req.user.userId;
 
-    // Validation
-    const validation = authValidation.validateSetPassword(newPassword);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
+ 
 
     // Service call
     const result = await authService.setUserPassword(userId, newPassword);
@@ -203,11 +180,6 @@ export const changePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    // Validation
-    const validation = authValidation.validateChangePassword(oldPassword, newPassword);
-    if (!validation.isValid) {
-      return res.status(400).json({ message: validation.message });
-    }
 
     // Service call
     const result = await authService.changeUserPassword(userId, oldPassword, newPassword);
@@ -236,11 +208,7 @@ export const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
-    // Validation
-    const validation = authValidation.validateRefreshToken(refreshToken);
-    if (!validation.isValid) {
-      return res.status(401).json({ message: validation.message });
-    }
+   
 
     // Service call
     const result = authService.refreshAccessToken(refreshToken);

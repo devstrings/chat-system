@@ -1,17 +1,31 @@
-
-import Message from "../models/message.js";
+import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import Attachment from "../models/Attachment.js";
 import Friendship from "../models/Friendship.js";
 import Group from "../models/Group.js";
 
-// CHECK FRIENDSHIP SERVICE
+//  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {
+  //  Convert to string for proper comparison
+  const user1 = currentUserId.toString();
+  const user2 = otherUserId.toString();
+
+  console.log(" [SERVICE] Checking friendship:", {
+    user1,
+    user2,
+  });
+
   const friendship = await Friendship.findOne({
     $or: [
-      { user1: currentUserId, user2: otherUserId },
-      { user1: otherUserId, user2: currentUserId },
+      { user1: user1, user2: user2 },
+      { user1: user2, user2: user1 },
     ],
+    status: "accepted",
+  });
+
+  console.log(" [SERVICE] Friendship result:", {
+    found: !!friendship,
+    status: friendship?.status || "not found",
   });
 
   return friendship;
@@ -37,7 +51,11 @@ export const createNewConversation = async (currentUserId, otherUserId) => {
 };
 
 // GET OR CREATE CONVERSATION SERVICE
-export const processGetOrCreateConversation = async (currentUserId, otherUserId, skipCreate) => {
+export const processGetOrCreateConversation = async (
+  currentUserId,
+  otherUserId,
+  skipCreate,
+) => {
   // Find existing conversation
   let conversation = await findExistingConversation(currentUserId, otherUserId);
 
@@ -63,14 +81,30 @@ export const fetchConversationById = async (conversationId) => {
 
 // FIND OTHER USER IN CONVERSATION SERVICE
 export const findOtherUserInConversation = (conversation, currentUserId) => {
-  const otherUserId = conversation.participants.find(
-    (p) => p.toString() !== currentUserId
+  // Convert to string for comparison
+  const currentUserStr = currentUserId.toString();
+
+  const otherUser = conversation.participants.find(
+    (p) => p.toString() !== currentUserStr,
   );
-  return otherUserId;
+
+  console.log(" [SERVICE] Finding other user:", {
+    currentUserId: currentUserStr,
+    participants: conversation.participants.map((p) => p.toString()),
+    otherUser: otherUser?.toString(),
+  });
+
+  // Return as string, not ObjectId
+  return otherUser?.toString();
 };
 
 // FETCH MESSAGES SERVICE
-export const fetchMessages = async (conversationId, currentUserId, limit, skip) => {
+export const fetchMessages = async (
+  conversationId,
+  currentUserId,
+  limit,
+  skip,
+) => {
   const messages = await Message.find({
     conversationId,
     // Filter out messages deleted for current user
@@ -132,8 +166,8 @@ export const fetchUserConversations = async (currentUserId) => {
 
 // CLEAR CHAT SERVICE
 export const processClearChat = async (conversationId, currentUserId) => {
-  console.log(" CLEAR CHAT START");
-  console.log(" conversationId:", conversationId);
+  console.log("CLEAR CHAT START");
+  console.log("conversationId:", conversationId);
   console.log(" userId:", currentUserId);
 
   const conversation = await Conversation.findById(conversationId);
@@ -146,7 +180,7 @@ export const processClearChat = async (conversationId, currentUserId) => {
     },
     {
       $addToSet: { deletedFor: currentUserId },
-    }
+    },
   );
 
   console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
@@ -169,12 +203,20 @@ export const processClearChat = async (conversationId, currentUserId) => {
 };
 
 // DELETE CONVERSATION SERVICE
-export const processDeleteConversation = async (conversationId, currentUserId, otherUserId) => {
+export const processDeleteConversation = async (
+  conversationId,
+  currentUserId,
+  otherUserId,
+) => {
   console.log("[DELETE] Starting deletion for:", conversationId);
 
   let conversation;
 
-  if (conversationId && conversationId !== "undefined" && conversationId !== "null") {
+  if (
+    conversationId &&
+    conversationId !== "undefined" &&
+    conversationId !== "null"
+  ) {
     conversation = await Conversation.findById(conversationId);
   }
 
@@ -190,21 +232,21 @@ export const processDeleteConversation = async (conversationId, currentUserId, o
   }
 
   const otherUserIdInConv = conversation.participants.find(
-    (p) => p.toString() !== currentUserId
+    (p) => p.toString() !== currentUserId,
   );
 
   console.log(" Participants:", {
     currentUser: currentUserId,
-    otherUser: otherUserIdInConv
+    otherUser: otherUserIdInConv,
   });
 
-  // Add current user to deletedBy array 
+  // Add current user to deletedBy array
   if (!conversation.deletedBy) {
     conversation.deletedBy = [];
   }
-  
+
   const alreadyDeleted = conversation.deletedBy.some(
-    (d) => d.userId.toString() === currentUserId
+    (d) => d.userId.toString() === currentUserId,
   );
 
   if (!alreadyDeleted) {
@@ -216,7 +258,7 @@ export const processDeleteConversation = async (conversationId, currentUserId, o
     console.log(" Added user to deletedBy array");
   }
 
-  //  Delete messages ONLY for current user 
+  //  Delete messages ONLY for current user
   const result = await Message.updateMany(
     {
       conversationId: conversation._id,
@@ -224,40 +266,40 @@ export const processDeleteConversation = async (conversationId, currentUserId, o
     },
     {
       $addToSet: { deletedFor: currentUserId },
-    }
+    },
   );
   console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
 
   //  Check if BOTH users deleted it
   const bothDeleted = conversation.participants.every((p) =>
-    conversation.deletedBy.some((d) => d.userId.toString() === p.toString())
+    conversation.deletedBy.some((d) => d.userId.toString() === p.toString()),
   );
 
   if (bothDeleted) {
     console.log(" BOTH users deleted, hard deleting conversation & messages");
-    
+
     // Hard delete messages
     await Message.deleteMany({ conversationId: conversation._id });
-    
+
     // Hard delete attachments
     await Attachment.updateMany(
       { conversationId: conversation._id },
-      { status: "deleted" }
+      { status: "deleted" },
     );
-    
+
     // Hard delete conversation
     await Conversation.findByIdAndDelete(conversation._id);
-    
+
     console.log(" Conversation permanently deleted from DB");
   } else {
-    console.log("Soft deleted for current user only");
+    console.log(" Soft deleted for current user only");
   }
 
   return {
     success: true,
     action: bothDeleted ? "HARD_DELETE" : "SOFT_DELETE",
-    message: bothDeleted 
-      ? "Conversation permanently deleted" 
+    message: bothDeleted
+      ? "Conversation permanently deleted"
       : "Conversation deleted for you only",
     conversationId: conversation._id,
     userId: otherUserIdInConv?.toString(),
@@ -322,7 +364,12 @@ export const processDeleteMessageForEveryone = async (messageId) => {
 
 // BULK DELETE MESSAGES SERVICE
 export const processBulkDeleteMessages = async (messageIds, currentUserId) => {
-  console.log(" Bulk delete - Messages:", messageIds.length, "User:", currentUserId);
+  console.log(
+    " Bulk delete - Messages:",
+    messageIds.length,
+    "User:",
+    currentUserId,
+  );
 
   // Populate conversation for each message
   const messages = await Message.find({ _id: { $in: messageIds } }).populate(
@@ -361,7 +408,7 @@ export const processBulkDeleteMessages = async (messageIds, currentUserId) => {
     }
   }
 
-  console.log(" Bulk delete completed:", deletedCount, "messages");
+  console.log(` Bulk delete completed: ${deletedCount} messages`);
 
   return {
     message: `${deletedCount} messages deleted`,
@@ -533,7 +580,7 @@ export const transformGroupMessages = (messages) => {
 
 // EDIT MESSAGE SERVICE
 export const processEditMessage = async (messageId, text) => {
-  const message = await Message.findById(messageId).populate('conversationId');
+  const message = await Message.findById(messageId).populate("conversationId");
 
   // Save to edit history
   if (!message.editHistory) {
@@ -541,7 +588,7 @@ export const processEditMessage = async (messageId, text) => {
   }
   message.editHistory.push({
     text: message.text,
-    editedAt: new Date()
+    editedAt: new Date(),
   });
 
   // Update message
@@ -553,7 +600,7 @@ export const processEditMessage = async (messageId, text) => {
 
   return {
     message: "Message edited successfully",
-    updatedMessage: message
+    updatedMessage: message,
   };
 };
 

@@ -4,7 +4,6 @@ import { useAuthImage } from "../../hooks/useAuthImage";
 import API_BASE_URL from "../../config/api";
 import { useDispatch } from "react-redux";
 import { updateGroup } from "../../store/slices/groupSlice";
-import axiosInstance from "../../utils/axiosInstance";
 
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {
