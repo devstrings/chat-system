@@ -4,7 +4,6 @@ import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-// import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import compression from "compression";
 import session from "express-session";
@@ -58,7 +57,9 @@ app.use(cors({
     const allowedOrigins = [
       config.frontend.url,
       'http://localhost:3000',
-      'http://localhost:5173'
+      'http://localhost:5173',
+      'http://chat_frontend:5173',  
+      'http://frontend:5173',       
     ];
     
     if (!origin) return callback(null, true);
@@ -76,10 +77,10 @@ app.use(cors({
 //  3. RATE LIMITING
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 500,
+   skip: (req) => req.path.includes('/messages'),
   message: 'Too many requests, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
+
 });
 app.use('/api/', apiLimiter);
 

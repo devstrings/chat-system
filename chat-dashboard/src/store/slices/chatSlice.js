@@ -261,8 +261,25 @@ const chatSlice = createSlice({
         if (fileType === "text/plain") return "📝 Text file";
         return "📎 File";
       };
-      const messageText =
-        message.text || formatAttachmentText(message.attachments);
+      let messageText = "";
+      if (message.isCallRecord) {
+        const icon = message.callType === "video" ? "📹" : "📞";
+        if (message.callStatus === "missed")
+          messageText = `${icon} Missed Call`;
+        else if (message.callStatus === "rejected")
+          messageText = `${icon} Call Declined`;
+        else if (message.callStatus === "cancelled")
+          messageText = `${icon} Cancelled`;
+        else if (message.callDuration > 0) {
+          const mins = Math.floor(message.callDuration / 60);
+          const secs = message.callDuration % 60;
+          messageText = `${icon} ${mins > 0 ? mins + "m " : ""}${secs}s`;
+        } else {
+          messageText = `${icon} Call`;
+        }
+      } else {
+        messageText = message.text || formatAttachmentText(message.attachments);
+      }
       const senderId = message.sender?._id || message.sender;
 
       //  USE MESSAGE CREATION TIME (not current time) for sorting
@@ -283,6 +300,10 @@ const chatSlice = createSlice({
         attachments: message.attachments || [],
         _updated: timestamp,
         isGroup: isGroup || false,
+        isCallRecord: message.isCallRecord || false,
+        callType: message.callType || null,
+        callStatus: message.callStatus || null,
+        callDuration: message.callDuration || 0,
       };
 
       console.log(`[REDUX] Set _updated for ${targetKey}:`, {

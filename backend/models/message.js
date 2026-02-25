@@ -65,7 +65,34 @@ const messageSchema = new mongoose.Schema({
     type: Date
   },
   
-  
+  isCallRecord: {
+    type: Boolean,
+    default: false
+  },
+  callRecordId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Call"
+  },
+  callStatus: {
+    type: String,
+    enum: ["missed", "rejected", "completed", "cancelled"],
+  },
+  callType: {
+    type: String,
+    enum: ["audio", "video"],
+  },
+  callDuration: {
+    type: Number,
+    default: 0
+  },
+  callCaller: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+  callReceiver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
   isEdited: {
     type: Boolean,
     default: false
@@ -76,7 +103,7 @@ const messageSchema = new mongoose.Schema({
   originalText: {
     type: String
   },
-    editHistory: [{
+  editHistory: [{
     text: String,
     editedAt: {
       type: Date,

@@ -105,12 +105,14 @@ export const fetchMessages = async (
   limit,
   skip,
 ) => {
-  const messages = await Message.find({
+ const messages = await Message.find({
     conversationId,
-    // Filter out messages deleted for current user
-    $or: [{ isDeleted: false }, { deletedFor: { $ne: currentUserId } }],
+    deletedForEveryone: { $ne: true },
+    deletedFor: { $ne: currentUserId },
   })
-    .populate("sender", "username email")
+   .populate("sender", "username email profileImage")
+    .populate("callCaller", "username email profileImage")
+    .populate("callReceiver", "username email profileImage")
     .populate({
       path: "attachments",
       select:
@@ -128,9 +130,12 @@ export const transformMessages = (messages, currentUserId) => {
   const transformedMessages = messages.map((msg) => {
     const messageObj = msg.toObject();
 
-    // Add deleted info for frontend
-    messageObj.isDeletedForMe = msg.deletedFor.includes(currentUserId);
+    messageObj.isDeletedForMe = msg.deletedFor?.includes(currentUserId);
     messageObj.isDeletedForEveryone = msg.deletedForEveryone;
+
+    if (messageObj.isCallRecord) {
+      return messageObj; 
+    }
 
     if (messageObj.attachments && messageObj.attachments.length > 0) {
       messageObj.attachments = messageObj.attachments.map((att) => ({

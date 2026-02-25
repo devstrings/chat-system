@@ -10,6 +10,7 @@ import {
 } from "../store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
+
 export default function ChatWindow({
   conversationId,
   currentUserId,
@@ -175,7 +176,7 @@ export default function ChatWindow({
     try {
       const messageIds = Array.from(selectedMessages);
 
-      //  Redux async thunk use karo
+      //  Redux async thunk 
       await dispatch(
         bulkDeleteMessages({
           messageIds,
@@ -394,19 +395,77 @@ export default function ChatWindow({
                 </div>
               </div>
 
-              {msgs.map((msg) => (
-                <Message
-                  key={msg._id}
-                  message={msg}
-                  isOwn={
-                    msg.sender._id === currentUserId ||
-                    msg.sender === currentUserId
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={selectedMessages.has(msg._id)}
-                  onToggleSelect={toggleMessageSelection}
-                />
-              ))}
+              {msgs.map((msg) => {
+                if (msg.isCallRecord) {
+                  const isOutgoing = msg.caller === currentUserId;
+                  const isMissed = msg.callStatus === "missed";
+                  const isRejected = msg.callStatus === "rejected";
+                  const isCancelled = msg.callStatus === "cancelled";
+
+                  const getCallIcon = () => {
+                    if (msg.callType === "video") return "";
+                    return "";
+                  };
+
+                  const getCallText = () => {
+                    if (isMissed)
+                      return isOutgoing ? "No Answer" : "Missed Call";
+                    if (isRejected)
+                      return isOutgoing ? "Call Declined" : "Declined";
+                    if (isCancelled)
+                      return isOutgoing ? "Cancelled" : "Cancelled";
+                    if (msg.duration > 0) {
+                      const mins = Math.floor(msg.duration / 60);
+                      const secs = msg.duration % 60;
+                      return `${mins > 0 ? mins + "m " : ""}${secs}s`;
+                    }
+                    return "Call Ended";
+                  };
+
+                  const getCallColor = () => {
+                    if (isMissed || isRejected) return "text-red-500";
+                    return "text-green-500";
+                  };
+
+                  return (
+                    <div
+                      key={msg._id}
+                      className={`flex items-center justify-center my-2`}
+                    >
+                      <div
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${
+                          isMissed || isRejected
+                            ? "bg-red-50 border-red-200"
+                            : "bg-green-50 border-green-200"
+                        }`}
+                      >
+                        <span>{getCallIcon()}</span>
+                        <span className={`font-medium ${getCallColor()}`}>
+                          {isOutgoing ? "↗ " : "↙ "}
+                          {msg.callType === "video" ? "Video" : "Voice"} Call
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          • {getCallText()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Message
+                    key={msg._id}
+                    message={msg}
+                    isOwn={
+                      msg.sender._id === currentUserId ||
+                      msg.sender === currentUserId
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedMessages.has(msg._id)}
+                    onToggleSelect={toggleMessageSelection}
+                  />
+                );
+              })}
             </div>
           ))}
 

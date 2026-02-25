@@ -11,7 +11,7 @@ const generateAccessToken = (userId, username) => {
   return jwt.sign(
     { id: userId, username }, 
     config.jwtSecret, 
-    { expiresIn: '15m' }
+ { expiresIn: config.jwtExpiresIn } 
   );
 };
 
@@ -154,7 +154,7 @@ export const processForgotPassword = async (email) => {
   // Create reset URL
   const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
 
-  //  CONSOLE LOGGING (instead of email)
+  //  CONSOLE LOGGING 
   console.log("\n" + "=".repeat(80));
   console.log(" PASSWORD RESET REQUEST");
   console.log("=".repeat(80));

@@ -284,6 +284,19 @@ export default function Sidebar({
 
   const formatLastMessageText = (message) => {
     if (!message) return "";
+    // Call record
+    if (message.isCallRecord) {
+      const icon = message.callType === "video" ? "📹" : "📞";
+      if (message.callStatus === "missed") return `${icon} Missed Call`;
+      if (message.callStatus === "rejected") return `${icon} Call Declined`;
+      if (message.callStatus === "cancelled") return `${icon} Cancelled`;
+      if (message.callDuration > 0) {
+        const mins = Math.floor(message.callDuration / 60);
+        const secs = message.callDuration % 60;
+        return `${icon} ${mins > 0 ? mins + "m " : ""}${secs}s`;
+      }
+      return `${icon} Call`;
+    }
 
     if (message.attachments && message.attachments.length > 0) {
       const attachment = message.attachments[0];

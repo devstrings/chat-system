@@ -3,6 +3,9 @@ import API_BASE_URL from "../config/api";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/SideBar";
 import ChatWindow from "../components/ChatWindow";
+import { useWebRTC } from "../hooks/useWebRTC";
+import VideoCall from "../components/Call/VideoCall";
+import IncomingCall from "../components/Call/IncomingCall";
 import MessageInput from "../components/MessageInput";
 import ConfirmationDialog, {
   AlertDialog,
@@ -29,9 +32,13 @@ import {
   deleteConversation,
   updateMessageStatus,
   updateMessage,
-  updateGroupMessageInSidebar,  
+  updateGroupMessageInSidebar,
 } from "../store/slices/chatSlice";
-import { addGroupMessage, updateGroup, updateGroupMessage } from "../store/slices/groupSlice";
+import {
+  addGroupMessage,
+  updateGroup,
+  updateGroupMessage,
+} from "../store/slices/groupSlice";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -54,6 +61,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const {
+    startCall,
+    answerCall,
+    endCall,
+    localStream,
+    remoteStream,
+    isMuted,
+    isVideoOff,
+    receiverOnline,
+    toggleMute,
+    toggleVideo,
+  } = useWebRTC();
+
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [activeCall, setActiveCall] = useState(null);
   const [searchInChat, setSearchInChat] = useState("");
   const [showSearchBox, setShowSearchBox] = useState(false);
 
@@ -96,186 +118,229 @@ export default function Dashboard() {
     type: "info",
   });
 
-//SOCKET LISTENERS FOR SIDEBAR UPDATES
-useEffect(() => {
-  if (!socket || !currentUserId) return;
+  //SOCKET LISTENERS FOR SIDEBAR UPDATES
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
 
-  console.log("🔌 Setting up sidebar socket listeners");
+    console.log("🔌 Setting up sidebar socket listeners");
 
-  //  Individual message received
-  const handleSidebarMessage = (msg) => {
-    console.log(" [DASHBOARD] Individual message received:", {
-      id: msg._id,
-      conversationId: msg.conversationId,
-      sender: msg.sender?._id,
-      receiver: msg.receiver?._id,
-      text: msg.text,
-    });
-
-    const senderId = msg.sender?._id || msg.sender;
-    const receiverId = msg.receiver?._id || msg.receiver;
-
-    //  FIND OTHER USER
-    let otherUserId;
-
-    if (
-      senderId === currentUserId ||
-      senderId?.toString() === currentUserId
-    ) {
-      otherUserId = receiverId;
-    } else {
-      otherUserId = senderId;
-    }
-
-    //  CONVERT TO STRING
-    if (typeof otherUserId === "object" && otherUserId?._id) {
-      otherUserId = otherUserId._id;
-    }
-    otherUserId = otherUserId?.toString();
-
-    if (!otherUserId) {
-      console.error(" Cannot determine otherUserId!");
-      return;
-    }
-
-    console.log(` Updating Redux for userId: "${otherUserId}"`);
-
-    //  UPDATE REDUX
-    dispatch(
-      addMessage({
+    //  Individual message received
+    const handleSidebarMessage = (msg) => {
+      console.log(" [DASHBOARD] Individual message received:", {
+        id: msg._id,
         conversationId: msg.conversationId,
-        message: msg,
-        userId: otherUserId,
-        isGroup: false,
-      }),
-    );
-  };
+        sender: msg.sender?._id,
+        receiver: msg.receiver?._id,
+        text: msg.text,
+      });
 
-  //  Group message received
-  const handleSidebarGroupMessage = (msg) => {
-    console.log(" [SIDEBAR] Group message:", msg._id);
+      const senderId = msg.sender?._id || msg.sender;
+      const receiverId = msg.receiver?._id || msg.receiver;
 
-    // Update group messages in groupSlice
-    dispatch(
-      addGroupMessage({
-        groupId: msg.groupId,
-        message: msg,
-      }),
-    );
+      //  FIND OTHER USER
+      let otherUserId;
 
-    // Also update lastMessages for sidebar
-    dispatch(
-      addMessage({
-        conversationId: msg.groupId,
-        message: msg,
-        userId: msg.groupId,
-        isGroup: true,
-      }),
-    );
-  };
+      if (
+        senderId === currentUserId ||
+        senderId?.toString() === currentUserId
+      ) {
+        otherUserId = receiverId;
+      } else {
+        otherUserId = senderId;
+      }
 
-  //  Status update
-  const handleSidebarStatus = (data) => {
-    console.log("[SIDEBAR] Status update:", data.messageId);
+      //  CONVERT TO STRING
+      if (typeof otherUserId === "object" && otherUserId?._id) {
+        otherUserId = otherUserId._id;
+      }
+      otherUserId = otherUserId?.toString();
 
-    dispatch(
-      updateMessageStatus({
-        conversationId: data.conversationId,
-        messageId: data.messageId,
-        status: data.status,
-      }),
-    );
-  };
+      if (!otherUserId) {
+        console.error(" Cannot determine otherUserId!");
+        return;
+      }
 
-  //  Message edited (individual)
-  const handleSidebarEdit = (data) => {
-    console.log(" [SIDEBAR] Message edited:", data.messageId);
+      console.log(` Updating Redux for userId: "${otherUserId}"`);
 
-    dispatch(
-      updateMessage({
-        conversationId: data.conversationId,
-        messageId: data.messageId,
-        text: data.text,
-        editedAt: data.editedAt,
-      }),
-    );
-  };
+      //  UPDATE REDUX
+      dispatch(
+        addMessage({
+          conversationId: msg.conversationId,
+          message: msg,
+          userId: otherUserId,
+          isGroup: false,
+        }),
+      );
+    };
 
-  //   Group message edited (NEW HANDLER - ADD THIS)
-  const handleSidebarGroupEdit = (data) => {
-    console.log(" [SIDEBAR] Group message edited:", data);
+    //  Group message received
+    const handleSidebarGroupMessage = (msg) => {
+      console.log(" [SIDEBAR] Group message:", msg._id);
 
-    // Update in groupSlice (chat window)
-    dispatch(
-      updateGroupMessage({
-        groupId: data.groupId,
-        messageId: data.messageId,
-        text: data.text,
-        editedAt: data.editedAt,
-      }),
-    );
+      // Update group messages in groupSlice
+      dispatch(
+        addGroupMessage({
+          groupId: msg.groupId,
+          message: msg,
+        }),
+      );
 
-    //  Update in chatSlice (sidebar lastMessage)
-    dispatch(
-      updateGroupMessageInSidebar({
-        groupId: data.groupId,
-        messageId: data.messageId,
-        text: data.text,
-        editedAt: data.editedAt,
-      }),
-    );
-  };
+      // Also update lastMessages for sidebar
+      dispatch(
+        addMessage({
+          conversationId: msg.groupId,
+          message: msg,
+          userId: msg.groupId,
+          isGroup: true,
+        }),
+      );
+    };
 
-  socket.on("receiveMessage", handleSidebarMessage);
-  socket.on("receiveGroupMessage", handleSidebarGroupMessage);
-  socket.on("messageStatusUpdate", handleSidebarStatus);
-  socket.on("messageEdited", handleSidebarEdit);
-  socket.on("groupMessageEdited", handleSidebarGroupEdit); 
+    //  Status update
+    const handleSidebarStatus = (data) => {
+      console.log("[SIDEBAR] Status update:", data.messageId);
 
-  const handleConversationUpdated = (data) => {
-  console.log(" [SIDEBAR] conversationUpdated received:", data);
+      dispatch(
+        updateMessageStatus({
+          conversationId: data.conversationId,
+          messageId: data.messageId,
+          status: data.status,
+        }),
+      );
+    };
 
-  // lastMessages mein se sahi userId dhundo
-  const otherUserId = Object.keys(lastMessages).find(
-    (uid) => lastMessages[uid]?.conversationId === data.conversationId
-  );
+    //  Message edited (individual)
+    const handleSidebarEdit = (data) => {
+      console.log(" [SIDEBAR] Message edited:", data.messageId);
 
-  if (!otherUserId) {
-    console.warn(" Could not find userId for conversationId:", data.conversationId);
-    return;
-  }
+      dispatch(
+        updateMessage({
+          conversationId: data.conversationId,
+          messageId: data.messageId,
+          text: data.text,
+          editedAt: data.editedAt,
+        }),
+      );
+    };
 
-  dispatch(
-    addMessage({
-      conversationId: data.conversationId,
-      message: {
-        _id: `update-${Date.now()}`,
-        text: data.lastMessage ?? "",
-        createdAt: new Date(data.lastMessageTime || Date.now()).toISOString(),
-        sender: currentUserId,
-        status: "sent",
-        attachments: [],
-        _updated: Date.now(),
-      },
-      userId: otherUserId, 
-      isGroup: false,
-    })
-  );
-};
+    //   Group message edited
+    const handleSidebarGroupEdit = (data) => {
+      console.log(" [SIDEBAR] Group message edited:", data);
 
-socket.on("conversationUpdated", handleConversationUpdated);
+      // Update in groupSlice (chat window)
+      dispatch(
+        updateGroupMessage({
+          groupId: data.groupId,
+          messageId: data.messageId,
+          text: data.text,
+          editedAt: data.editedAt,
+        }),
+      );
 
-return () => {
-  console.log(" Cleaning up sidebar socket listeners");
-  socket.off("receiveMessage", handleSidebarMessage);
-  socket.off("receiveGroupMessage", handleSidebarGroupMessage);
-  socket.off("messageStatusUpdate", handleSidebarStatus);
-  socket.off("messageEdited", handleSidebarEdit);
-  socket.off("groupMessageEdited", handleSidebarGroupEdit);
-  socket.off("conversationUpdated", handleConversationUpdated); 
-};
-}, [socket, currentUserId, dispatch]);
-  // Load all statuses
+      //  Update in chatSlice (sidebar lastMessage)
+      dispatch(
+        updateGroupMessageInSidebar({
+          groupId: data.groupId,
+          messageId: data.messageId,
+          text: data.text,
+          editedAt: data.editedAt,
+        }),
+      );
+    };
+
+    socket.on("receiveMessage", handleSidebarMessage);
+    socket.on("receiveGroupMessage", handleSidebarGroupMessage);
+    socket.on("messageStatusUpdate", handleSidebarStatus);
+    socket.on("messageEdited", handleSidebarEdit);
+    socket.on("groupMessageEdited", handleSidebarGroupEdit);
+
+    const handleConversationUpdated = (data) => {
+      console.log(" [SIDEBAR] conversationUpdated received:", data);
+
+      // lastMessages mein se sahi userId dhundo
+      const otherUserId = Object.keys(lastMessages).find(
+        (uid) => lastMessages[uid]?.conversationId === data.conversationId,
+      );
+
+      if (!otherUserId) {
+        console.warn(
+          " Could not find userId for conversationId:",
+          data.conversationId,
+        );
+        return;
+      }
+
+      dispatch(
+        addMessage({
+          conversationId: data.conversationId,
+          message: {
+            _id: `update-${Date.now()}`,
+            text: data.lastMessage ?? "",
+            createdAt: new Date(
+              data.lastMessageTime || Date.now(),
+            ).toISOString(),
+            sender: currentUserId,
+            status: "sent",
+            attachments: [],
+            _updated: Date.now(),
+          },
+          userId: otherUserId,
+          isGroup: false,
+        }),
+      );
+    };
+
+    socket.on("conversationUpdated", handleConversationUpdated);
+    //  Call record - sidebar update
+    const handleCallRecord = async ({ callMessage, otherUserId }) => {
+      console.log(" Call record received:", callMessage);
+      console.log(" otherUserId:", otherUserId);
+      console.log(" currentUserId:", currentUserId);
+
+      let convId = lastMessagesRef.current[otherUserId]?.conversationId;
+
+      if (!convId) {
+        try {
+          const res = await axiosInstance.post(
+            `${API_BASE_URL}/api/messages/conversation`,
+            { otherUserId, skipCreate: true },
+          );
+          convId = res.data?._id;
+        } catch (err) {
+          console.log(" API fetch failed:", err);
+          return;
+        }
+      }
+
+      if (!convId) return;
+
+      dispatch(
+        addMessage({
+          conversationId: convId,
+          message: {
+            ...callMessage,
+            conversationId: convId,
+            _updated: Date.now(),
+          },
+          userId: otherUserId,
+          isGroup: false,
+        }),
+      );
+    };
+
+    socket.on("call:record", handleCallRecord);
+
+    return () => {
+      console.log(" Cleaning up sidebar socket listeners");
+      socket.off("receiveMessage", handleSidebarMessage);
+      socket.off("receiveGroupMessage", handleSidebarGroupMessage);
+      socket.off("messageStatusUpdate", handleSidebarStatus);
+      socket.off("messageEdited", handleSidebarEdit);
+      socket.off("groupMessageEdited", handleSidebarGroupEdit);
+      socket.off("conversationUpdated", handleConversationUpdated);
+      socket.off("call:record", handleCallRecord);
+    };
+  }, [socket, currentUserId, dispatch, lastMessages]); // Load all statuses
   useEffect(() => {
     const loadAllStatuses = async () => {
       try {
@@ -735,15 +800,35 @@ return () => {
 
             if (visibleMessages.length > 0) {
               const lastMsg = visibleMessages[visibleMessages.length - 1];
+              console.log(" lastMsg:", {
+                id: lastMsg._id,
+                text: lastMsg.text,
+                isCallRecord: lastMsg.isCallRecord,
+                callStatus: lastMsg.callStatus,
+              });
 
               const messageTimestamp = new Date(lastMsg.createdAt).getTime();
 
-              //  Update Redux with timestamp
+              let processedMsg = { ...lastMsg };
+              if (lastMsg.isCallRecord) {
+                const icon = lastMsg.callType === "video" ? "📹" : "📞";
+                processedMsg.text =
+                  lastMsg.callStatus === "missed"
+                    ? `${icon} Missed Call`
+                    : lastMsg.callStatus === "rejected"
+                      ? `${icon} Call Declined`
+                      : lastMsg.callStatus === "cancelled"
+                        ? `${icon} Cancelled`
+                        : lastMsg.callDuration > 0
+                          ? `${icon} ${lastMsg.callDuration}s`
+                          : `${icon} Call`;
+              }
+
               dispatch(
                 addMessage({
                   conversationId,
                   message: {
-                    ...lastMsg,
+                    ...processedMsg,
                     _loadedTimestamp: messageTimestamp,
                   },
                   userId: user._id,
@@ -806,14 +891,35 @@ return () => {
 
             if (visibleMessages.length > 0) {
               const lastMsg = visibleMessages[visibleMessages.length - 1];
+              console.log(" lastMsg:", {
+                id: lastMsg._id,
+                text: lastMsg.text,
+                isCallRecord: lastMsg.isCallRecord,
+                callStatus: lastMsg.callStatus,
+              });
 
               const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+
+              let processedMsg = { ...lastMsg };
+              if (lastMsg.isCallRecord) {
+                const icon = lastMsg.callType === "video" ? "📹" : "📞";
+                processedMsg.text =
+                  lastMsg.callStatus === "missed"
+                    ? `${icon} Missed Call`
+                    : lastMsg.callStatus === "rejected"
+                      ? `${icon} Call Declined`
+                      : lastMsg.callStatus === "cancelled"
+                        ? `${icon} Cancelled`
+                        : lastMsg.callDuration > 0
+                          ? `${icon} ${lastMsg.callDuration}s`
+                          : `${icon} Call`;
+              }
 
               dispatch(
                 addMessage({
                   conversationId: group._id,
                   message: {
-                    ...lastMsg,
+                    ...processedMsg,
                     _loadedTimestamp: messageTimestamp,
                   },
                   isGroup: true,
@@ -1160,9 +1266,10 @@ return () => {
                         )}
                       </div>
 
-                      {!isGroupChat && onlineUsers.includes(selectedUser._id) && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
+                      {!isGroupChat &&
+                        onlineUsers.includes(selectedUser._id) && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        )}
                     </div>
 
                     {/* NAME & STATUS */}
@@ -1195,6 +1302,62 @@ return () => {
 
                   {/* HEADER ACTIONS (Search, Menu) */}
                   <div className="flex items-center gap-1 md:gap-2 relative">
+                    {/* CALL BUTTONS - */}
+                    {!isGroupChat && selectedUser && (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (!socket) {
+                              alert("Not connected. Please refresh.");
+                              return;
+                            }
+                            console.log("Calling:", selectedUser._id);
+                            startCall(selectedUser._id, "audio");
+                            setActiveCall({
+                              user: selectedUser,
+                              type: "audio",
+                            });
+                            setShowVideoCall(true);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-green-600"
+                          title="Voice Call"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!socket) {
+                              alert("Not connected. Please refresh.");
+                              return;
+                            }
+                            console.log(" Video calling:", selectedUser._id);
+                            startCall(selectedUser._id, "video");
+                            setActiveCall({
+                              user: selectedUser,
+                              type: "video",
+                            });
+                            setShowVideoCall(true);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-blue-600"
+                          title="Video Call"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+
                     <button
                       onClick={() => setShowSearchBox(!showSearchBox)}
                       className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
@@ -1253,7 +1416,7 @@ return () => {
                                     message: ` ${selectedUser.username}\n📧 ${
                                       selectedUser.email
                                     }\n${
-                                  onlineUsers.includes(selectedUser._id)
+                                      onlineUsers.includes(selectedUser._id)
                                         ? " Online"
                                         : " Offline"
                                     }`,
@@ -1423,7 +1586,48 @@ return () => {
           )}
         </div>
       </div>
-
+      {/* Video Call Modal */}
+      {showVideoCall && activeCall && (
+        <VideoCall
+          remoteUser={activeCall.user}
+          callType={activeCall.type}
+          localStream={localStream}
+          remoteStream={remoteStream}
+          isMuted={isMuted}
+          isVideoOff={isVideoOff}
+          receiverOnline={receiverOnline}
+          onToggleMute={toggleMute}
+          onToggleVideo={toggleVideo}
+          onEndCall={() => {
+            endCall();
+            setShowVideoCall(false);
+            setActiveCall(null);
+          }}
+          onClose={() => {
+            setShowVideoCall(false);
+            setActiveCall(null);
+          }}
+        />
+      )}
+      {/* Incoming Call */}
+      <IncomingCall
+        answerCall={answerCall}
+        onCallAccepted={(callData) => {
+          setActiveCall({
+            user: callData.callerInfo,
+            type: callData.callType,
+          });
+          setShowVideoCall(true);
+        }}
+        onCallEnded={() => {
+          setShowVideoCall(false);
+          setActiveCall(null);
+        }}
+        onCallRejected={() => {
+          setShowVideoCall(false);
+          setActiveCall(null);
+        }}
+      />
       {/* DIALOGS */}
       <ConfirmationDialog
         isOpen={clearChatDialog.isOpen}

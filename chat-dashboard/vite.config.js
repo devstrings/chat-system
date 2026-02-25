@@ -9,21 +9,22 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     
-    server: {
-      port: 5173,
-      proxy: {
-        '/api': {
-          target: env.VITE_API_URL || 'http://localhost:5000',
-          changeOrigin: true,
-          secure: false,
-        },
-        '/socket.io': {
-          target: env.VITE_API_URL || 'http://localhost:5000',
-          changeOrigin: true,
-          ws: true,
-        }
-      }
+ server: {
+  port: 5173,
+  host: true,  
+  proxy: {
+    '/api': {
+      target: env.VITE_API_URL || 'http://backend:5000',  // ← localhost → backend
+      changeOrigin: true,
+      secure: false,
     },
+    '/socket.io': {
+      target: env.VITE_API_URL || 'http://backend:5000',  // ← localhost → backend
+      changeOrigin: true,
+      ws: true,
+    }
+  }
+},
     
     build: {
       outDir: 'dist',
