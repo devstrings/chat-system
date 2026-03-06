@@ -3,6 +3,7 @@ import passport from "../config/passport.js";
 import {
   register,
   login,
+  logout,
   googleCallback,
   facebookCallback,
   forgotPassword,
@@ -47,6 +48,23 @@ router.post("/login", loginValidation, validate, login);
 
 /**
  * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user and invalidate refresh token
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Logout failed
+ */
+router.post("/logout", verifyToken, logout);
+/**
+ * @swagger
  * /auth/refresh-token:
  *   post:
  *     summary: Refresh JWT token
@@ -65,7 +83,7 @@ router.post(
   "/forgot-password",
   forgotPasswordValidation,
   validate,
-  forgotPassword
+  forgotPassword,
 );
 
 /**
@@ -79,7 +97,7 @@ router.post(
   "/reset-password",
   resetPasswordValidation,
   validate,
-  resetPassword
+  resetPassword,
 );
 
 /**
@@ -94,7 +112,7 @@ router.post(
   verifyToken,
   setPasswordValidation,
   validate,
-  setPassword
+  setPassword,
 );
 
 /**
@@ -109,7 +127,7 @@ router.post(
   verifyToken,
   changePasswordValidation,
   validate,
-  changePassword
+  changePassword,
 );
 
 /**
@@ -133,7 +151,7 @@ router.get(
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
-  })
+  }),
 );
 
 /**
@@ -149,7 +167,7 @@ router.get(
     session: false,
     failureRedirect: `${config.frontend.loginUrl}?error=google_auth_failed`,
   }),
-  googleCallback
+  googleCallback,
 );
 
 /**
@@ -164,7 +182,7 @@ router.get(
   passport.authenticate("facebook", {
     scope: ["email"],
     session: false,
-  })
+  }),
 );
 
 /**
@@ -180,14 +198,14 @@ router.get(
     session: false,
     failureRedirect: `${config.frontend.loginUrl}?error=facebook_auth_failed`,
   }),
-  facebookCallback
+  facebookCallback,
 );
 
 // ERROR HANDLER
 router.use((err, req, res, next) => {
   console.error(" OAuth error:", err.message);
   res.redirect(
-    `${config.frontend.loginUrl}?error=${encodeURIComponent(err.message)}`
+    `${config.frontend.loginUrl}?error=${encodeURIComponent(err.message)}`,
   );
 });
 

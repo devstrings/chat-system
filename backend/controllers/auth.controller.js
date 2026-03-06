@@ -1,13 +1,10 @@
-
 import * as authService from "../services/auth.service.js";
 import config from "../config/index.js";
-
+import { redisClient } from "../config/redis.js";
 // REGISTER CONTROLLER
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
-  
 
     // Service call
     const user = await authService.registerUser(username, email, password);
@@ -21,7 +18,7 @@ export const register = async (req, res) => {
     if (err.message === "Email already registered") {
       return res.status(400).json({ message: err.message });
     }
-    res.status(500).json({ message: "Registration failed", error: err.message });
+    res.status(500).json({ message: "Registration failed" });
   }
 };
 
@@ -29,8 +26,6 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-   
 
     // Service call
     const result = await authService.loginUser(email, password);
@@ -50,15 +45,14 @@ export const login = async (req, res) => {
     if (err.message.includes("Google or Facebook")) {
       return res.status(400).json({ message: err.message });
     }
-    res.status(500).json({ message: "Login failed", error: err.message });
+    res.status(500).json({ message: "Login failed" });
   }
 };
 
 // GOOGLE CALLBACK CONTROLLER
-export const googleCallback = (req, res) => {
+export const googleCallback = async (req, res) => {
   try {
-    // Service call
-    const redirectUrl = authService.handleGoogleCallback(req.user);
+    const redirectUrl = await authService.handleGoogleCallback(req.user);
     res.redirect(redirectUrl);
   } catch (err) {
     console.error(" Google callback error:", err);
@@ -67,10 +61,9 @@ export const googleCallback = (req, res) => {
 };
 
 // FACEBOOK CALLBACK CONTROLLER
-export const facebookCallback = (req, res) => {
+export const facebookCallback = async (req, res) => {
   try {
-    // Service call
-    const redirectUrl = authService.handleFacebookCallback(req.user);
+    const redirectUrl = await authService.handleFacebookCallback(req.user);
     res.redirect(redirectUrl);
   } catch (err) {
     console.error("Facebook callback error:", err);
@@ -82,7 +75,6 @@ export const facebookCallback = (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
 
     // Service call
     const result = await authService.processForgotPassword(email);
@@ -98,7 +90,6 @@ export const forgotPassword = async (req, res) => {
     console.error("Forgot password error:", err);
     res.status(500).json({
       message: "Failed to process request",
-      error: err.message,
     });
   }
 };
@@ -107,8 +98,6 @@ export const forgotPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
-
-  
 
     // Service call
     const result = await authService.processResetPassword(token, newPassword);
@@ -121,7 +110,6 @@ export const resetPassword = async (req, res) => {
     }
     res.status(500).json({
       message: "Failed to reset password",
-      error: err.message,
     });
   }
 };
@@ -131,8 +119,6 @@ export const setPassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
     const userId = req.user.id || req.user.userId;
-
- 
 
     // Service call
     const result = await authService.setUserPassword(userId, newPassword);
@@ -148,7 +134,6 @@ export const setPassword = async (req, res) => {
     }
     res.status(500).json({
       message: "Failed to set password",
-      error: err.message,
     });
   }
 };
@@ -169,7 +154,6 @@ export const getCurrentUser = async (req, res) => {
     }
     res.status(500).json({
       message: "Failed to fetch user",
-      error: err.message,
     });
   }
 };
@@ -180,9 +164,12 @@ export const changePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-
     // Service call
-    const result = await authService.changeUserPassword(userId, oldPassword, newPassword);
+    const result = await authService.changeUserPassword(
+      userId,
+      oldPassword,
+      newPassword,
+    );
 
     res.json(result);
   } catch (err) {
@@ -198,7 +185,6 @@ export const changePassword = async (req, res) => {
     }
     res.status(500).json({
       message: "Failed to change password",
-      error: err.message,
     });
   }
 };
@@ -207,15 +193,21 @@ export const changePassword = async (req, res) => {
 export const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-
-   
-
-    // Service call
-    const result = authService.refreshAccessToken(refreshToken);
-
+    const result = await authService.refreshAccessToken(refreshToken);
     res.json(result);
   } catch (err) {
     console.error(" Refresh token error:", err);
     return res.status(403).json({ message: "Invalid refresh token" });
+  }
+};
+// LOGOUT CONTROLLER
+export const logout = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await redisClient.del(`refresh:${userId}`);
+    res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    res.status(500).json({ message: "Logout failed" });
   }
 };

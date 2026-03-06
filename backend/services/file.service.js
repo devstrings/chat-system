@@ -1,4 +1,3 @@
-
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -21,7 +20,15 @@ const calculateFileHash = (filePath) =>
 export const processFileDownload = async (filename, userId) => {
   console.log(" Download request:", { filename, userId });
 
-  //  Try multiple possible file paths
+  // Extra safety check
+  if (
+    filename.includes("..") ||
+    filename.includes("/") ||
+    filename.includes("\\")
+  ) {
+    throw new Error("File not found on server");
+  }
+
   const possiblePaths = [
     path.join(process.cwd(), "uploads", "messages", filename),
     path.join(process.cwd(), "uploads", filename),
@@ -75,7 +82,9 @@ export const processFileDownload = async (filename, userId) => {
   }
 
   if (!hasAccess) {
-    throw new Error("Access denied: You don't have permission to access this file");
+    throw new Error(
+      "Access denied: You don't have permission to access this file",
+    );
   }
 
   return { filePath, attachment };
@@ -107,7 +116,9 @@ export const verifyUserAccess = async (conversationId, userId) => {
   }
 
   if (!isParticipant) {
-    throw new Error("Access denied: You are not a participant in this conversation");
+    throw new Error(
+      "Access denied: You are not a participant in this conversation",
+    );
   }
 
   return true;
@@ -124,9 +135,7 @@ export const calculateAudioDuration = async (file) => {
       audioDuration = await getAudioDurationInSeconds(file.path);
       audioDuration = Math.floor(audioDuration);
 
-      isVoiceMessage =
-        file.originalname.includes("voice_") ||
-        false; // This will be set from request body in controller
+      isVoiceMessage = file.originalname.includes("voice_") || false; // This will be set from request body in controller
 
       console.log(
         `Audio duration: ${audioDuration}s, Voice: ${isVoiceMessage}`,
@@ -151,14 +160,20 @@ export const checkDuplicateFile = async (fileHash, conversationId) => {
 };
 
 // UPLOAD FILE SERVICE
-export const processFileUpload = async (file, conversationId, userId, isVoiceMessageFlag) => {
+export const processFileUpload = async (
+  file,
+  conversationId,
+  userId,
+  isVoiceMessageFlag,
+) => {
   console.log(" Upload started");
   console.log(" File:", file);
   console.log(" User ID extracted:", userId);
 
   // Calculate audio duration for audio files
-  const { audioDuration, isVoiceMessage: audioIsVoice } = await calculateAudioDuration(file);
-  
+  const { audioDuration, isVoiceMessage: audioIsVoice } =
+    await calculateAudioDuration(file);
+
   // Override with explicit flag from request
   const isVoiceMessage = isVoiceMessageFlag === "true" || audioIsVoice;
 
@@ -172,7 +187,7 @@ export const processFileUpload = async (file, conversationId, userId, isVoiceMes
 
   if (existingAttachment) {
     console.log(" Duplicate file found, reusing existing");
-    
+
     // Clean up uploaded file since we're using existing one
     if (fs.existsSync(file.path)) {
       fs.unlinkSync(file.path);

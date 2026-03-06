@@ -21,11 +21,10 @@ export default function ForgotPassword() {
         email,
       });
 
-      //  Get reset URL from response (development only)
-      if (res.data.resetUrl) {
+      // handle development reset URL
+      if (import.meta.env.DEV && res.data.resetUrl) {
         setResetUrl(res.data.resetUrl);
       }
-
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send reset email");

@@ -1,7 +1,11 @@
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import Group from "../models/Group.js";
-
+import {
+  MESSAGE_EDIT_LIMIT_MS,
+  MESSAGE_DELETE_LIMIT_MS,
+  GROUP_MESSAGE_EDIT_LIMIT_MS,
+} from "../utils/constants.js";
 export function handleMessage(io, socket) {
   console.log(` User connected: ${socket.user.id}`);
 
@@ -506,9 +510,9 @@ export function handleMessage(io, socket) {
         }
 
         const messageAge = Date.now() - new Date(message.createdAt).getTime();
-        const fiveMinutes = 5 * 60 * 1000;
+        // const fiveMinutes = 5 * 60 * 1000;
 
-        if (messageAge > fiveMinutes) {
+        if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
           socket.emit("errorMessage", {
             message: "Cannot delete for everyone after 5 minutes",
           });
@@ -618,15 +622,14 @@ export function handleMessage(io, socket) {
 
       // Check 3 hour limit
       const messageAge = Date.now() - new Date(message.createdAt).getTime();
-      const threeHours = 3 * 60 * 60 * 1000;
+      // const threeHours = 3 * 60 * 60 * 1000;
 
-      if (messageAge > threeHours) {
+      if (messageAge > MESSAGE_EDIT_LIMIT_MS) {
         socket.emit("errorMessage", {
-          message: "Cannot edit after 3 hours",
+          message: "Cannot edit after 15 minutes",
         });
         return;
       }
-
       // Save to history
       if (!message.editHistory) {
         message.editHistory = [];
@@ -885,9 +888,8 @@ export function handleMessage(io, socket) {
 
       // Check 5 minute time limit
       const messageAge = Date.now() - new Date(message.createdAt).getTime();
-      const fiveMinutes = 5 * 60 * 1000;
-
-      if (messageAge > fiveMinutes) {
+      // const fiveMinutes = 5 * 60 * 1000;
+      if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
         socket.emit("errorMessage", {
           message: "Cannot delete for everyone after 5 minutes",
         });
@@ -1028,11 +1030,11 @@ export function handleMessage(io, socket) {
 
       // Check 3 hour limit
       const messageAge = Date.now() - new Date(message.createdAt).getTime();
-      const threeHours = 3 * 60 * 60 * 1000;
+      // const threeHours = 3 * 60 * 60 * 1000;
 
-      if (messageAge > threeHours) {
+      if (messageAge > GROUP_MESSAGE_EDIT_LIMIT_MS) {
         socket.emit("errorMessage", {
-          message: "Cannot edit after 3 hours",
+          message: "Cannot edit after 15 minutes",
         });
         return;
       }

@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
-import { SOCKET_URL } from "../../config/api";import {
+import { SOCKET_URL } from "../../config/api";
+import {
   setSocket,
   setConnected,
   setOnlineUsers,
@@ -48,16 +49,16 @@ const socketMiddleware = (store) => {
       }
 
       console.log(" Initializing socket connection...");
-socket = io(SOCKET_URL, {
-  auth: { token: accessToken },
-  transports: ["websocket"],
-  reconnection: true,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-  reconnectionAttempts: Infinity,
-  timeout: 20000,
-  upgrade: false,
-});
+      socket = io(SOCKET_URL, {
+        auth: { token: accessToken },
+        transports: ["websocket"],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        timeout: 20000,
+        upgrade: false,
+      });
 
       tokenRef = accessToken;
 
@@ -91,7 +92,6 @@ socket = io(SOCKET_URL, {
 
       // ONLINE USERS
       socket.on("onlineUsersList", (data) => {
-        console.log(" Online users list:", data.onlineUsers?.length || 0);
         if (data.onlineUsers && Array.isArray(data.onlineUsers)) {
           const userIds = data.onlineUsers.map((u) => u._id);
           store.dispatch(setOnlineUsers(userIds));
@@ -99,7 +99,6 @@ socket = io(SOCKET_URL, {
       });
 
       socket.on("userOnline", (data) => {
-        console.log(" User came online:", data.user?.username);
         store.dispatch(addOnlineUser(data.userId));
       });
 
@@ -110,8 +109,6 @@ socket = io(SOCKET_URL, {
 
       // INDIVIDUAL CHAT MESSAGES
       socket.on("receiveMessage", (msg) => {
-        console.log("Received message:", msg._id);
-
         const senderId = msg.sender?._id || msg.sender;
         const receiverId = msg.receiver?._id || msg.receiver;
 
@@ -270,8 +267,6 @@ socket = io(SOCKET_URL, {
 
       //  GROUP CHAT MESSAGES
       socket.on("receiveGroupMessage", (msg) => {
-        console.log(" Group message received:", msg._id);
-
         // Group messages update
         store.dispatch(
           addGroupMessage({

@@ -1,0 +1,3 @@
+export const MESSAGE_EDIT_LIMIT_MS = 15 * 60 * 1000;
+export const MESSAGE_DELETE_LIMIT_MS = 5 * 60 * 1000;
+export const GROUP_MESSAGE_EDIT_LIMIT_MS = 15 * 60 * 1000;

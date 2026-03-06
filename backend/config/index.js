@@ -9,7 +9,8 @@ console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 const requiredEnvVars = [
   "MONGO_URI",
   "JWT_SECRET",
-  "SESSION_SECRET",  
+  "JWT_REFRESH_SECRET",
+  "SESSION_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "FACEBOOK_APP_ID",
@@ -30,12 +31,14 @@ if (missingVars.length > 0) {
 const config = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
+  serverUrl: process.env.BACKEND_URL || "http://localhost:5000",
 
   mongoUri: process.env.MONGO_URI,
 
-  jwtSecret: process.env.JWT_SECRET,
-  sessionSecret: process.env.SESSION_SECRET,  
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+jwtSecret: process.env.JWT_SECRET,
+jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
+sessionSecret: process.env.SESSION_SECRET,  
+jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
 
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
 

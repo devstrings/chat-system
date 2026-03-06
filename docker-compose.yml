@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Backend Service
+  backend:
+    build: ./backend
+    container_name: chat_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGO_URI=mongodb://host.docker.internal:27017/chat-system
+      - REDIS_URL=redis://host.docker.internal:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=7d
+      - SESSION_SECRET=${SESSION_SECRET}
+      - FRONTEND_URL=http://localhost:5173
+      - BACKEND_URL=http://localhost:5000
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET}
+      - FACEBOOK_CALLBACK_URL=http://localhost:5000/api/auth/facebook/callback
+      - FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback
+      - FRONTEND_LOGIN_URL=http://localhost:5173/login
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_FROM=Chat System <noreply@chatsystem.com>
+      - RESET_TOKEN_EXPIRY=15
+      - TURN_SERVER=turn:localhost:3478
+      - TURN_USERNAME=chatuser
+      - TURN_PASSWORD=chatpassword123
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - chat_network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - coturn
+
+  # Frontend Service
+  frontend:
+    build: ./chat-dashboard
+    container_name: chat_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+      - VITE_SOCKET_URL=http://localhost:5000
+      - VITE_TURN_SERVER=turn:localhost:3478
+      - VITE_TURN_USERNAME=chatuser
+      - VITE_TURN_PASSWORD=chatpassword123
+    depends_on:
+      - backend
+    networks:
+      - chat_network
+    volumes:
+      - ./chat-dashboard:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+
+  # Coturn TURN Server
+  coturn:
+    image: coturn/coturn:latest
+    container_name: chat_coturn
+    restart: always
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "49152-49200:49152-49200/udp"
+    command: >
+      -n
+      --log-file=stdout
+      --min-port=49152
+      --max-port=49200
+      --realm=localhost
+      --user=chatuser:chatpassword123
+      --lt-cred-mech
+      --fingerprint
+      --no-multicast-peers
+      --no-cli
+      --no-tls
+      --no-dtls
+      --listening-ip=0.0.0.0
+      --external-ip=127.0.0.1
+      --allow-loopback-peers
+    networks:
+      - chat_network
+
+networks:
+  chat_network:
+    driver: bridge

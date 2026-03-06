@@ -6,7 +6,10 @@ import BlockedUser from "../../models/BlockedUser.js";
 import User from "../../models/User.js";
 import Message from "../../models/Message.js";
 import Status from "../../models/Status.js";
-
+import {
+  MESSAGE_EDIT_LIMIT_MS,
+  MESSAGE_DELETE_LIMIT_MS,
+} from "../../utils/constants.js";
 // HELPER FUNCTIONS
 
 const sendError = (res, statusCode, message) => {
@@ -19,11 +22,11 @@ export const validateUserExists = async (req, res, next) => {
   try {
     const userId = req.user.id || req.user.userId;
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return sendError(res, 404, "User not found");
     }
-    
+
     req.validatedUser = user;
     next();
   } catch (err) {
@@ -47,7 +50,7 @@ export const validateFriendship = async (req, res, next) => {
     console.log(" Validating friendship:", {
       currentUserId,
       otherUserId,
-      skipCreate
+      skipCreate,
     });
 
     if (!otherUserId) {
@@ -64,12 +67,17 @@ export const validateFriendship = async (req, res, next) => {
     const friendship = await Friendship.findOne({
       $or: [
         { user1: currentUserId, user2: otherUserId },
-        { user1: otherUserId, user2: currentUserId }
+        { user1: otherUserId, user2: currentUserId },
       ],
-      status: 'accepted' 
+      status: "accepted",
     });
 
-    console.log(" Friendship found:", !!friendship, "Status:", friendship?.status || 'not found');
+    console.log(
+      " Friendship found:",
+      !!friendship,
+      "Status:",
+      friendship?.status || "not found",
+    );
 
     if (!friendship) {
       console.log(" Not friends or friendship not accepted");
@@ -93,11 +101,15 @@ export const validateNotBlocked = async (req, res, next) => {
     }
 
     const currentUserId = req.user.id;
-    const targetUserId = req.body.otherUserId || req.body.receiverId || req.body.userId || req.params.userId;
+    const targetUserId =
+      req.body.otherUserId ||
+      req.body.receiverId ||
+      req.body.userId ||
+      req.params.userId;
 
     console.log(" Checking block status:", {
       currentUserId,
-      targetUserId
+      targetUserId,
     });
 
     //  Skip if no target user
@@ -109,13 +121,17 @@ export const validateNotBlocked = async (req, res, next) => {
     const isBlocked = await BlockedUser.findOne({
       $or: [
         { blocker: currentUserId, blocked: targetUserId },
-        { blocker: targetUserId, blocked: currentUserId }
-      ]
+        { blocker: targetUserId, blocked: currentUserId },
+      ],
     });
 
     if (isBlocked) {
       console.log(" Users are blocked");
-      return sendError(res, 403, "Cannot perform this action - users are blocked");
+      return sendError(
+        res,
+        403,
+        "Cannot perform this action - users are blocked",
+      );
     }
 
     console.log(" Not blocked");
@@ -176,7 +192,8 @@ export const validateFriendRequestForReject = async (req, res, next) => {
 
 export const validateNotSelf = (req, res, next) => {
   const currentUserId = req.user.id;
-  const targetUserId = req.body.receiverId || req.body.userId || req.params.userId;
+  const targetUserId =
+    req.body.receiverId || req.body.userId || req.params.userId;
 
   if (currentUserId === targetUserId) {
     return sendError(res, 400, "Cannot perform this action on yourself");
@@ -223,27 +240,33 @@ export const validateConversationParticipant = async (req, res, next) => {
     console.log(" [VALIDATE PARTICIPANT] Input:", {
       currentUserId,
       conversationId: conversation._id,
-      participants: conversation.participants.map(p => p.toString()),
-      deletedBy: conversation.deletedBy?.map(d => ({
+      participants: conversation.participants.map((p) => p.toString()),
+      deletedBy: conversation.deletedBy?.map((d) => ({
         userId: d.userId?.toString(),
-        deletedAt: d.deletedAt
-      }))
+        deletedAt: d.deletedAt,
+      })),
     });
 
     //  Check if conversation was deleted by user
-    if (conversation.deletedBy?.some(d => d.userId?.toString() === currentUserId.toString())) {
+    if (
+      conversation.deletedBy?.some(
+        (d) => d.userId?.toString() === currentUserId.toString(),
+      )
+    ) {
       console.log(" [VALIDATE PARTICIPANT] Conversation deleted by user");
       return sendError(res, 404, "Conversation not found");
     }
 
     //  Check participant with proper string conversion
-    const participantsAsStrings = conversation.participants.map(p => p.toString());
+    const participantsAsStrings = conversation.participants.map((p) =>
+      p.toString(),
+    );
     const userIdAsString = currentUserId.toString();
-    
+
     console.log(" [VALIDATE PARTICIPANT] Comparison:", {
       userIdAsString,
       participantsAsStrings,
-      includes: participantsAsStrings.includes(userIdAsString)
+      includes: participantsAsStrings.includes(userIdAsString),
     });
 
     const isParticipant = participantsAsStrings.includes(userIdAsString);
@@ -278,16 +301,16 @@ export const validateConversationPinLimit = async (req, res, next) => {
     const userId = req.user.id;
     const conversation = req.validatedConversation;
 
-    const isAlreadyPinned = conversation.pinnedBy && conversation.pinnedBy.some(
-      pin => pin.userId.toString() === userId
-    );
+    const isAlreadyPinned =
+      conversation.pinnedBy &&
+      conversation.pinnedBy.some((pin) => pin.userId.toString() === userId);
 
     if (isAlreadyPinned) {
       return sendError(res, 400, "Conversation already pinned");
     }
 
     const userPinnedCount = await Conversation.countDocuments({
-      "pinnedBy.userId": userId
+      "pinnedBy.userId": userId,
     });
 
     if (userPinnedCount >= 3) {
@@ -305,9 +328,11 @@ export const validateConversationArchive = async (req, res, next) => {
     const userId = req.user.id;
     const conversation = req.validatedConversation;
 
-    const isAlreadyArchived = conversation.archivedBy && conversation.archivedBy.some(
-      archive => archive.userId.toString() === userId
-    );
+    const isAlreadyArchived =
+      conversation.archivedBy &&
+      conversation.archivedBy.some(
+        (archive) => archive.userId.toString() === userId,
+      );
 
     if (isAlreadyArchived) {
       return sendError(res, 400, "Conversation already archived");
@@ -325,7 +350,8 @@ export const validateMessageExists = async (req, res, next) => {
   try {
     const { messageId } = req.params;
 
-    const message = await Message.findById(messageId).populate("conversationId");
+    const message =
+      await Message.findById(messageId).populate("conversationId");
 
     if (!message) {
       return sendError(res, 404, "Message not found");
@@ -353,10 +379,9 @@ export const validateMessageEditTime = (req, res, next) => {
   const message = req.validatedMessage;
   const messageAge = Date.now() - new Date(message.createdAt).getTime();
 
-  if (messageAge > 15 * 60 * 1000) { // 15 minutes
+  if (messageAge > MESSAGE_EDIT_LIMIT_MS) {
     return sendError(res, 400, "Cannot edit message after 15 minutes");
   }
-
   next();
 };
 
@@ -364,10 +389,9 @@ export const validateMessageDeleteTime = (req, res, next) => {
   const message = req.validatedMessage;
   const messageAge = Date.now() - new Date(message.createdAt).getTime();
 
-  if (messageAge > 5 * 60 * 1000) { // 5 minutes
+  if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
     return sendError(res, 400, "Cannot delete for everyone after 5 minutes");
   }
-
   next();
 };
 
@@ -380,7 +404,7 @@ export const validateMessageParticipant = (req, res, next) => {
   }
 
   const isParticipant = message.conversationId.participants.some(
-    p => p.toString() === currentUserId
+    (p) => p.toString() === currentUserId,
   );
 
   if (!isParticipant) {
@@ -423,8 +447,8 @@ export const validateGroupMember = (req, res, next) => {
   const currentUserId = req.user.id;
   const group = req.validatedGroup;
 
-  const isMember = group.members.some(m =>
-    m._id ? m._id.toString() === currentUserId : m.toString() === currentUserId
+  const isMember = group.members.some((m) =>
+    m._id ? m._id.toString() === currentUserId : m.toString() === currentUserId,
   );
 
   if (!isMember) {
@@ -438,7 +462,7 @@ export const validateGroupAdmin = (req, res, next) => {
   const currentUserId = req.user.id;
   const group = req.validatedGroup;
 
-  const isAdmin = group.admins.some(a => a.toString() === currentUserId);
+  const isAdmin = group.admins.some((a) => a.toString() === currentUserId);
 
   if (!isAdmin) {
     return sendError(res, 403, "Only admins can perform this action");
@@ -474,16 +498,16 @@ export const validateGroupPinLimit = async (req, res, next) => {
     const userId = req.user.id;
     const group = req.validatedGroup;
 
-    const isAlreadyPinned = group.pinnedBy && group.pinnedBy.some(
-      pin => pin.userId.toString() === userId
-    );
+    const isAlreadyPinned =
+      group.pinnedBy &&
+      group.pinnedBy.some((pin) => pin.userId.toString() === userId);
 
     if (isAlreadyPinned) {
       return sendError(res, 400, "Group already pinned");
     }
 
     const userPinnedCount = await Group.countDocuments({
-      "pinnedBy.userId": userId
+      "pinnedBy.userId": userId,
     });
 
     if (userPinnedCount >= 3) {
@@ -500,9 +524,9 @@ export const validateGroupArchive = (req, res, next) => {
   const userId = req.user.id;
   const group = req.validatedGroup;
 
-  const isAlreadyArchived = group.archivedBy && group.archivedBy.some(
-    archive => archive.userId.toString() === userId
-  );
+  const isAlreadyArchived =
+    group.archivedBy &&
+    group.archivedBy.some((archive) => archive.userId.toString() === userId);
 
   if (isAlreadyArchived) {
     return sendError(res, 400, "Group already archived");
@@ -515,8 +539,8 @@ export const validateMemberIsInGroup = (req, res, next) => {
   const { memberId } = req.params;
   const group = req.validatedGroup;
 
-  const isMember = group.members.some(m =>
-    m._id ? m._id.toString() === memberId : m.toString() === memberId
+  const isMember = group.members.some((m) =>
+    m._id ? m._id.toString() === memberId : m.toString() === memberId,
   );
 
   if (!isMember) {
@@ -530,15 +554,15 @@ export const validateMemberIsAdmin = (req, res, next) => {
   const { memberId } = req.params;
   const group = req.validatedGroup;
 
-  const isMember = group.members.some(m =>
-    m._id ? m._id.toString() === memberId : m.toString() === memberId
+  const isMember = group.members.some((m) =>
+    m._id ? m._id.toString() === memberId : m.toString() === memberId,
   );
 
   if (!isMember) {
     return sendError(res, 404, "Member not found in group");
   }
 
-  const isAdmin = group.admins.some(a => a.toString() === memberId);
+  const isAdmin = group.admins.some((a) => a.toString() === memberId);
 
   if (!isAdmin) {
     return sendError(res, 400, "User is not an admin");
@@ -551,7 +575,7 @@ export const validateMemberIsNotAdmin = (req, res, next) => {
   const { memberId } = req.params;
   const group = req.validatedGroup;
 
-  const isAlreadyAdmin = group.admins.some(a => a.toString() === memberId);
+  const isAlreadyAdmin = group.admins.some((a) => a.toString() === memberId);
 
   if (isAlreadyAdmin) {
     return sendError(res, 400, "User is already an admin");
@@ -609,7 +633,7 @@ export const validateFileUploaded = (req, res, next) => {
 export const validateFilename = (req, res, next) => {
   const { filename } = req.params;
 
-  if (!filename || typeof filename !== 'string') {
+  if (!filename || typeof filename !== "string") {
     return sendError(res, 400, "Invalid filename");
   }
 
@@ -677,8 +701,8 @@ export const validateUserNotBlocked = async (req, res, next) => {
     const isBlocked = await BlockedUser.findOne({
       $or: [
         { blocker: currentUserId, blocked: id },
-        { blocker: id, blocked: currentUserId }
-      ]
+        { blocker: id, blocked: currentUserId },
+      ],
     });
 
     if (isBlocked) {

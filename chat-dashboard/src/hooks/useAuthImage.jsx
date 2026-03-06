@@ -15,8 +15,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
 
     const loadImage = async () => {
       try {
-        console.log(" useAuthImage: Starting load for:", imageUrl);
-
         // Step 1: Clean the URL
         let cleanUrl = imageUrl.trim();
 
@@ -24,7 +22,7 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         cleanUrl = cleanUrl
           .replace(/localhost:5000https?:\/\//g, "")
           .replace(/^https?:\/\/localhost:5000\//, "");
-        
+
         // Step 2: Check if it's an external URL (Google/Facebook/etc)
         const isExternalHttps =
           cleanUrl.startsWith("https://") && !cleanUrl.includes("localhost");
@@ -52,8 +50,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
           isGoogleImage ||
           isFacebookImage
         ) {
-          console.log(" External URL detected - Loading directly:", cleanUrl);
-
           // ENHANCEMENT: Increase Google image quality
           if (isGoogleImage) {
             cleanUrl = cleanUrl.replace(/s\d+-c$/, "s400-c");
@@ -70,7 +66,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         }
 
         // Step 4: Local image - fetch from backend
-        console.log(" Local image detected - Fetching from backend");
 
         let filename = cleanUrl;
 
@@ -91,8 +86,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
           filename = filename.split("?")[0];
         }
 
-        console.log(" Extracted filename:", filename);
-
         // Build API URL
         let apiUrl;
         if (type === "group") {
@@ -103,11 +96,9 @@ export const useAuthImage = (imageUrl, type = "profile") => {
           apiUrl = `${API_BASE_URL}/api/file/profile/${filename}?t=${Date.now()}`;
         }
 
-        console.log(" Fetching from:", apiUrl);
-
         // Use accessToken instead of token
-     const token = localStorage.getItem("accessToken");
-        
+        const token = localStorage.getItem("accessToken");
+
         if (!token) {
           console.warn(" No auth token found");
           setImageSrc(null);
@@ -123,7 +114,6 @@ export const useAuthImage = (imageUrl, type = "profile") => {
         const blob = response.data;
         const objectUrl = URL.createObjectURL(blob);
         setImageSrc(objectUrl);
-        console.log(" Local image loaded successfully");
       } catch (err) {
         console.error(" useAuthImage error:", {
           message: err.message,

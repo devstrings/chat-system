@@ -59,14 +59,18 @@ export const register = createAsyncThunk(
 export const logout = createAsyncThunk(
   "auth/logout",
   async (_, { dispatch }) => {
+    try {
+      await axiosInstance.post(`${API_BASE_URL}/api/auth/logout`);
+    } catch (err) {
+      console.error("Logout API error:", err);
+    }
+
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("username");
     localStorage.removeItem("profileImage");
 
-    // Reset all slices
     dispatch({ type: "RESET_APP" });
-
     return null;
   },
 );
@@ -168,10 +172,6 @@ const authSlice = createSlice({
     },
     updateToken: (state, action) => {
       state.token = action.payload;
-      console.log(
-        " Token updated in Redux:",
-        action.payload.substring(0, 20) + "...",
-      );
     },
   },
   extraReducers: (builder) => {

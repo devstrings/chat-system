@@ -1,8 +1,24 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "../hooks/useAuthImage";
 import axiosInstance from "../utils/axiosInstance";
+import { AlertDialog } from "./ConfirmationDialog";
 import API_BASE_URL from "../config/api";
-import axios from "axios";
+
+function AuthImage({ imageUrl, username, className }) {
+  const { imageSrc, loading } = useAuthImage(imageUrl);
+  if (loading)
+    return <div className={`${className} bg-gray-300 animate-pulse`} />;
+  if (imageSrc)
+    return <img src={imageSrc} alt={username} className={className} />;
+  return (
+    <div
+      className={`${className} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold`}
+    >
+      {username?.charAt(0)?.toUpperCase()}
+    </div>
+  );
+}
+
 export default function ProfileSettings({
   currentUser,
   onClose,
@@ -56,12 +72,7 @@ export default function ProfileSettings({
   const checkLocalAuth = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      const response = await axios.get(`${API_BASE_URL}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+      const response = await axiosInstance.get(`${API_BASE_URL}/api/auth/me`);
       console.log(" User info:", response.data);
       console.log(" primaryProvider:", response.data.primaryProvider);
       console.log(" hasPassword:", response.data.hasPassword);
@@ -159,10 +170,20 @@ export default function ProfileSettings({
       });
 
       onProfileImageUpdate(imageUrl);
-      alert("Profile picture uploaded successfully!");
+      setAlertDialog({
+        isOpen: true,
+        title: "Success!",
+        message: "Profile picture uploaded successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("Failed to upload profile picture");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to upload profile picture",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -199,10 +220,20 @@ export default function ProfileSettings({
       onProfileImageUpdate(coverPhotoWithTimestamp, true);
       setCoverPhotoPreview(coverPhotoWithTimestamp);
 
-      alert("Cover photo uploaded successfully!");
+      setAlertDialog({
+        isOpen: true,
+        title: "Success!",
+        message: "Cover photo uploaded successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Cover upload failed:", err);
-      alert("Failed to upload cover photo");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to upload cover photo",
+        type: "error",
+      });
     } finally {
       setCoverPhotoLoading(false);
     }
@@ -229,10 +260,20 @@ export default function ProfileSettings({
       onProfileImageUpdate(null, true);
       setCoverPhotoPreview(null);
 
-      alert("Cover photo removed successfully");
+      setAlertDialog({
+        isOpen: true,
+        title: "Removed!",
+        message: "Cover photo removed successfully",
+        type: "success",
+      });
     } catch (err) {
       console.error("Remove cover failed:", err);
-      alert("Failed to remove cover photo");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to remove cover photo",
+        type: "error",
+      });
     } finally {
       setCoverPhotoLoading(false);
     }
@@ -251,10 +292,20 @@ export default function ProfileSettings({
 
       onProfileImageUpdate(null);
       setShowPhotoMenu(false);
-      alert("Profile picture removed successfully");
+      setAlertDialog({
+        isOpen: true,
+        title: "Removed!",
+        message: "Profile picture removed successfully",
+        type: "success",
+      });
     } catch (err) {
       console.error("Remove failed:", err);
-      alert("Failed to remove profile picture");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to remove profile picture",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -370,10 +421,20 @@ export default function ProfileSettings({
         },
       });
       setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
-      alert("User unblocked successfully!");
+      setAlertDialog({
+        isOpen: true,
+        title: "Success!",
+        message: "User unblocked successfully!",
+        type: "success",
+      });
     } catch (err) {
       console.error("Unblock failed:", err);
-      alert("Failed to unblock user");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to unblock user",
+        type: "error",
+      });
     }
   };
 
@@ -387,11 +448,21 @@ export default function ProfileSettings({
         },
       });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
-      alert("Friend request accepted!");
+      setAlertDialog({
+        isOpen: true,
+        title: "Accepted!",
+        message: "Friend request accepted!",
+        type: "success",
+      });
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       console.error("Accept failed:", err);
-      alert("Failed to accept request");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to accept request",
+        type: "error",
+      });
     }
   };
 
@@ -405,10 +476,20 @@ export default function ProfileSettings({
         },
       });
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
-      alert("Friend request rejected");
+      setAlertDialog({
+        isOpen: true,
+        title: "Rejected",
+        message: "Friend request rejected",
+        type: "info",
+      });
     } catch (err) {
       console.error("Reject failed:", err);
-      alert("Failed to reject request");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to reject request",
+        type: "error",
+      });
     }
   };
 
@@ -1027,19 +1108,11 @@ export default function ProfileSettings({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <div className="w-10 h-10 rounded-full overflow-hidden">
-                            {request.sender.profileImage ? (
-                              <img
-                                src={request.sender.profileImage}
-                                alt={request.sender.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                                {request.sender.username
-                                  .charAt(0)
-                                  .toUpperCase()}
-                              </div>
-                            )}
+                            <AuthImage
+                              imageUrl={request.sender.profileImage}
+                              username={request.sender.username}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
@@ -1110,17 +1183,11 @@ export default function ProfileSettings({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-10 h-10 rounded-full overflow-hidden">
-                            {block.blocked.profileImage ? (
-                              <img
-                                src={block.blocked.profileImage}
-                                alt={block.blocked.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white font-bold">
-                                {block.blocked.username.charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                            <AuthImage
+                              imageUrl={block.blocked.profileImage}
+                              username={block.blocked.username}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
@@ -1144,6 +1211,13 @@ export default function ProfileSettings({
               )}
             </div>
           )}
+          <AlertDialog
+            isOpen={alertDialog.isOpen}
+            onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+            title={alertDialog.title}
+            message={alertDialog.message}
+            type={alertDialog.type}
+          />
         </div>
       </div>
     </div>

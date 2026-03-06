@@ -43,8 +43,8 @@ export default function Message({
   const canEdit = () => {
     if (!isOwn) return false;
     const messageAge = Date.now() - new Date(message.createdAt).getTime();
-    const threeHours = 3 * 60 * 60 * 1000;
-    return messageAge <= threeHours;
+    const fifteenMinutes = 15 * 60 * 1000;
+    return messageAge <= fifteenMinutes;
   };
 
   const handleEditMessage = () => {
@@ -181,67 +181,20 @@ export default function Message({
   };
   //  toggleAudio function
   const toggleAudio = (index, audioUrl) => {
-  const audio = audioRefs.current[index];
+    const audio = audioRefs.current[index];
 
-  if (!audio) {
-    const newAudio = new Audio();
-    const token = localStorage.getItem("accessToken");
+    if (!audio) {
+      const newAudio = new Audio();
+      const token = localStorage.getItem("accessToken");
 
-    // Check if URL is external
-    if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
-      // External URL - no auth needed
-      newAudio.src = audioUrl;
-      newAudio.play();
-
-      newAudio.onloadedmetadata = () => {
-        setAudioDuration((prev) => ({ ...prev, [index]: newAudio.duration }));
-      };
-
-      newAudio.ontimeupdate = () => {
-        setAudioProgress((prev) => ({
-          ...prev,
-          [index]: (newAudio.currentTime / newAudio.duration) * 100,
-        }));
-      };
-
-      newAudio.onended = () => {
-        setPlayingAudio(null);
-        setAudioProgress((prev) => ({ ...prev, [index]: 0 }));
-      };
-
-      audioRefs.current[index] = newAudio;
-      setPlayingAudio(index);
-      return;
-    }
-
-    //  Local file - fetch with auth token
-    if (!token) {
-      console.error(" No auth token found");
-      alert("Please login to play audio");
-      return;
-    }
-
-    fetch(`${API_BASE_URL}${audioUrl}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,  
-      },
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-        return res.blob();
-      })
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        newAudio.src = url;
+      // Check if URL is external
+      if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
+        // External URL - no auth needed
+        newAudio.src = audioUrl;
         newAudio.play();
 
         newAudio.onloadedmetadata = () => {
-          setAudioDuration((prev) => ({
-            ...prev,
-            [index]: newAudio.duration,
-          }));
+          setAudioDuration((prev) => ({ ...prev, [index]: newAudio.duration }));
         };
 
         newAudio.ontimeupdate = () => {
@@ -258,25 +211,72 @@ export default function Message({
 
         audioRefs.current[index] = newAudio;
         setPlayingAudio(index);
+        return;
+      }
+
+      //  Local file - fetch with auth token
+      if (!token) {
+        console.error(" No auth token found");
+        alert("Please login to play audio");
+        return;
+      }
+
+      fetch(`${API_BASE_URL}${audioUrl}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       })
-      .catch((err) => {
-        console.error(" Audio load error:", err);
-        alert("Failed to load audio. Please try again.");
-      });
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          newAudio.src = url;
+          newAudio.play();
 
-    return;
-  }
+          newAudio.onloadedmetadata = () => {
+            setAudioDuration((prev) => ({
+              ...prev,
+              [index]: newAudio.duration,
+            }));
+          };
 
-  // Toggle play/pause
-  if (playingAudio === index) {
-    audio.pause();
-    setPlayingAudio(null);
-  } else {
-    Object.values(audioRefs.current).forEach((a) => a?.pause());
-    audio.play();
-    setPlayingAudio(index);
-  }
-};
+          newAudio.ontimeupdate = () => {
+            setAudioProgress((prev) => ({
+              ...prev,
+              [index]: (newAudio.currentTime / newAudio.duration) * 100,
+            }));
+          };
+
+          newAudio.onended = () => {
+            setPlayingAudio(null);
+            setAudioProgress((prev) => ({ ...prev, [index]: 0 }));
+          };
+
+          audioRefs.current[index] = newAudio;
+          setPlayingAudio(index);
+        })
+        .catch((err) => {
+          console.error(" Audio load error:", err);
+          alert("Failed to load audio. Please try again.");
+        });
+
+      return;
+    }
+
+    // Toggle play/pause
+    if (playingAudio === index) {
+      audio.pause();
+      setPlayingAudio(null);
+    } else {
+      Object.values(audioRefs.current).forEach((a) => a?.pause());
+      audio.play();
+      setPlayingAudio(index);
+    }
+  };
 
   const formatAudioTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return "0:00";

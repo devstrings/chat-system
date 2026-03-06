@@ -2,24 +2,23 @@ import FriendRequest from "../models/FriendRequest.js";
 import Friendship from "../models/Friendship.js";
 import BlockedUser from "../models/BlockedUser.js";
 import mongoose from "mongoose";
-
+import config from "../config/index.js";
 //  HELPER FUNCTION TO FORMAT USER WITH FULL IMAGE URL
 const formatUserWithFullImageUrl = (user) => {
   const userObj = user.toObject ? user.toObject() : user;
-  
-  //  Check if already external URL
-  const isExternalUrl = userObj.profileImage && (
-    userObj.profileImage.startsWith('http://') || 
-    userObj.profileImage.startsWith('https://')
-  );
-  
+
+  const isExternalUrl =
+    userObj.profileImage &&
+    (userObj.profileImage.startsWith("http://") ||
+      userObj.profileImage.startsWith("https://"));
+
   return {
     ...userObj,
-    profileImage: userObj.profileImage 
-      ? (isExternalUrl 
-          ? userObj.profileImage  
-          : `http://localhost:5000${userObj.profileImage}`)  
-      : null
+    profileImage: userObj.profileImage
+      ? isExternalUrl
+        ? userObj.profileImage
+        : `${config.serverUrl}${userObj.profileImage}`
+      : null,
   };
 };
 
@@ -28,8 +27,8 @@ export const checkIfBlocked = async (senderId, receiverId) => {
   const isBlocked = await BlockedUser.findOne({
     $or: [
       { blocker: senderId, blocked: receiverId },
-      { blocker: receiverId, blocked: senderId }
-    ]
+      { blocker: receiverId, blocked: senderId },
+    ],
   });
 
   return isBlocked;
@@ -40,8 +39,8 @@ export const checkIfAlreadyFriends = async (senderId, receiverId) => {
   const alreadyFriends = await Friendship.findOne({
     $or: [
       { user1: senderId, user2: receiverId },
-      { user1: receiverId, user2: senderId }
-    ]
+      { user1: receiverId, user2: senderId },
+    ],
   });
 
   return alreadyFriends;
@@ -52,7 +51,7 @@ export const checkOppositeRequest = async (senderId, receiverId) => {
   const oppositeRequest = await FriendRequest.findOne({
     sender: receiverId,
     receiver: senderId,
-    status: "pending"
+    status: "pending",
   });
 
   return oppositeRequest;
@@ -64,24 +63,33 @@ export const checkExistingRequest = async (senderId, receiverId) => {
   const existingRequest = await FriendRequest.findOne({
     $or: [
       { sender: senderId, receiver: receiverId },
-      { sender: receiverId, receiver: senderId }
+      { sender: receiverId, receiver: senderId },
     ],
-    status: "pending"  
+    status: "pending",
   });
-  
-  console.log(" checkExistingRequest result:", existingRequest ? `Found: ${existingRequest.sender} → ${existingRequest.receiver} (${existingRequest.status})` : "Not found");
-  
+
+  console.log(
+    " checkExistingRequest result:",
+    existingRequest
+      ? `Found: ${existingRequest.sender} → ${existingRequest.receiver} (${existingRequest.status})`
+      : "Not found",
+  );
+
   return existingRequest;
 };
 
 // AUTO ACCEPT AND CREATE FRIENDSHIP SERVICE
-export const autoAcceptAndCreateFriendship = async (oppositeRequest, senderId, receiverId) => {
+export const autoAcceptAndCreateFriendship = async (
+  oppositeRequest,
+  senderId,
+  receiverId,
+) => {
   console.log(" Auto-accepting friend request:", { senderId, receiverId });
 
   //  Create friendship
   await Friendship.create({
     user1: senderId,
-    user2: receiverId
+    user2: receiverId,
   });
 
   //  DELETE the opposite request after accepting (cleanup)
@@ -89,9 +97,9 @@ export const autoAcceptAndCreateFriendship = async (oppositeRequest, senderId, r
 
   console.log(" Auto-accept completed, old request deleted");
 
-  return { 
-    message: "You are now friends!", 
-    autoAccepted: true 
+  return {
+    message: "You are now friends!",
+    autoAccepted: true,
   };
 };
 
@@ -117,28 +125,35 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
   const existingPendingRequest = await FriendRequest.findOne({
     $or: [
       { sender: senderId, receiver: receiverId },
-      { sender: receiverId, receiver: senderId }
+      { sender: receiverId, receiver: senderId },
     ],
-    status: "pending"
+    status: "pending",
   });
-  
+
   if (existingPendingRequest) {
-    const isSameDirection = 
-      existingPendingRequest.sender.toString() === senderId && 
+    const isSameDirection =
+      existingPendingRequest.sender.toString() === senderId &&
       existingPendingRequest.receiver.toString() === receiverId;
-    
-    const isOppositeDirection = 
-      existingPendingRequest.sender.toString() === receiverId && 
+
+    const isOppositeDirection =
+      existingPendingRequest.sender.toString() === receiverId &&
       existingPendingRequest.receiver.toString() === senderId;
-    
+
     if (isSameDirection) {
-      console.log(" Request already exists (same direction):", existingPendingRequest._id);
+      console.log(
+        " Request already exists (same direction):",
+        existingPendingRequest._id,
+      );
       throw new Error("Request already sent");
     }
-    
+
     if (isOppositeDirection) {
       console.log("Opposite request found, auto-accepting");
-      return await autoAcceptAndCreateFriendship(existingPendingRequest, senderId, receiverId);
+      return await autoAcceptAndCreateFriendship(
+        existingPendingRequest,
+        senderId,
+        receiverId,
+      );
     }
   }
 
@@ -146,9 +161,9 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
   await FriendRequest.deleteMany({
     $or: [
       { sender: senderId, receiver: receiverId },
-      { sender: receiverId, receiver: senderId }
+      { sender: receiverId, receiver: senderId },
     ],
-    status: { $ne: "pending" }  // Delete accepted/rejected requests
+    status: { $ne: "pending" }, // Delete accepted/rejected requests
   });
 
   // Create new request
@@ -156,14 +171,14 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
   const friendRequest = await FriendRequest.create({
     sender: senderId,
     receiver: receiverId,
-    status: "pending"
+    status: "pending",
   });
 
   console.log(" Friend request created:", friendRequest._id);
 
-  return { 
-    message: "Friend request sent", 
-    friendRequest 
+  return {
+    message: "Friend request sent",
+    friendRequest,
   };
 };
 
@@ -172,12 +187,12 @@ export const processAcceptFriendRequest = async (friendRequest) => {
   // Create friendship
   await Friendship.create({
     user1: friendRequest.sender,
-    user2: friendRequest.receiver
+    user2: friendRequest.receiver,
   });
 
   //  DELETE the request (don't just update status)
   await FriendRequest.findByIdAndDelete(friendRequest._id);
-  
+
   console.log(" Friend request deleted after accepting:", friendRequest._id);
 
   return { message: "Friend request accepted" };
@@ -195,15 +210,15 @@ export const processRejectFriendRequest = async (requestId) => {
 export const fetchPendingRequests = async (currentUserId) => {
   const requests = await FriendRequest.find({
     receiver: currentUserId,
-    status: "pending"
+    status: "pending",
   })
     .populate("sender", "username email profileImage")
     .sort({ createdAt: -1 });
 
   //  Format sender with full image URL
-  const formattedRequests = requests.map(request => ({
+  const formattedRequests = requests.map((request) => ({
     ...request.toObject(),
-    sender: formatUserWithFullImageUrl(request.sender)
+    sender: formatUserWithFullImageUrl(request.sender),
   }));
 
   return formattedRequests;
@@ -213,15 +228,15 @@ export const fetchPendingRequests = async (currentUserId) => {
 export const fetchSentRequests = async (currentUserId) => {
   const requests = await FriendRequest.find({
     sender: currentUserId,
-    status: "pending"
+    status: "pending",
   })
     .populate("receiver", "username email profileImage")
     .sort({ createdAt: -1 });
 
   //  Format receiver with full image URL
-  const formattedRequests = requests.map(request => ({
+  const formattedRequests = requests.map((request) => ({
     ...request.toObject(),
-    receiver: formatUserWithFullImageUrl(request.receiver)
+    receiver: formatUserWithFullImageUrl(request.receiver),
   }));
 
   return formattedRequests;
@@ -235,8 +250,8 @@ export const processUnfriend = async (currentUserId, friendId) => {
   const friendship = await Friendship.findOneAndDelete({
     $or: [
       { user1: currentUserId, user2: friendId },
-      { user1: friendId, user2: currentUserId }
-    ]
+      { user1: friendId, user2: currentUserId },
+    ],
   });
 
   if (!friendship) {
@@ -250,8 +265,8 @@ export const processUnfriend = async (currentUserId, friendId) => {
   const deletedRequests = await FriendRequest.deleteMany({
     $or: [
       { sender: currentUserId, receiver: friendId },
-      { sender: friendId, receiver: currentUserId }
-    ]
+      { sender: friendId, receiver: currentUserId },
+    ],
   });
 
   console.log(" Deleted ALL friend requests:", deletedRequests.deletedCount);
@@ -264,7 +279,7 @@ export const processBlockUser = async (blockerId, userId) => {
   // Check if already blocked
   const existingBlock = await BlockedUser.findOne({
     blocker: blockerId,
-    blocked: userId
+    blocked: userId,
   });
 
   if (existingBlock) {
@@ -275,22 +290,22 @@ export const processBlockUser = async (blockerId, userId) => {
   await Friendship.findOneAndDelete({
     $or: [
       { user1: blockerId, user2: userId },
-      { user1: userId, user2: blockerId }
-    ]
+      { user1: userId, user2: blockerId },
+    ],
   });
 
   // Remove pending friend requests
   await FriendRequest.deleteMany({
     $or: [
       { sender: blockerId, receiver: userId },
-      { sender: userId, receiver: blockerId }
-    ]
+      { sender: userId, receiver: blockerId },
+    ],
   });
 
   // Create block
   await BlockedUser.create({
     blocker: blockerId,
-    blocked: userId
+    blocked: userId,
   });
 
   return { message: "User blocked successfully" };
@@ -300,7 +315,7 @@ export const processBlockUser = async (blockerId, userId) => {
 export const processUnblockUser = async (blockerId, userId) => {
   const block = await BlockedUser.findOneAndDelete({
     blocker: blockerId,
-    blocked: userId
+    blocked: userId,
   });
 
   if (!block) {
@@ -317,9 +332,9 @@ export const fetchBlockedUsers = async (currentUserId) => {
     .sort({ createdAt: -1 });
 
   //  Format blocked user with full image URL
-  const formattedBlocked = blocked.map(block => ({
+  const formattedBlocked = blocked.map((block) => ({
     ...block.toObject(),
-    blocked: formatUserWithFullImageUrl(block.blocked)
+    blocked: formatUserWithFullImageUrl(block.blocked),
   }));
 
   return formattedBlocked;
@@ -331,8 +346,8 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
   const friendship = await Friendship.findOne({
     $or: [
       { user1: currentUserId, user2: userId },
-      { user1: userId, user2: currentUserId }
-    ]
+      { user1: userId, user2: currentUserId },
+    ],
   });
 
   if (friendship) {
@@ -342,7 +357,7 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
   // Check if blocked
   const isBlocked = await BlockedUser.findOne({
     blocker: currentUserId,
-    blocked: userId
+    blocked: userId,
   });
 
   if (isBlocked) {
@@ -351,7 +366,7 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
 
   const isBlockedBy = await BlockedUser.findOne({
     blocker: userId,
-    blocked: currentUserId
+    blocked: currentUserId,
   });
 
   if (isBlockedBy) {
@@ -362,7 +377,7 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
   const sentRequest = await FriendRequest.findOne({
     sender: currentUserId,
     receiver: userId,
-    status: "pending"
+    status: "pending",
   });
 
   if (sentRequest) {
@@ -372,7 +387,7 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
   const receivedRequest = await FriendRequest.findOne({
     sender: userId,
     receiver: currentUserId,
-    status: "pending"
+    status: "pending",
   });
 
   if (receivedRequest) {
@@ -388,29 +403,28 @@ export const fetchAllFriends = async (currentUserId) => {
 
   // Find all friendships where current user is involved
   const friendships = await Friendship.find({
-    $or: [
-      { user1: currentUserId },
-      { user2: currentUserId }
-    ]
+    $or: [{ user1: currentUserId }, { user2: currentUserId }],
   });
 
   console.log(` Found ${friendships.length} friendships`);
 
   // Extract friend user IDs
-  const friendIds = friendships.map(friendship => {
-    return friendship.user1.toString() === currentUserId 
-      ? friendship.user2 
+  const friendIds = friendships.map((friendship) => {
+    return friendship.user1.toString() === currentUserId
+      ? friendship.user2
       : friendship.user1;
   });
 
   // Get user details for all friends
   const User = mongoose.model("User");
-  const friends = await User.find({ 
-    _id: { $in: friendIds } 
+  const friends = await User.find({
+    _id: { $in: friendIds },
   }).select("username email profileImage");
 
   //  Format all friends with full image URLs
-  const formattedFriends = friends.map(friend => formatUserWithFullImageUrl(friend));
+  const formattedFriends = friends.map((friend) =>
+    formatUserWithFullImageUrl(friend),
+  );
 
   console.log(` Returning ${formattedFriends.length} friends`);
 

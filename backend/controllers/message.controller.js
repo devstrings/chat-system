@@ -8,16 +8,23 @@ export const getOrCreateConversation = async (req, res) => {
     const { otherUserId, skipCreate } = req.body;
 
     // Check if conversation exists
-    const existingConversation = await messageService.findExistingConversation(currentUserId, otherUserId);
+    const existingConversation = await messageService.findExistingConversation(
+      currentUserId,
+      otherUserId,
+    );
     const isNewConversation = !existingConversation && !skipCreate;
 
     // Service call
-    const conversation = await messageService.processGetOrCreateConversation(currentUserId, otherUserId, skipCreate);
+    const conversation = await messageService.processGetOrCreateConversation(
+      currentUserId,
+      otherUserId,
+      skipCreate,
+    );
 
     if (!conversation && skipCreate) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         message: "No conversation found",
-        exists: false 
+        exists: false,
       });
     }
 
@@ -27,14 +34,14 @@ export const getOrCreateConversation = async (req, res) => {
       if (io) {
         console.log("Emitting newConversation event:", {
           conversationId: conversation._id,
-          participants: [currentUserId, otherUserId]
+          participants: [currentUserId, otherUserId],
         });
-        
+
         io.to(currentUserId).emit("newConversation", {
           conversationId: conversation._id.toString(),
           otherUserId,
         });
-        
+
         io.to(otherUserId).emit("newConversation", {
           conversationId: conversation._id.toString(),
           otherUserId: currentUserId,
@@ -45,7 +52,7 @@ export const getOrCreateConversation = async (req, res) => {
     res.json(conversation);
   } catch (err) {
     console.error("Get/Create conversation error:", err);
-    res.status(500).json({ message: "Failed to get conversation", error: err.message });
+    res.status(500).json({ message: "Failed to get conversation" });
   }
 };
 
@@ -59,20 +66,20 @@ export const sendMessage = async (req, res) => {
       conversationId,
       hasText: !!text,
       attachmentsCount: attachments?.length || 0,
-      userId: currentUserId
+      userId: currentUserId,
     });
 
-    const conversation = req.validatedConversation; 
+    const conversation = req.validatedConversation;
 
     // Extract only attachment IDs
-    const attachmentIds = attachments?.map(att => att.attachmentId) || [];
+    const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
 
     // Create message
     const message = await Message.create({
       conversationId,
       sender: currentUserId,
       text: text || "",
-      attachments: attachmentIds, 
+      attachments: attachmentIds,
       status: "sent",
       isGroupMessage: false,
     });
@@ -81,7 +88,8 @@ export const sendMessage = async (req, res) => {
     await message.populate("sender", "username email profileImage");
     await message.populate({
       path: "attachments",
-      select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+      select:
+        "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
     });
 
     // Update conversation last message
@@ -110,21 +118,19 @@ export const sendMessage = async (req, res) => {
     const io = req.app.get("io");
     if (io) {
       const otherUserId = conversation.participants.find(
-        (p) => p.toString() !== currentUserId
+        (p) => p.toString() !== currentUserId,
       );
 
       io.to(otherUserId.toString()).emit("receiveMessage", messageObj);
-      
+
       console.log("Socket event sent to:", otherUserId);
     }
 
     res.json(messageObj);
-
   } catch (err) {
     console.error("Send message error:", err);
-    res.status(500).json({ 
-      message: "Failed to send message", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to send message",
     });
   }
 };
@@ -141,19 +147,19 @@ export const getMessages = async (req, res) => {
       conversationId,
       currentUserId,
       limit,
-      skip
+      skip,
     });
 
     const conversation = req.validatedConversation;
 
     console.log(" Validated conversation:", {
       id: conversation._id,
-      participants: conversation.participants.map(p => p.toString()),
-      deletedBy: conversation.deletedBy
+      participants: conversation.participants.map((p) => p.toString()),
+      deletedBy: conversation.deletedBy,
     });
 
     const wasDeletedByUser = conversation.deletedBy?.some(
-      d => d.userId?.toString() === currentUserId.toString()
+      (d) => d.userId?.toString() === currentUserId.toString(),
     );
 
     if (wasDeletedByUser) {
@@ -162,22 +168,22 @@ export const getMessages = async (req, res) => {
     }
 
     const otherUserId = conversation.participants
-      .find(p => p.toString() !== currentUserId.toString())
+      .find((p) => p.toString() !== currentUserId.toString())
       ?.toString();
-    
+
     console.log(" Checking friendship:", {
       currentUserId: currentUserId.toString(),
-      otherUserId: otherUserId
+      otherUserId: otherUserId,
     });
 
     const friendship = await messageService.checkFriendship(
-      currentUserId.toString(), 
-      otherUserId
+      currentUserId.toString(),
+      otherUserId,
     );
-    
+
     console.log(" Friendship check result:", {
       found: !!friendship,
-      status: friendship?.status || 'not found'
+      status: friendship?.status || "not found",
     });
 
     if (!friendship) {
@@ -189,24 +195,23 @@ export const getMessages = async (req, res) => {
 
     // Service call
     const messages = await messageService.fetchMessages(
-      conversationId, 
-      currentUserId, 
-      limit, 
-      skip
+      conversationId,
+      currentUserId,
+      limit,
+      skip,
     );
-    
+
     const transformedMessages = messageService.transformMessages(
-      messages, 
-      currentUserId
+      messages,
+      currentUserId,
     );
 
     console.log(` Returning ${transformedMessages.length} messages`);
     res.json(transformedMessages);
   } catch (err) {
     console.error(" Get messages error:", err);
-    res.status(500).json({ 
-      message: "Failed to fetch messages", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to fetch messages",
     });
   }
 };
@@ -217,12 +222,13 @@ export const getUserConversations = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service call
-    const conversations = await messageService.fetchUserConversations(currentUserId);
+    const conversations =
+      await messageService.fetchUserConversations(currentUserId);
 
     res.json(conversations);
   } catch (err) {
     console.error("Get conversations error:", err);
-    res.status(500).json({ message: "Failed to fetch conversations", error: err.message });
+    res.status(500).json({ message: "Failed to fetch conversations" });
   }
 };
 
@@ -233,7 +239,10 @@ export const clearChat = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service call
-    const result = await messageService.processClearChat(conversationId, currentUserId);
+    const result = await messageService.processClearChat(
+      conversationId,
+      currentUserId,
+    );
 
     // Get socket.io instance and emit
     const io = req.app.get("io");
@@ -241,32 +250,35 @@ export const clearChat = async (req, res) => {
     if (io) {
       console.log("EMITTING chatCleared EVENT");
       console.log("Conversation ID:", conversationId.toString());
-      console.log("Participants:", result.participants.map(p => p.toString()));
+      console.log(
+        "Participants:",
+        result.participants.map((p) => p.toString()),
+      );
       console.log("Cleared by:", currentUserId);
-      
+
       console.log(`Emitting ONLY to user who cleared: ${currentUserId}`);
-      
+
       io.to(currentUserId).emit("chatCleared", {
         conversationId: conversationId.toString(),
         clearedBy: currentUserId,
         clearedFor: currentUserId,
-        action: "clearedForMe"
+        action: "clearedForMe",
       });
-      
+
       console.log("Socket event emitted to clearing user only");
     } else {
       console.error("Socket.IO not available!");
     }
     console.log(" Socket event emitted to clearing user only");
 
-io.to(currentUserId).emit("conversationUpdated", {
-  conversationId: conversationId.toString(),
-  lastMessage: "",
-  lastMessageTime: Date.now()
-});
+    io.to(currentUserId).emit("conversationUpdated", {
+      conversationId: conversationId.toString(),
+      lastMessage: "",
+      lastMessageTime: Date.now(),
+    });
 
-console.log(" Sent sidebar update for cleared chat");
-    
+    console.log(" Sent sidebar update for cleared chat");
+
     res.json({
       success: result.success,
       action: result.action,
@@ -274,14 +286,12 @@ console.log(" Sent sidebar update for cleared chat");
       clearedCount: result.clearedCount,
       conversationId: result.conversationId,
     });
-
   } catch (err) {
     console.error("CLEAR CHAT ERROR:", err);
     console.error("Stack:", err.stack);
     res.status(500).json({
       success: false,
       message: "Failed to clear chat",
-      error: err.message,
     });
   }
 };
@@ -294,13 +304,17 @@ export const deleteConversation = async (req, res) => {
     const { otherUserId } = req.body;
 
     // Service call
-    const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
+    const result = await messageService.processDeleteConversation(
+      conversationId,
+      currentUserId,
+      otherUserId,
+    );
 
     // Emit socket event ONLY to current user
     const io = req.app.get("io");
     if (io) {
       const userSocket = [...io.sockets.sockets.values()].find(
-        (s) => s.user && s.user.id === currentUserId
+        (s) => s.user && s.user.id === currentUserId,
       );
 
       if (userSocket) {
@@ -314,21 +328,19 @@ export const deleteConversation = async (req, res) => {
     }
 
     res.json(result);
-
   } catch (err) {
     console.error("Delete conversation error:", err);
-    
+
     if (err.message === "No conversation found to delete") {
       return res.status(404).json({
         success: false,
         message: err.message,
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: "Failed to delete conversation",
-      error: err.message,
     });
   }
 };
@@ -340,12 +352,15 @@ export const deleteMessageForMe = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service call
-    const result = await messageService.processDeleteMessageForMe(messageId, currentUserId);
+    const result = await messageService.processDeleteMessageForMe(
+      messageId,
+      currentUserId,
+    );
 
     res.json(result);
   } catch (err) {
     console.error("Delete for me error:", err);
-    res.status(500).json({ message: "Failed to delete message", error: err.message });
+    res.status(500).json({ message: "Failed to delete message" });
   }
 };
 
@@ -355,13 +370,14 @@ export const deleteMessageForEveryone = async (req, res) => {
     const { messageId } = req.params;
 
     // Service call
-    const result = await messageService.processDeleteMessageForEveryone(messageId);
+    const result =
+      await messageService.processDeleteMessageForEveryone(messageId);
 
     console.log("Message deleted for everyone");
     res.json(result);
   } catch (err) {
     console.error("Delete for everyone error:", err);
-    res.status(500).json({ message: "Failed to delete message", error: err.message });
+    res.status(500).json({ message: "Failed to delete message" });
   }
 };
 
@@ -372,12 +388,15 @@ export const bulkDeleteMessages = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service call
-    const result = await messageService.processBulkDeleteMessages(messageIds, currentUserId);
+    const result = await messageService.processBulkDeleteMessages(
+      messageIds,
+      currentUserId,
+    );
 
     res.json(result);
   } catch (err) {
     console.error("Bulk delete error:", err);
-    res.status(500).json({ message: "Failed to delete messages", error: err.message });
+    res.status(500).json({ message: "Failed to delete messages" });
   }
 };
 
@@ -388,7 +407,10 @@ export const pinConversation = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const result = await messageService.processPinConversation(conversationId, userId);
+    const result = await messageService.processPinConversation(
+      conversationId,
+      userId,
+    );
 
     res.json(result);
   } catch (err) {
@@ -404,7 +426,10 @@ export const unpinConversation = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const result = await messageService.processUnpinConversation(conversationId, userId);
+    const result = await messageService.processUnpinConversation(
+      conversationId,
+      userId,
+    );
 
     res.json(result);
   } catch (err) {
@@ -419,7 +444,8 @@ export const getPinnedConversations = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const pinnedConversations = await messageService.fetchPinnedConversations(userId);
+    const pinnedConversations =
+      await messageService.fetchPinnedConversations(userId);
 
     res.json(pinnedConversations);
   } catch (err) {
@@ -435,7 +461,10 @@ export const archiveConversation = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const result = await messageService.processArchiveConversation(conversationId, userId);
+    const result = await messageService.processArchiveConversation(
+      conversationId,
+      userId,
+    );
 
     res.json(result);
   } catch (err) {
@@ -451,7 +480,10 @@ export const unarchiveConversation = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const result = await messageService.processUnarchiveConversation(conversationId, userId);
+    const result = await messageService.processUnarchiveConversation(
+      conversationId,
+      userId,
+    );
 
     res.json(result);
   } catch (err) {
@@ -466,7 +498,8 @@ export const getArchivedConversations = async (req, res) => {
     const userId = req.user.id;
 
     // Service call
-    const archivedConversations = await messageService.fetchArchivedConversations(userId);
+    const archivedConversations =
+      await messageService.fetchArchivedConversations(userId);
 
     res.json(archivedConversations);
   } catch (err) {
@@ -483,14 +516,18 @@ export const getGroupMessages = async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
 
     // Service call
-    const messages = await messageService.fetchGroupMessages(groupId, limit, skip);
+    const messages = await messageService.fetchGroupMessages(
+      groupId,
+      limit,
+      skip,
+    );
     const transformedMessages = messageService.transformGroupMessages(messages);
 
     console.log(`Fetched ${transformedMessages.length} group messages`);
     res.json(transformedMessages);
   } catch (err) {
     console.error("Get group messages error:", err);
-    res.status(500).json({ message: "Failed to fetch messages", error: err.message });
+    res.status(500).json({ message: "Failed to fetch messages" });
   }
 };
 
@@ -506,9 +543,8 @@ export const editMessage = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("Edit message error:", err);
-    res.status(500).json({ 
-      message: "Failed to edit message", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to edit message",
     });
   }
 };

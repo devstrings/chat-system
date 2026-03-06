@@ -22,7 +22,6 @@ const processQueue = (error, token = null) => {
 let store;
 export const injectStore = (_store) => {
   store = _store;
-  console.log(" Store injected successfully");
 };
 
 let lastValidToken = localStorage.getItem("accessToken");
@@ -48,22 +47,17 @@ const checkTokenModification = () => {
 
   // Skip if no token
   if (!currentToken) {
-    console.log(" No token - skipping check");
     return true;
   }
 
   // Initialize if first time
   if (!lastValidToken) {
-    console.log(" Initializing lastValidToken");
     lastValidToken = currentToken;
     return true;
   }
 
   // Check mismatch
   if (currentToken !== lastValidToken) {
-    console.error(" TOKEN MISMATCH DETECTED!");
-    console.log("Expected:", lastValidToken.substring(0, 30) + "...");
-    console.log("Found:", currentToken.substring(0, 30) + "...");
     performLogout("Token manually modified");
     return false;
   }
@@ -73,7 +67,6 @@ const checkTokenModification = () => {
 
 const updateTokenReference = (newToken) => {
   if (newToken) {
-    console.log(" Updating token reference");
     lastValidToken = newToken;
     localStorage.setItem("accessToken", newToken);
   }
@@ -112,7 +105,6 @@ axiosInstance.interceptors.response.use(
   (response) => {
     //  Update token reference on successful response with new token
     if (response.data?.accessToken) {
-      console.log(" New token received in response");
       updateTokenReference(response.data.accessToken);
 
       if (store) {
@@ -133,8 +125,6 @@ axiosInstance.interceptors.response.use(
 
     //  ONLY handle 401 (not 403)
     if (status === 401) {
-      console.log(" 401 Error - attempting token refresh");
-
       // Prevent infinite loops
       if (originalRequest._retry) {
         console.error(" Already retried - LOGOUT");
@@ -168,16 +158,12 @@ axiosInstance.interceptors.response.use(
       }
 
       try {
-        console.log(" Calling refresh token API...");
-
         const { data } = await axios.post(
           `${API_BASE_URL}/api/auth/refresh-token`,
           { refreshToken },
         );
 
         if (data.accessToken) {
-          console.log(" New access token received");
-
           //  Update reference FIRST
           updateTokenReference(data.accessToken);
 

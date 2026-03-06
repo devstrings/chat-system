@@ -8,16 +8,22 @@ export const getUsers = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service calls
-    const blockedRelationships = await userService.fetchBlockedRelationships(currentUserId);
-    const blockedUserIds = userService.getBlockedUserIds(blockedRelationships, currentUserId);
-    const users = await userService.fetchAllUsersExceptBlocked(currentUserId, blockedUserIds);
+    const blockedRelationships =
+      await userService.fetchBlockedRelationships(currentUserId);
+    const blockedUserIds = userService.getBlockedUserIds(
+      blockedRelationships,
+      currentUserId,
+    );
+    const users = await userService.fetchAllUsersExceptBlocked(
+      currentUserId,
+      blockedUserIds,
+    );
 
     res.json(users);
   } catch (err) {
     console.error("Get users error:", err);
-    res.status(500).json({ 
-      message: "Failed to fetch users", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to fetch users",
     });
   }
 };
@@ -29,16 +35,23 @@ export const searchUsers = async (req, res) => {
     const currentUserId = req.user.id;
 
     // Service calls
-    const blockedRelationships = await userService.fetchBlockedRelationships(currentUserId);
-    const blockedUserIds = userService.getBlockedUserIds(blockedRelationships, currentUserId);
-    const users = await userService.searchUsersExceptBlocked(searchQuery, currentUserId, blockedUserIds);
+    const blockedRelationships =
+      await userService.fetchBlockedRelationships(currentUserId);
+    const blockedUserIds = userService.getBlockedUserIds(
+      blockedRelationships,
+      currentUserId,
+    );
+    const users = await userService.searchUsersExceptBlocked(
+      searchQuery,
+      currentUserId,
+      blockedUserIds,
+    );
 
     res.json(users);
   } catch (err) {
     console.error("Search users error:", err);
-    res.status(500).json({ 
-      message: "Search failed", 
-      error: err.message 
+    res.status(500).json({
+      message: "Search failed",
     });
   }
 };
@@ -58,9 +71,8 @@ export const getUserById = async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error("Get user by ID error:", err);
-    res.status(500).json({ 
-      message: "Failed to fetch user", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to fetch user",
     });
   }
 };
@@ -83,9 +95,8 @@ export const getCurrentUser = async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error("Get current user error:", err);
-    res.status(500).json({ 
-      message: "Failed to get profile", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to get profile",
     });
   }
 };
@@ -130,9 +141,8 @@ export const uploadProfileImage = async (req, res) => {
     });
   } catch (err) {
     console.error("Upload profile image error:", err);
-    res.status(500).json({ 
-      message: "Upload failed", 
-      error: err.message 
+    res.status(500).json({
+      message: "Upload failed",
     });
   }
 };
@@ -146,7 +156,10 @@ export const updateProfileImage = async (req, res) => {
     console.log("Saving profile image:", profileImage);
 
     // Service call
-    const user = await userService.processUpdateProfileImage(userId, profileImage);
+    const user = await userService.processUpdateProfileImage(
+      userId,
+      profileImage,
+    );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -163,9 +176,8 @@ export const updateProfileImage = async (req, res) => {
     });
   } catch (err) {
     console.error("Update profile image error:", err);
-    res.status(500).json({ 
-      message: "Failed to update profile image", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to update profile image",
     });
   }
 };
@@ -197,8 +209,8 @@ export const uploadCoverPhoto = async (req, res) => {
   try {
     // Service call
     const result = await userService.processUploadCoverPhoto(
-      req.user.id, 
-      req.file.filename
+      req.user.id,
+      req.file.filename,
     );
 
     if (!result.user) {
@@ -216,7 +228,6 @@ export const uploadCoverPhoto = async (req, res) => {
     console.error("Upload cover photo error:", err);
     res.status(500).json({
       message: "Failed to upload cover photo",
-      error: err.message,
     });
   }
 };
@@ -246,7 +257,6 @@ export const removeCoverPhoto = async (req, res) => {
 
     res.status(500).json({
       message: "Failed to remove cover photo",
-      error: err.message,
     });
   }
 };

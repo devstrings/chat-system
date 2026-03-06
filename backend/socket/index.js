@@ -70,10 +70,6 @@ export const setupSocket = (io) => {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(socket.id);
-    if (!userSockets.has(userId)) {
-      userSockets.set(userId, new Set());
-    }
-    userSockets.get(userId).add(socket.id);
     console.log(
       ` User ${userId} has ${userSockets.get(userId).size} active socket(s)`,
     );

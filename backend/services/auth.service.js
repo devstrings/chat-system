@@ -1,26 +1,21 @@
-
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import AuthProvider from "../models/AuthProvider.js";
 import config from "../config/index.js";
 import crypto from "crypto";
-
+import { redisClient } from "../config/redis.js";
 // Token generation helpers
 const generateAccessToken = (userId, username) => {
-  return jwt.sign(
-    { id: userId, username }, 
-    config.jwtSecret, 
- { expiresIn: config.jwtExpiresIn } 
-  );
+  return jwt.sign({ id: userId, username }, config.jwtSecret, {
+    expiresIn: config.jwtExpiresIn,
+  });
 };
 
 const generateRefreshToken = (userId, username) => {
-  return jwt.sign(
-    { id: userId, username }, 
-    config.jwtSecret, 
-    { expiresIn: '30d' }
-  );
+  return jwt.sign({ id: userId, username }, config.jwtRefreshSecret, {
+    expiresIn: "30d",
+  });
 };
 
 // REGISTER SERVICE
@@ -78,7 +73,9 @@ export const loginUser = async (email, password) => {
   }
 
   if (!localProvider) {
-    throw new Error("This account was created with Google or Facebook. Please use social login.");
+    throw new Error(
+      "This account was created with Google or Facebook. Please use social login.",
+    );
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
@@ -89,6 +86,17 @@ export const loginUser = async (email, password) => {
   // Generate both tokens
   const accessToken = generateAccessToken(user._id, user.username);
   const refreshToken = generateRefreshToken(user._id, user.username);
+
+  // Redis mein save karo
+  try {
+    await redisClient.set(
+      `refresh:${user._id}`,
+      refreshToken,
+      { EX: 30 * 24 * 60 * 60 }, // 30 din
+    );
+  } catch (err) {
+    console.error(" Redis refresh token save error:", err);
+  }
 
   console.log(" User logged in:", email);
 
@@ -101,28 +109,44 @@ export const loginUser = async (email, password) => {
 };
 
 // GOOGLE OAUTH SERVICE
-export const handleGoogleCallback = (user) => {
+export const handleGoogleCallback = async (user) => {
   const accessToken = generateAccessToken(user._id, user.username);
   const refreshToken = generateRefreshToken(user._id, user.username);
   const profileImage = user.profileImage || "";
+
+  // Redis mein save karo
+  try {
+    await redisClient.set(`refresh:${user._id}`, refreshToken, {
+      EX: 30 * 24 * 60 * 60,
+    });
+  } catch (err) {
+    console.error(" Redis refresh token save error:", err);
+  }
 
   const redirectUrl = `${config.frontend.callbackUrl}?accessToken=${accessToken}&refreshToken=${refreshToken}&username=${encodeURIComponent(user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
 
   console.log(" Google OAuth success:", user.email);
-
   return redirectUrl;
 };
 
 // FACEBOOK OAUTH SERVICE
-export const handleFacebookCallback = (user) => {
+export const handleFacebookCallback = async (user) => {
   const accessToken = generateAccessToken(user._id, user.username);
   const refreshToken = generateRefreshToken(user._id, user.username);
   const profileImage = user.profileImage || "";
 
+  // Redis mein save karo
+  try {
+    await redisClient.set(`refresh:${user._id}`, refreshToken, {
+      EX: 30 * 24 * 60 * 60,
+    });
+  } catch (err) {
+    console.error(" Redis refresh token save error:", err);
+  }
+
   const redirectUrl = `${config.frontend.callbackUrl}?accessToken=${accessToken}&refreshToken=${refreshToken}&username=${encodeURIComponent(user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
 
   console.log(" Facebook OAuth success:", user.email);
-
   return redirectUrl;
 };
 
@@ -154,7 +178,7 @@ export const processForgotPassword = async (email) => {
   // Create reset URL
   const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
 
-  //  CONSOLE LOGGING 
+  //  CONSOLE LOGGING
   console.log("\n" + "=".repeat(80));
   console.log(" PASSWORD RESET REQUEST");
   console.log("=".repeat(80));
@@ -168,7 +192,10 @@ export const processForgotPassword = async (email) => {
   return {
     message: "Password reset link generated successfully",
     resetUrl: config.nodeEnv === "development" ? resetUrl : null,
-    expiresIn: config.nodeEnv === "development" ? config.resetToken.expiryMinutes + " minutes" : null,
+    expiresIn:
+      config.nodeEnv === "development"
+        ? config.resetToken.expiryMinutes + " minutes"
+        : null,
   };
 };
 
@@ -223,7 +250,9 @@ export const setUserPassword = async (userId, newPassword) => {
 
   // Check only if password already exists
   if (user.password) {
-    throw new Error("You already have a password. Use 'Change Password' instead.");
+    throw new Error(
+      "You already have a password. Use 'Change Password' instead.",
+    );
   }
 
   // Hash and set password
@@ -267,9 +296,7 @@ export const fetchCurrentUser = async (userId) => {
 
   const hasLocalAuth = authProviders.some((p) => p.provider === "local");
   const hasGoogleAuth = authProviders.some((p) => p.provider === "google");
-  const hasFacebookAuth = authProviders.some(
-    (p) => p.provider === "facebook",
-  );
+  const hasFacebookAuth = authProviders.some((p) => p.provider === "facebook");
 
   const primaryProvider =
     authProviders.length > 0 ? authProviders[0].provider : "local";
@@ -329,14 +356,21 @@ export const changeUserPassword = async (userId, oldPassword, newPassword) => {
 };
 
 // REFRESH TOKEN SERVICE
-export const refreshAccessToken = (refreshToken) => {
-  // Verify refresh token
-  const decoded = jwt.verify(refreshToken, config.jwtSecret);
+export const refreshAccessToken = async (refreshToken) => {
+  const decoded = jwt.verify(refreshToken, config.jwtRefreshSecret);
 
-  // Generate new access token
+  // Redis se check karo
+  try {
+    const savedToken = await redisClient.get(`refresh:${decoded.id}`);
+    if (!savedToken || savedToken !== refreshToken) {
+      throw new Error("Invalid refresh token");
+    }
+  } catch (err) {
+    if (err.message === "Invalid refresh token") throw err;
+    console.error(" Redis check error:", err);
+  }
+
   const newAccessToken = generateAccessToken(decoded.id, decoded.username);
-
   console.log("Token refreshed for user:", decoded.username);
-
   return { accessToken: newAccessToken };
 };

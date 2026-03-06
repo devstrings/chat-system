@@ -39,67 +39,77 @@ const io = new Server(server, {
 app.set("io", io);
 
 //  1. SECURITY HEADERS
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false,
-}));
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 //  2. CORS
-app.use(cors({
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      config.frontend.url,
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://chat_frontend:5173',  
-      'http://frontend:5173',       
-    ];
-    
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error('CORS policy violation'), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        config.frontend.url,
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://chat_frontend:5173",
+        "http://frontend:5173",
+      ];
+
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) === -1) {
+        return callback(new Error("CORS policy violation"), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 //  3. RATE LIMITING
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 500,
-   skip: (req) => req.path.includes('/messages'),
-  message: 'Too many requests, please try again later',
-
+  message: "Too many requests, please try again later",
 });
-app.use('/api/', apiLimiter);
+app.use("/api/", apiLimiter);
+
+// Messages ke liye alag limiter
+const messageLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 messages per minute
+  message: "Too many messages, slow down!",
+});
+app.use("/api/messages/send", messageLimiter);
 
 //  4. COMPRESSION
 app.use(compression());
 
 //  5. BODY PARSER WITH LIMITS
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 //  6. MONGO SANITIZATION (Express 5 compatible - custom middleware)
 app.use((req, res, next) => {
   const sanitize = (obj) => {
-    if (!obj || typeof obj !== 'object') return obj;
-    
+    if (!obj || typeof obj !== "object") return obj;
+
     for (const key in obj) {
-      if (key.includes('$') || key.includes('.')) {
+      if (key.includes("$") || key.includes(".")) {
         delete obj[key];
-      } else if (typeof obj[key] === 'object') {
+      } else if (typeof obj[key] === "object") {
         sanitize(obj[key]);
       }
     }
@@ -108,7 +118,7 @@ app.use((req, res, next) => {
 
   if (req.body) sanitize(req.body);
   if (req.params) sanitize(req.params);
-  
+
   next();
 });
 
@@ -120,17 +130,19 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 console.log(` Swagger docs: http://localhost:${config.port}/api-docs`);
 
 //  8. SESSION WITH SEPARATE SECRET
-app.use(session({
-  secret: config.sessionSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: config.nodeEnv === "production",
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    sameSite: 'lax',
-  },
-}));
+app.use(
+  session({
+    secret: config.sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.nodeEnv === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: "lax",
+    },
+  }),
+);
 
 // Passport initialization
 app.use(passport.initialize());
@@ -166,16 +178,16 @@ app.get("/health", (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(" Server error:", err);
-  
+
   // Don't leak error details in production
   const errorResponse = {
     message: err.message || "Internal server error",
   };
-  
+
   if (config.nodeEnv === "development") {
     errorResponse.stack = err.stack;
   }
-  
+
   res.status(err.status || 500).json(errorResponse);
 });
 
@@ -206,7 +218,7 @@ startServer();
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log(" SIGTERM received, shutting down gracefully...");
-  
+
   server.close(async () => {
     console.log(" HTTP server closed");
 

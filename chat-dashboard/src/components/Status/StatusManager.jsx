@@ -1,6 +1,7 @@
 //(Upload + Privacy + My Status)
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "../../config/api";
+import ConfirmationDialog from "../ConfirmationDialog";
 export default function StatusManager({
   currentUser,
   onClose,
@@ -34,6 +35,14 @@ export default function StatusManager({
     title: "",
     message: "",
     type: "success",
+  });
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    type: "danger",
   });
 
   const bgColors = [
@@ -100,7 +109,12 @@ export default function StatusManager({
     } else if (file.type.startsWith("video/")) {
       setStatusType("video");
     } else {
-      alert("Only images and videos are supported");
+      setAlertDialog({
+        isOpen: true,
+        title: "Invalid File",
+        message: "Only images and videos are supported",
+        type: "error",
+      });
       return;
     }
 
@@ -115,15 +129,23 @@ export default function StatusManager({
 
   const handleCreateStatus = async () => {
     if (statusType === "text" && !textContent.trim()) {
-      alert("Please enter some text");
+      setAlertDialog({
+        isOpen: true,
+        title: "Required",
+        message: "Please enter some text",
+        type: "error",
+      });
       return;
     }
-
     if ((statusType === "image" || statusType === "video") && !selectedFile) {
-      alert("Please select a file");
+      setAlertDialog({
+        isOpen: true,
+        title: "Required",
+        message: "Please select a file",
+        type: "error",
+      });
       return;
     }
-
     setLoading(true);
 
     try {
@@ -173,9 +195,6 @@ export default function StatusManager({
       setStatusType("text");
 
       //  Show success message (don't close modal)
-      alert("Status added! You can add more or close when done.");
-
-      //  Show success message (don't close modal)
       setAlertDialog({
         isOpen: true,
         title: " Status Added!",
@@ -189,28 +208,48 @@ export default function StatusManager({
       }
     } catch (err) {
       console.error("Create status error:", err);
-      alert("Failed to create status");
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to create status",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteStatus = async (statusId) => {
-    if (!confirm("Delete this status?")) return;
-
-    try {
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${API_BASE_URL}/api/status/${statusId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setMyStatuses((prev) => prev.filter((s) => s._id !== statusId));
-      alert("Status deleted successfully!");
-    } catch (err) {
-      console.error("Delete status error:", err);
-      alert("Failed to delete status");
-    }
+  const handleDeleteStatus = (statusId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Status?",
+      message: "Are you sure you want to delete this status?",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem("accessToken");
+          await fetch(`${API_BASE_URL}/api/status/${statusId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setMyStatuses((prev) => prev.filter((s) => s._id !== statusId));
+          setAlertDialog({
+            isOpen: true,
+            title: "Deleted!",
+            message: "Status deleted successfully",
+            type: "success",
+          });
+        } catch (err) {
+          console.error("Delete status error:", err);
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: "Failed to delete status",
+            type: "error",
+          });
+        }
+      },
+    });
   };
 
   const handleViewStatusViewers = async (statusId) => {
@@ -790,6 +829,15 @@ export default function StatusManager({
             />
           </div>
         </div>
+
+        <ConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+        />
       </>
     );
 
