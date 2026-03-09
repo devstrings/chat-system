@@ -8,33 +8,33 @@ services:
     restart: always
     ports:
       - "5000:5000"
-    environment:
-      - NODE_ENV=development
-      - PORT=5000
-      - MONGO_URI=mongodb://host.docker.internal:27017/chat-system
-      - REDIS_URL=redis://host.docker.internal:6379
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=7d
-      - SESSION_SECRET=${SESSION_SECRET}
-      - FRONTEND_URL=http://localhost:5173
-      - BACKEND_URL=http://localhost:5000
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
-      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID}
-      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET}
-      - FACEBOOK_CALLBACK_URL=http://localhost:5000/api/auth/facebook/callback
-      - FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback
-      - FRONTEND_LOGIN_URL=http://localhost:5173/login
-      - EMAIL_HOST=smtp.gmail.com
-      - EMAIL_PORT=587
-      - EMAIL_USER=${EMAIL_USER}
-      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
-      - EMAIL_FROM=Chat System <noreply@chatsystem.com>
-      - RESET_TOKEN_EXPIRY=15
-      - TURN_SERVER=turn:localhost:3478
-      - TURN_USERNAME=chatuser
-      - TURN_PASSWORD=chatpassword123
+    # environment:
+    #   - NODE_ENV=development
+    #   - PORT=5000
+    #   - MONGO_URI=mongodb://host.docker.internal:27017/chat-system
+    #   - REDIS_URL=redis://host.docker.internal:6379
+    #   - JWT_SECRET=${JWT_SECRET}
+    #   - JWT_EXPIRES_IN=7d
+    #   - SESSION_SECRET=${SESSION_SECRET}
+    #   - FRONTEND_URL=http://localhost:5173
+    #   - BACKEND_URL=http://localhost:5000
+    #   - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    #   - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    #   - GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+    #   - FACEBOOK_APP_ID=${FACEBOOK_APP_ID}
+    #   - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET}
+    #   - FACEBOOK_CALLBACK_URL=http://localhost:5000/api/auth/facebook/callback
+    #   - FRONTEND_CALLBACK_URL=http://localhost:5173/auth/callback
+    #   - FRONTEND_LOGIN_URL=http://localhost:5173/login
+    #   - EMAIL_HOST=smtp.gmail.com
+    #   - EMAIL_PORT=587
+    #   - EMAIL_USER=${EMAIL_USER}
+    #   - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    #   - EMAIL_FROM=Chat System <noreply@chatsystem.com>
+    #   - RESET_TOKEN_EXPIRY=15
+    #   - TURN_SERVER=turn:localhost:3478
+    #   - TURN_USERNAME=chatuser
+    #   - TURN_PASSWORD=chatpassword123
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -54,9 +54,9 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:5000
-      - VITE_SOCKET_URL=http://localhost:5000
-      - VITE_TURN_SERVER=turn:localhost:3478
+      - VITE_API_URL=http://192.168.0.116:5000
+      - VITE_SOCKET_URL=http://192.168.0.116:5000
+      - VITE_TURN_SERVER=turn:192.168.0.116:3478
       - VITE_TURN_USERNAME=chatuser
       - VITE_TURN_PASSWORD=chatpassword123
     depends_on:

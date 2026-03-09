@@ -2,9 +2,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const env = (key, defaultValue) => process.env[key] || defaultValue;
+
+
 console.log("Loading config...");
-console.log("MONGO_URI exists:", !!process.env.MONGO_URI);
-console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 
 const requiredEnvVars = [
   "MONGO_URI",
@@ -28,60 +29,64 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
+
+const PORT = env("PORT", 5000);
+
+const prod_envs = ["production", "staging"];
+const serverUrl = prod_envs.includes(env("NODE_ENV")) ? env("BACKEND_URL") : `http://localhost:${PORT}`;
+
+const googleCallbackUrl = env('GOOGLE_CALLBACK_URL') ? `${serverUrl}${env('GOOGLE_CALLBACK_URL')}` : `${serverUrl}/api/auth/google/callback`;
+const facebookCallbackUrl = env('FACEBOOK_CALLBACK_URL') ? `${serverUrl}${env('FACEBOOK_CALLBACK_URL')}` : `${serverUrl}/api/auth/facebook/callback`;
+
 const config = {
-  port: process.env.PORT || 5000,
-  nodeEnv: process.env.NODE_ENV || "development",
-  serverUrl: process.env.BACKEND_URL || "http://localhost:5000",
+  port: env("PORT", 5000),
+  nodeEnv: env("NODE_ENV", "development"),
+  serverUrl: serverUrl,
 
-  mongoUri: process.env.MONGO_URI,
+  mongoUri: env("MONGO_URI", "mongodb://localhost:27017/chat-system"),
 
-jwtSecret: process.env.JWT_SECRET,
-jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-sessionSecret: process.env.SESSION_SECRET,  
-jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  jwtSecret: env("JWT_SECRET", "your_jwt_secret"),
+  jwtRefreshSecret: env("JWT_REFRESH_SECRET", "your_jwt_refresh_secret"),
+  sessionSecret: env("SESSION_SECRET", "your_session_secret"),
+  jwtExpiresIn: env("JWT_EXPIRES_IN", "7d"),
 
-  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+  redisUrl: env("REDIS_URL", "redis://localhost:6379"),
 
   google: {
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackUrl:
-      process.env.GOOGLE_CALLBACK_URL ||
-      "http://localhost:5000/api/auth/google/callback",
+    clientId: env("GOOGLE_CLIENT_ID"),
+    clientSecret: env("GOOGLE_CLIENT_SECRET"),
+    callbackUrl: googleCallbackUrl,
   },
 
   facebook: {
-    appId: process.env.FACEBOOK_APP_ID,
-    appSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackUrl:
-      process.env.FACEBOOK_CALLBACK_URL ||
-      "http://localhost:5000/api/auth/facebook/callback",
+    appId: env("FACEBOOK_APP_ID"),
+    appSecret: env("FACEBOOK_APP_SECRET"),
+    callbackUrl: facebookCallbackUrl,
   },
 
   frontend: {
-    url: process.env.FRONTEND_URL || "http://localhost:5173",
+    url: env("FRONTEND_URL", "http://localhost:5173"),
     callbackUrl:
-      process.env.FRONTEND_CALLBACK_URL ||
-      "http://localhost:5173/auth/callback",
-    loginUrl: process.env.FRONTEND_LOGIN_URL || "http://localhost:5173/login",
+      env("FRONTEND_CALLBACK_URL", "http://localhost:5173/auth/callback"),
+    loginUrl: env("FRONTEND_LOGIN_URL", "http://localhost:5173/login"),
   },
 
   upload: {
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024,
-    maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE) || 5 * 1024 * 1024,
-    maxVoiceSize: parseInt(process.env.MAX_VOICE_SIZE) || 10 * 1024 * 1024,
+    maxFileSize: parseInt(env("MAX_FILE_SIZE", "52428800")),
+    maxImageSize: parseInt(env("MAX_IMAGE_SIZE", "5242880")),
+    maxVoiceSize: parseInt(env("MAX_VOICE_SIZE", "10485760")),
   },
 
   email: {
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    user: process.env.EMAIL_USER,
-    password: process.env.EMAIL_PASSWORD,
-    from: process.env.EMAIL_FROM || "Chat System <noreply@chatsystem.com>",
+    host: env("EMAIL_HOST", "smtp.gmail.com"),
+    port: parseInt(env("EMAIL_PORT", "587")),
+    user: env("EMAIL_USER"),
+    password: env("EMAIL_PASSWORD"),
+    from: env("EMAIL_FROM", "Chat System <noreply@chatsystem.com>"),
   },
 
   resetToken: {
-    expiryMinutes: parseInt(process.env.RESET_TOKEN_EXPIRY) || 15,
+    expiryMinutes: parseInt(env("RESET_TOKEN_EXPIRY", "15")),
   },
 };
 
