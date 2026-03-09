@@ -39,7 +39,7 @@ const googleCallbackUrl = env('GOOGLE_CALLBACK_URL') ? `${serverUrl}${env('GOOGL
 const facebookCallbackUrl = env('FACEBOOK_CALLBACK_URL') ? `${serverUrl}${env('FACEBOOK_CALLBACK_URL')}` : `${serverUrl}/api/auth/facebook/callback`;
 
 const config = {
-  port: env("PORT", 5000),
+  port: PORT,
   nodeEnv: env("NODE_ENV", "development"),
   serverUrl: serverUrl,
 
