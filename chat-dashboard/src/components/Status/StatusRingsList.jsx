@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API_BASE_URL from "../../config/api";
-
+import axiosInstance from "../../utils/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -108,14 +108,8 @@ export default function StatusRingsList({
 
   const loadStatuses = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(`${API_BASE_URL}/api/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
+      const response = await axiosInstance.get(`/api/status`);
+      const data = response.data;
 
       // Filter expired statuses
       const now = new Date();

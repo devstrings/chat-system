@@ -81,19 +81,10 @@ const UserItem = memo(function UserItem({
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        const res = await fetch(
-          `${API_BASE_URL}/api/friends/status/${user._id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-        const data = await res.json();
-        setRelationshipStatus(data.status);
-        if (data.requestId) {
-          setRequestId(data.requestId);
+        const res = await axiosInstance.get(`/api/friends/status/${user._id}`);
+        setRelationshipStatus(res.data.status);
+        if (res.data.requestId) {
+          setRequestId(res.data.requestId);
         }
       } catch (err) {
         console.error("Fetch status error:", err);
@@ -173,20 +164,9 @@ const UserItem = memo(function UserItem({
 
   const handleSendRequest = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${API_BASE_URL}/api/friends/request/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ receiverId: user._id }),
+      const res = await axiosInstance.post(`/api/friends/request/send`, {
+        receiverId: user._id,
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message);
-      }
 
       setRelationshipStatus("request_sent");
 
@@ -211,22 +191,7 @@ const UserItem = memo(function UserItem({
 
   const handleAcceptRequest = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(
-        `${API_BASE_URL}/api/friends/request/${requestId}/accept`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message);
-      }
+      await axiosInstance.post(`/api/friends/request/${requestId}/accept`);
 
       setRelationshipStatus("friends");
 
@@ -251,21 +216,7 @@ const UserItem = memo(function UserItem({
 
   const handleRejectRequest = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(
-        `${API_BASE_URL}/api/friends/request/${requestId}/reject`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message);
-      }
+      await axiosInstance.delete(`/api/friends/request/${requestId}/reject`);
 
       setRelationshipStatus("none");
 
@@ -299,21 +250,7 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("accessToken");
-          const res = await fetch(
-            `${API_BASE_URL}/api/friends/unfriend/${user._id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-
-          if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.message);
-          }
+          await axiosInstance.delete(`/api/friends/unfriend/${user._id}`);
 
           setRelationshipStatus("none");
 
@@ -350,21 +287,7 @@ const UserItem = memo(function UserItem({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("accessToken");
-          const res = await fetch(`${API_BASE_URL}/api/friends/block`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ userId: user._id }),
-          });
-
-          if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.message);
-          }
-
+          await axiosInstance.post(`/api/friends/block`, { userId: user._id });
           setRelationshipStatus("blocked");
 
           setAlertDialog({
@@ -400,21 +323,7 @@ const UserItem = memo(function UserItem({
       type: "success",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("accessToken");
-          const res = await fetch(
-            `${API_BASE_URL}/api/friends/unblock/${user._id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-
-          if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.message);
-          }
+          await axiosInstance.delete(`/api/friends/unblock/${user._id}`);
 
           setRelationshipStatus("none");
 

@@ -1,5 +1,6 @@
 import Call from "../models/Call.js";
-import mongoose from "mongoose"
+import AppError from "../shared/AppError.js";
+import mongoose from "mongoose";
 export const fetchUserCallHistory = async (userId, limit = 20, page = 1) => {
   const calls = await Call.find({
     $or: [{ caller: userId }, { receiver: userId }]
@@ -65,7 +66,7 @@ export const processDeleteCall = async (callId, userId) => {
   });
 
   if (!call) {
-    throw new Error("Call not found");
+throw new AppError("Call not found", 404); 
   }
 
   await Call.findByIdAndDelete(callId);
@@ -108,8 +109,7 @@ export const fetchCallById = async (callId, userId) => {
     .populate("receiver", "username profileImage");
 
   if (!call) {
-    throw new Error("Call not found");
-  }
+throw new AppError("Call not found", 404);   }
 
   return call;
 };

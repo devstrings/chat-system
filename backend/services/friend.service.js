@@ -3,6 +3,7 @@ import Friendship from "../models/Friendship.js";
 import BlockedUser from "../models/BlockedUser.js";
 import mongoose from "mongoose";
 import config from "../config/index.js";
+import AppError from "../shared/AppError.js";
 //  HELPER FUNCTION TO FORMAT USER WITH FULL IMAGE URL
 const formatUserWithFullImageUrl = (user) => {
   const userObj = user.toObject ? user.toObject() : user;
@@ -111,15 +112,13 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
   const isBlocked = await checkIfBlocked(senderId, receiverId);
   if (isBlocked) {
     console.log(" Cannot send: Users blocked");
-    throw new Error("Cannot send request");
-  }
+throw new AppError("Cannot send request", 403);  }
 
   // Check if already friends
   const alreadyFriends = await checkIfAlreadyFriends(senderId, receiverId);
   if (alreadyFriends) {
     console.log(" Already friends");
-    throw new Error("Already friends");
-  }
+throw new AppError("Already friends", 400);  }
 
   //  Check for ONLY PENDING requests (ignore accepted/rejected ones)
   const existingPendingRequest = await FriendRequest.findOne({
@@ -144,8 +143,7 @@ export const processSendFriendRequest = async (senderId, receiverId) => {
         " Request already exists (same direction):",
         existingPendingRequest._id,
       );
-      throw new Error("Request already sent");
-    }
+throw new AppError("Request already sent", 400);    }
 
     if (isOppositeDirection) {
       console.log("Opposite request found, auto-accepting");
@@ -256,8 +254,7 @@ export const processUnfriend = async (currentUserId, friendId) => {
 
   if (!friendship) {
     console.log(" Friendship not found");
-    throw new Error("Friendship not found");
-  }
+throw new AppError("Friendship not found", 404);  }
 
   console.log(" Friendship deleted:", friendship._id);
 
@@ -283,8 +280,7 @@ export const processBlockUser = async (blockerId, userId) => {
   });
 
   if (existingBlock) {
-    throw new Error("User already blocked");
-  }
+throw new AppError("User already blocked", 400);  }
 
   // Remove friendship if exists
   await Friendship.findOneAndDelete({
@@ -319,8 +315,7 @@ export const processUnblockUser = async (blockerId, userId) => {
   });
 
   if (!block) {
-    throw new Error("User not blocked");
-  }
+throw new AppError("User not blocked", 404);  }
 
   return { message: "User unblocked successfully" };
 };

@@ -1,262 +1,91 @@
 import * as userService from "../services/user.service.js";
 import path from "path";
 import fs from "fs";
+import asyncHandler from "express-async-handler";
 
 // GET ALL USERS CONTROLLER
-export const getUsers = async (req, res) => {
-  try {
-    const currentUserId = req.user.id;
-
-    // Service calls
-    const blockedRelationships =
-      await userService.fetchBlockedRelationships(currentUserId);
-    const blockedUserIds = userService.getBlockedUserIds(
-      blockedRelationships,
-      currentUserId,
-    );
-    const users = await userService.fetchAllUsersExceptBlocked(
-      currentUserId,
-      blockedUserIds,
-    );
-
-    res.json(users);
-  } catch (err) {
-    console.error("Get users error:", err);
-    res.status(500).json({
-      message: "Failed to fetch users",
-    });
-  }
-};
+export const getUsers = asyncHandler(async (req, res) => {
+  const currentUserId = req.user.id;
+  const blockedRelationships = await userService.fetchBlockedRelationships(currentUserId);
+  const blockedUserIds = userService.getBlockedUserIds(blockedRelationships, currentUserId);
+  const users = await userService.fetchAllUsersExceptBlocked(currentUserId, blockedUserIds);
+  res.json(users);
+});
 
 // SEARCH USERS CONTROLLER
-export const searchUsers = async (req, res) => {
-  try {
-    const searchQuery = req.query.q || req.query.query;
-    const currentUserId = req.user.id;
-
-    // Service calls
-    const blockedRelationships =
-      await userService.fetchBlockedRelationships(currentUserId);
-    const blockedUserIds = userService.getBlockedUserIds(
-      blockedRelationships,
-      currentUserId,
-    );
-    const users = await userService.searchUsersExceptBlocked(
-      searchQuery,
-      currentUserId,
-      blockedUserIds,
-    );
-
-    res.json(users);
-  } catch (err) {
-    console.error("Search users error:", err);
-    res.status(500).json({
-      message: "Search failed",
-    });
-  }
-};
+export const searchUsers = asyncHandler(async (req, res) => {
+  const searchQuery = req.query.q || req.query.query;
+  const currentUserId = req.user.id;
+  const blockedRelationships = await userService.fetchBlockedRelationships(currentUserId);
+  const blockedUserIds = userService.getBlockedUserIds(blockedRelationships, currentUserId);
+  const users = await userService.searchUsersExceptBlocked(searchQuery, currentUserId, blockedUserIds);
+  res.json(users);
+});
 
 // GET USER BY ID CONTROLLER
-export const getUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Service call
-    const user = await userService.fetchUserById(id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json(user);
-  } catch (err) {
-    console.error("Get user by ID error:", err);
-    res.status(500).json({
-      message: "Failed to fetch user",
-    });
-  }
-};
+export const getUserById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const user = await userService.fetchUserById(id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json(user);
+});
 
 // GET CURRENT USER CONTROLLER
-export const getCurrentUser = async (req, res) => {
-  try {
-    const user = await userService.fetchCurrentUser(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    console.log("Current user loaded:", {
-      username: user.username,
-      profileImage: user.profileImage,
-      coverPhoto: user.coverPhoto,
-    });
-
-    res.json(user);
-  } catch (err) {
-    console.error("Get current user error:", err);
-    res.status(500).json({
-      message: "Failed to get profile",
-    });
-  }
-};
+export const getCurrentUser = asyncHandler(async (req, res) => {
+  const user = await userService.fetchCurrentUser(req.user.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json(user);
+});
 
 // SERVE PROFILE IMAGE CONTROLLER
-export const serveProfileImage = async (req, res) => {
-  try {
-    const filename = req.params.filename;
-    const filepath = path.join(
-      process.cwd(),
-      "uploads",
-      "profileImages",
-      filename,
-    );
-
-    console.log("Serving image:", filename);
-    console.log("File path:", filepath);
-
-    if (!fs.existsSync(filepath)) {
-      console.log("File not found:", filepath);
-      return res.status(404).json({ message: "Image not found" });
-    }
-
-    console.log("File found, sending...");
-    res.sendFile(filepath);
-  } catch (err) {
-    console.error("Image serve error:", err);
-    res.status(500).json({ message: "Error loading image" });
+export const serveProfileImage = asyncHandler(async (req, res) => {
+  const filename = req.params.filename;
+  const filepath = path.join(process.cwd(), "uploads", "profileImages", filename);
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ message: "Image not found" });
   }
-};
+  res.sendFile(filepath);
+});
 
 // UPLOAD PROFILE IMAGE CONTROLLER
-export const uploadProfileImage = async (req, res) => {
-  try {
-    const imageUrl = `/uploads/profileImages/${req.file.filename}`;
-
-    console.log("Image uploaded:", imageUrl);
-
-    res.json({
-      message: "Image uploaded successfully",
-      imageUrl,
-    });
-  } catch (err) {
-    console.error("Upload profile image error:", err);
-    res.status(500).json({
-      message: "Upload failed",
-    });
-  }
-};
+export const uploadProfileImage = asyncHandler(async (req, res) => {
+  const imageUrl = `/uploads/profileImages/${req.file.filename}`;
+  res.json({ message: "Image uploaded successfully", imageUrl });
+});
 
 // UPDATE PROFILE IMAGE CONTROLLER
-export const updateProfileImage = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { profileImage } = req.body;
-
-    console.log("Saving profile image:", profileImage);
-
-    // Service call
-    const user = await userService.processUpdateProfileImage(
-      userId,
-      profileImage,
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    console.log("User profileImage saved:", user.profileImage);
-
-    res.json({
-      message: "Profile image updated successfully",
-      user: {
-        ...user.toObject(),
-        profileImage: user.profileImage,
-      },
-    });
-  } catch (err) {
-    console.error("Update profile image error:", err);
-    res.status(500).json({
-      message: "Failed to update profile image",
-    });
-  }
-};
+export const updateProfileImage = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { profileImage } = req.body;
+  const user = await userService.processUpdateProfileImage(userId, profileImage);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json({
+    message: "Profile image updated successfully",
+    user: { ...user.toObject(), profileImage: user.profileImage },
+  });
+});
 
 // REMOVE PROFILE IMAGE CONTROLLER
-export const removeProfileImage = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    // Service call
-    const result = await userService.processRemoveProfileImage(userId);
-
-    if (!result) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({
-      message: "Profile image removed successfully",
-      user: result,
-    });
-  } catch (err) {
-    console.error("Remove profile image error:", err);
-    res.status(500).json({ message: "Failed to remove profile image" });
-  }
-};
-
+export const removeProfileImage = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const result = await userService.processRemoveProfileImage(userId);
+  if (!result) return res.status(404).json({ message: "User not found" });
+  res.json({ message: "Profile image removed successfully", user: result });
+});
 // UPLOAD COVER PHOTO CONTROLLER
-export const uploadCoverPhoto = async (req, res) => {
-  try {
-    // Service call
-    const result = await userService.processUploadCoverPhoto(
-      req.user.id,
-      req.file.filename,
-    );
-
-    if (!result.user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    console.log("Cover photo saved:", result.coverPhotoUrl);
-
-    res.json({
-      message: "Cover photo uploaded successfully",
-      coverPhotoUrl: result.coverPhotoUrl,
-      user: result.user,
-    });
-  } catch (err) {
-    console.error("Upload cover photo error:", err);
-    res.status(500).json({
-      message: "Failed to upload cover photo",
-    });
-  }
-};
+export const uploadCoverPhoto = asyncHandler(async (req, res) => {
+  const result = await userService.processUploadCoverPhoto(req.user.id, req.file.filename);
+  if (!result.user) return res.status(404).json({ message: "User not found" });
+  res.json({
+    message: "Cover photo uploaded successfully",
+    coverPhotoUrl: result.coverPhotoUrl,
+    user: result.user,
+  });
+});
 
 // REMOVE COVER PHOTO CONTROLLER
-export const removeCoverPhoto = async (req, res) => {
-  try {
-    console.log("Remove cover photo request");
-    console.log("User ID:", req.user.id);
-
-    // Service call
-    const result = await userService.processRemoveCoverPhoto(req.user.id);
-
-    if (!result) {
-      console.error("User not found");
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({
-      message: "Cover photo removed successfully",
-      user: result,
-    });
-  } catch (err) {
-    console.error("Remove cover photo error:", err);
-    console.error("Error details:", err.message);
-    console.error("Error stack:", err.stack);
-
-    res.status(500).json({
-      message: "Failed to remove cover photo",
-    });
-  }
-};
+export const removeCoverPhoto = asyncHandler(async (req, res) => {
+  const result = await userService.processRemoveCoverPhoto(req.user.id);
+  if (!result) return res.status(404).json({ message: "User not found" });
+  res.json({ message: "Cover photo removed successfully", user: result });
+});

@@ -1,365 +1,162 @@
 import * as groupService from "../services/group.service.js";
 import Message from "../models/Message.js";
-
+import asyncHandler from "express-async-handler";
 // CREATE GROUP CONTROLLER
-export const createGroup = async (req, res) => {
-  try {
-    const { name, description, memberIds } = req.body;
-    const creatorId = req.user.id;
-
-    // Service call
-    const group = await groupService.processCreateGroup(name, description, memberIds, creatorId);
-
-    res.status(201).json(group);
-  } catch (err) {
-    console.error("Create group error:", err);
-    res.status(500).json({ message: "Failed to create group" });
-  }
-};
+export const createGroup = asyncHandler(async (req, res) => {
+  const { name, description, memberIds } = req.body;
+  const creatorId = req.user.id;
+  const group = await groupService.processCreateGroup(name, description, memberIds, creatorId);
+  res.status(201).json(group);
+});
 
 // EDIT GROUP MESSAGE CONTROLLER 
-export const editGroupMessage = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const { text } = req.body;
-    const userId = req.user.id;
-
-    console.log("Editing group message:", { messageId, userId, text });
-
-    const message = req.validatedMessage; 
-
-    // Update message
-    message.text = text.trim();
-    message.isEdited = true;
-    message.editedAt = new Date();
-    await message.save();
-
-    console.log("Message updated:", message._id);
-
-    // Emit socket event to all group members
-    const io = req.app.get("io");
-    if (io) {
-      const groupId = message.groupId.toString();
-      console.log("Emitting groupMessageEdited to group:", groupId);
-      
-      io.to(groupId).emit("groupMessageEdited", {
-        groupId: groupId,
-        messageId: message._id.toString(),
-        text: message.text,
-        editedAt: message.editedAt
-      });
-      
-      console.log("Socket event emitted");
-    } else {
-      console.log("Socket.io instance not found");
-    }
-
-    res.json(message);
-  } catch (err) {
-    console.error("Edit group message error:", err);
-    res.status(500).json({ message: "Failed to edit message" });
+export const editGroupMessage = asyncHandler(async (req, res) => {
+  const { text } = req.body;
+  const message = req.validatedMessage;
+  message.text = text.trim();
+  message.isEdited = true;
+  message.editedAt = new Date();
+  await message.save();
+  const io = req.app.get("io");
+  if (io) {
+    io.to(message.groupId.toString()).emit("groupMessageEdited", {
+      groupId: message.groupId.toString(),
+      messageId: message._id.toString(),
+      text: message.text,
+      editedAt: message.editedAt
+    });
   }
-};
+  res.json(message);
+});
 
 // GET USER'S GROUPS CONTROLLER
-export const getUserGroups = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    // Service call
-    const groups = await groupService.fetchUserGroups(userId);
-
-    res.json(groups);
-  } catch (err) {
-    console.error("Get groups error:", err);
-    res.status(500).json({ message: "Failed to fetch groups" });
-  }
-};
+export const getUserGroups = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const groups = await groupService.fetchUserGroups(userId);
+  res.json(groups);
+});
 
 // GET GROUP DETAILS CONTROLLER
-export const getGroupDetails = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-
-    const group = req.validatedGroup; 
-
-    res.json(group);
-  } catch (err) {
-    console.error("Get group details error:", err);
-    res.status(500).json({ message: "Failed to fetch group details" });
-  }
-};
+export const getGroupDetails = asyncHandler(async (req, res) => {
+  const group = req.validatedGroup;
+  res.json(group);
+});
 
 // UPDATE GROUP (NAME/DESCRIPTION) CONTROLLER
-export const updateGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const { name, description } = req.body;
-
-    // Service call
-    const updatedGroup = await groupService.processUpdateGroup(groupId, name, description);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Update group error:", err);
-    res.status(500).json({ message: "Failed to update group" });
-  }
-};
-
+export const updateGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { name, description } = req.body;
+  const updatedGroup = await groupService.processUpdateGroup(groupId, name, description);
+  res.json(updatedGroup);
+});
 // UPDATE GROUP IMAGE CONTROLLER
-export const updateGroupImage = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-
-    // Service call
-    const updatedGroup = await groupService.processUpdateGroupImage(groupId, req.file);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Update group image error:", err);
-    res.status(500).json({ message: "Failed to update image" });
-  }
-};
-
+export const updateGroupImage = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const updatedGroup = await groupService.processUpdateGroupImage(groupId, req.file);
+  res.json(updatedGroup);
+});
 // REMOVE GROUP IMAGE CONTROLLER
-export const removeGroupImage = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-
-    // Service call
-    const updatedGroup = await groupService.processRemoveGroupImage(groupId);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Remove group image error:", err);
-    res.status(500).json({ message: "Failed to remove image" });
-  }
-};
+export const removeGroupImage = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const updatedGroup = await groupService.processRemoveGroupImage(groupId);
+  res.json(updatedGroup);
+});
 
 // ADD MEMBERS CONTROLLER
-export const addGroupMembers = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const { memberIds } = req.body;
-
-    // Service call
-    const updatedGroup = await groupService.processAddGroupMembers(groupId, memberIds);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Add members error:", err);
-    
-    if (err.message === "All users are already members") {
-      return res.status(400).json({ message: err.message });
-    }
-    
-    res.status(500).json({ message: "Failed to add members" });
-  }
-};
-
+export const addGroupMembers = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { memberIds } = req.body;
+  const updatedGroup = await groupService.processAddGroupMembers(groupId, memberIds);
+  res.json(updatedGroup);
+});
 // REMOVE MEMBER CONTROLLER
-export const removeGroupMember = async (req, res) => {
-  try {
-    const { groupId, memberId } = req.params;
-
-    // Service call
-    const updatedGroup = await groupService.processRemoveGroupMember(groupId, memberId);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Remove member error:", err);
-    res.status(500).json({ message: "Failed to remove member" });
-  }
-};
+export const removeGroupMember = asyncHandler(async (req, res) => {
+  const { groupId, memberId } = req.params;
+  const updatedGroup = await groupService.processRemoveGroupMember(groupId, memberId);
+  res.json(updatedGroup);
+});
 
 // LEAVE GROUP CONTROLLER
-export const leaveGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processLeaveGroup(groupId, userId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Leave group error:", err);
-    res.status(500).json({ message: "Failed to leave group" });
-  }
-};
-
+export const leaveGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processLeaveGroup(groupId, userId);
+  res.json(result);
+});
 // MAKE ADMIN CONTROLLER
-export const makeAdmin = async (req, res) => {
-  try {
-    const { groupId, memberId } = req.params;
-
-    // Service call
-    const updatedGroup = await groupService.processMakeAdmin(groupId, memberId);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Make admin error:", err);
-    res.status(500).json({ message: "Failed to make admin" });
-  }
-};
-
+export const makeAdmin = asyncHandler(async (req, res) => {
+  const { groupId, memberId } = req.params;
+  const updatedGroup = await groupService.processMakeAdmin(groupId, memberId);
+  res.json(updatedGroup);
+});
 // REMOVE ADMIN CONTROLLER
-export const removeAdmin = async (req, res) => {
-  try {
-    const { groupId, memberId } = req.params;
-      const group = await groupService.fetchGroupById(groupId);
-
-    // Service call
-    const updatedGroup = await groupService.processRemoveAdmin(groupId, memberId);
-
-    res.json(updatedGroup);
-  } catch (err) {
-    console.error("Remove admin error:", err);
-    res.status(500).json({ message: "Failed to remove admin" });
-  }
-};
+export const removeAdmin = asyncHandler(async (req, res) => {
+  const { groupId, memberId } = req.params;
+  const updatedGroup = await groupService.processRemoveAdmin(groupId, memberId);
+  res.json(updatedGroup);
+});
 
 // DELETE GROUP CONTROLLER
-export const deleteGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-
-    // Service call
-    const result = await groupService.processDeleteGroup(groupId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Delete group error:", err);
-    res.status(500).json({ message: "Failed to delete group" });
-  }
-};
-
+export const deleteGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const result = await groupService.processDeleteGroup(groupId);
+  res.json(result);
+});
 // PIN GROUP CONTROLLER
-export const pinGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processPinGroup(groupId, userId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Pin group error:", err);
-    res.status(500).json({ message: "Failed to pin group" });
-  }
-};
+export const pinGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processPinGroup(groupId, userId);
+  res.json(result);
+});
 
 // UNPIN GROUP CONTROLLER
-export const unpinGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processUnpinGroup(groupId, userId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Unpin group error:", err);
-    res.status(500).json({ message: "Failed to unpin group" });
-  }
-};
+export const unpinGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processUnpinGroup(groupId, userId);
+  res.json(result);
+});
 
 // ARCHIVE GROUP CONTROLLER
-export const archiveGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processArchiveGroup(groupId, userId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Archive group error:", err);
-    res.status(500).json({ message: "Failed to archive group" });
-  }
-};
+export const archiveGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processArchiveGroup(groupId, userId);
+  res.json(result);
+});
 
 // UNARCHIVE GROUP CONTROLLER
-export const unarchiveGroup = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processUnarchiveGroup(groupId, userId);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Unarchive group error:", err);
-    res.status(500).json({ message: "Failed to unarchive group" });
-  }
-};
-
+export const unarchiveGroup = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processUnarchiveGroup(groupId, userId);
+  res.json(result);
+});
 // CLEAR GROUP CHAT CONTROLLER
-export const clearGroupChat = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await groupService.processClearGroupChat(groupId, userId);
-
-    // Get socket.io instance and emit
-    const io = req.app.get("io");
-    
-    if (io) {
-      console.log("EMITTING groupChatCleared EVENT");
-      console.log("Group ID:", groupId);
-      console.log("Cleared by:", userId);
-      
-      io.to(userId).emit("groupChatCleared", {
-        groupId: result.groupId,
-        clearedBy: result.userId,
-        clearedFor: result.userId,
-        action: "clearedForMe"
-      });
-      
-      console.log("Socket event emitted to clearing user only");
-    }
-
-    res.json({
-      message: result.message,
-      deletedCount: result.deletedCount,
+export const clearGroupChat = asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.id;
+  const result = await groupService.processClearGroupChat(groupId, userId);
+  const io = req.app.get("io");
+  if (io) {
+    io.to(userId).emit("groupChatCleared", {
+      groupId: result.groupId,
+      clearedBy: result.userId,
+      clearedFor: result.userId,
+      action: "clearedForMe"
     });
-  } catch (err) {
-    console.error("Clear group chat error:", err);
-    res.status(500).json({ message: "Failed to clear chat" });
   }
-};
+  res.json({ message: result.message, deletedCount: result.deletedCount });
+});
 
 // SERVE GROUP IMAGE CONTROLLER
-export const serveGroupImage = async (req, res) => {
-  try {
-    const filename = req.params.filename;
-    const userId = req.user.id;
-
-    console.log("Serving group image:", { filename, userId });
-
-    // Service call
-    const filePath = groupService.findGroupImageFile(filename);
-    const mimeType = groupService.getMimeType(filePath);
-
-    // Set headers and send file
-    res.setHeader("Content-Type", mimeType);
-    res.setHeader("Cache-Control", "public, max-age=31536000");
-    res.setHeader("Content-Disposition", "inline");
-
-    return res.sendFile(filePath);
-  } catch (error) {
-    console.error("Group image serve error:", error);
-    
-    if (error.message === "Image not found") {
-      return res.status(404).json({ message: error.message });
-    }
-    
-    res.status(500).json({ message: "Failed to serve image" });
-  }
-};
+export const serveGroupImage = asyncHandler(async (req, res) => {
+  const filename = req.params.filename;
+  const filePath = groupService.findGroupImageFile(filename);
+  const mimeType = groupService.getMimeType(filePath);
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Cache-Control", "public, max-age=31536000");
+  res.setHeader("Content-Disposition", "inline");
+  return res.sendFile(filePath);
+});

@@ -1,213 +1,82 @@
 import * as authService from "../services/auth.service.js";
 import config from "../config/index.js";
 import { redisClient } from "../config/redis.js";
+import asyncHandler from "express-async-handler";
 // REGISTER CONTROLLER
-export const register = async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-
-    // Service call
-    const user = await authService.registerUser(username, email, password);
-
-    res.status(201).json({
-      message: "User registered successfully",
-      user,
-    });
-  } catch (err) {
-    console.error(" Registration error:", err);
-    if (err.message === "Email already registered") {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({ message: "Registration failed" });
-  }
-};
+export const register = asyncHandler(async (req, res) => {
+  const { username, email, password } = req.body;
+  const user = await authService.registerUser(username, email, password);
+  res.status(201).json({ message: "User registered successfully", user });
+});
 
 // LOGIN CONTROLLER
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Service call
-    const result = await authService.loginUser(email, password);
-
-    res.json({
-      message: "Login successful",
-      ...result,
-    });
-  } catch (err) {
-    console.error(" Login error:", err);
-    if (err.message === "User not found") {
-      return res.status(404).json({ message: err.message });
-    }
-    if (err.message === "Invalid email or password") {
-      return res.status(401).json({ message: err.message });
-    }
-    if (err.message.includes("Google or Facebook")) {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({ message: "Login failed" });
-  }
-};
+export const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const result = await authService.loginUser(email, password);
+  res.json({ message: "Login successful", ...result });
+});
 
 // GOOGLE CALLBACK CONTROLLER
-export const googleCallback = async (req, res) => {
-  try {
-    const redirectUrl = await authService.handleGoogleCallback(req.user);
-    res.redirect(redirectUrl);
-  } catch (err) {
-    console.error(" Google callback error:", err);
-    res.redirect(`${config.frontend.loginUrl}?error=token_generation_failed`);
-  }
-};
+export const googleCallback = asyncHandler(async (req, res) => {
+  const redirectUrl = await authService.handleGoogleCallback(req.user);
+  res.redirect(redirectUrl);
+});
 
 // FACEBOOK CALLBACK CONTROLLER
-export const facebookCallback = async (req, res) => {
-  try {
-    const redirectUrl = await authService.handleFacebookCallback(req.user);
-    res.redirect(redirectUrl);
-  } catch (err) {
-    console.error("Facebook callback error:", err);
-    res.redirect(`${config.frontend.loginUrl}?error=token_generation_failed`);
-  }
-};
+export const facebookCallback = asyncHandler(async (req, res) => {
+  const redirectUrl = await authService.handleFacebookCallback(req.user);
+  res.redirect(redirectUrl);
+});
 
 // FORGOT PASSWORD CONTROLLER
-export const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    // Service call
-    const result = await authService.processForgotPassword(email);
-
-    res.json({
-      message: result.message,
-      ...(result.resetUrl && {
-        resetUrl: result.resetUrl,
-        expiresIn: result.expiresIn,
-      }),
-    });
-  } catch (err) {
-    console.error("Forgot password error:", err);
-    res.status(500).json({
-      message: "Failed to process request",
-    });
-  }
-};
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await authService.processForgotPassword(email);
+  res.json({
+    message: result.message,
+    ...(result.resetUrl && { resetUrl: result.resetUrl, expiresIn: result.expiresIn }),
+  });
+});
 
 // RESET PASSWORD CONTROLLER
-export const resetPassword = async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-
-    // Service call
-    const result = await authService.processResetPassword(token, newPassword);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Reset password error:", err);
-    if (err.message === "Invalid or expired reset token") {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({
-      message: "Failed to reset password",
-    });
-  }
-};
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+  const result = await authService.processResetPassword(token, newPassword);
+  res.json(result);
+});
 
 // SET PASSWORD CONTROLLER
-export const setPassword = async (req, res) => {
-  try {
-    const { newPassword } = req.body;
-    const userId = req.user.id || req.user.userId;
-
-    // Service call
-    const result = await authService.setUserPassword(userId, newPassword);
-
-    res.json(result);
-  } catch (err) {
-    console.error("Set password error:", err);
-    if (err.message === "User not found") {
-      return res.status(404).json({ message: err.message });
-    }
-    if (err.message.includes("Change Password")) {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({
-      message: "Failed to set password",
-    });
-  }
-};
+export const setPassword = asyncHandler(async (req, res) => {
+  const { newPassword } = req.body;
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.setUserPassword(userId, newPassword);
+  res.json(result);
+});
 
 // GET CURRENT USER CONTROLLER
-export const getCurrentUser = async (req, res) => {
-  try {
-    const userId = req.user.id || req.user.userId;
-
-    // Service call
-    const userData = await authService.fetchCurrentUser(userId);
-
-    res.json(userData);
-  } catch (err) {
-    console.error("Get user error:", err);
-    if (err.message === "User not found") {
-      return res.status(404).json({ message: err.message });
-    }
-    res.status(500).json({
-      message: "Failed to fetch user",
-    });
-  }
-};
+export const getCurrentUser = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const userData = await authService.fetchCurrentUser(userId);
+  res.json(userData);
+});
 
 // CHANGE PASSWORD CONTROLLER
-export const changePassword = async (req, res) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-    const userId = req.user.id;
-
-    // Service call
-    const result = await authService.changeUserPassword(
-      userId,
-      oldPassword,
-      newPassword,
-    );
-
-    res.json(result);
-  } catch (err) {
-    console.error(" Change password error:", err);
-    if (err.message.includes("Set Password")) {
-      return res.status(400).json({ message: err.message });
-    }
-    if (err.message === "Current password is incorrect") {
-      return res.status(400).json({ message: err.message });
-    }
-    if (err.message.includes("must be different")) {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({
-      message: "Failed to change password",
-    });
-  }
-};
+export const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.user.id;
+  const result = await authService.changeUserPassword(userId, oldPassword, newPassword);
+  res.json(result);
+});
 
 // REFRESH TOKEN CONTROLLER
-export const refreshToken = async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    const result = await authService.refreshAccessToken(refreshToken);
-    res.json(result);
-  } catch (err) {
-    console.error(" Refresh token error:", err);
-    return res.status(403).json({ message: "Invalid refresh token" });
-  }
-};
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  const result = await authService.refreshAccessToken(refreshToken);
+  res.json(result);
+});
 // LOGOUT CONTROLLER
-export const logout = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    await redisClient.del(`refresh:${userId}`);
-    res.json({ message: "Logged out successfully" });
-  } catch (err) {
-    console.error("Logout error:", err);
-    res.status(500).json({ message: "Logout failed" });
-  }
-};
+export const logout = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  await redisClient.del(`refresh:${userId}`);
+  res.json({ message: "Logged out successfully" });
+});

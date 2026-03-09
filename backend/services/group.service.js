@@ -3,6 +3,7 @@ import user from "../models/User.js";
 import Message from "../models/Message.js";
 import fs from "fs";
 import path from "path";
+import AppError from "../shared/AppError.js";
 
 // CREATE GROUP SERVICE
 export const processCreateGroup = async (
@@ -124,8 +125,7 @@ export const processAddGroupMembers = async (groupId, memberIds) => {
   );
 
   if (newMembers.length === 0) {
-    throw new Error("All users are already members");
-  }
+throw new AppError("All users are already members", 400);  }
 
   // Add members back (even if previously removed)
   group.members.push(...newMembers);
@@ -343,8 +343,7 @@ export const findGroupImageFile = (filename) => {
 
   if (!filePath) {
     console.error(" Group image not found:", cleanFilename);
-    throw new Error("Image not found");
-  }
+throw new AppError("Image not found", 404);  }
 
   return filePath;
 };

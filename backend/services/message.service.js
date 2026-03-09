@@ -3,7 +3,7 @@ import Conversation from "../models/Conversation.js";
 import Attachment from "../models/Attachment.js";
 import Friendship from "../models/Friendship.js";
 import Group from "../models/Group.js";
-
+import AppError from "../shared/AppError.js";
 //  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {
   //  Convert to string for proper comparison
@@ -233,8 +233,7 @@ export const processDeleteConversation = async (
 
   if (!conversation) {
     console.log("No conversation found");
-    throw new Error("No conversation found to delete");
-  }
+throw new AppError("No conversation found to delete", 404);  }
 
   const otherUserIdInConv = conversation.participants.find(
     (p) => p.toString() !== currentUserId,

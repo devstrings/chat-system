@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "../../config/api";
 import ConfirmationDialog from "../ConfirmationDialog";
+import axiosInstance from "../../utils/axiosInstance";
 export default function StatusManager({
   currentUser,
   onClose,
@@ -78,19 +79,10 @@ export default function StatusManager({
     console.log(" Loading my statuses for user:", currentUser._id);
 
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `${API_BASE_URL}/api/status/user/${currentUser._id}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const response = await axiosInstance.get(
+        `/api/status/user/${currentUser._id}`,
       );
-
-      console.log(" Response status:", response.status);
-
-      if (!response.ok) {
-        throw new Error("Failed to load statuses");
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log(" My statuses loaded:", data);
       console.log(" Total statuses:", data.length);
 
@@ -171,17 +163,10 @@ export default function StatusManager({
       formData.append("hiddenFrom", JSON.stringify(hiddenFrom));
       formData.append("sharedWith", JSON.stringify(sharedWith));
 
-      const response = await fetch(`${API_BASE_URL}/api/status`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
+      const response = await axiosInstance.post(`/api/status`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-
-      if (!response.ok) throw new Error("Failed to create status");
-
-      const result = await response.json();
+      const result = response.data;
 
       if (onStatusCreated) {
         onStatusCreated(result.status);
@@ -227,11 +212,7 @@ export default function StatusManager({
       type: "danger",
       onConfirm: async () => {
         try {
-          const token = localStorage.getItem("accessToken");
-          await fetch(`${API_BASE_URL}/api/status/${statusId}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await axiosInstance.delete(`/api/status/${statusId}`);
           setMyStatuses((prev) => prev.filter((s) => s._id !== statusId));
           setAlertDialog({
             isOpen: true,
@@ -254,12 +235,10 @@ export default function StatusManager({
 
   const handleViewStatusViewers = async (statusId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `${API_BASE_URL}/api/status/${statusId}/viewers`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const response = await axiosInstance.get(
+        `/api/status/${statusId}/viewers`,
       );
-      const data = await response.json();
+      const data = response.data;
       setStatusViewers(data.viewers);
       setShowViewers(true);
     } catch (err) {

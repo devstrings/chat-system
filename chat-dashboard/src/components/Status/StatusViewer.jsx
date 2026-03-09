@@ -1,6 +1,7 @@
 // StatusViewer.jsx - VIEWER ONLY
 import React, { useState, useEffect, useRef } from "react";
 import API_BASE_URL from "../../config/api";
+import axiosInstance from "../../utils/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -169,14 +170,7 @@ export default function StatusViewer({
 
     const markAsViewed = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        await fetch(`${API_BASE_URL}/api/status/${currentStatus._id}/view`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
+        await axiosInstance.post(`/api/status/${currentStatus._id}/view`);
       } catch (err) {
         console.error("Mark as viewed error:", err);
       }

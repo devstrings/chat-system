@@ -18,7 +18,7 @@ import routes from "./routes/index.route.js";
 import config from "./config/index.js";
 import { setupSocket } from "./socket/index.js";
 import swaggerSpec from "./swagger.js";
-
+import errorHandler from "./middleware/errorHandler.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -80,13 +80,13 @@ app.use(
 
 //  3. RATE LIMITING
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 1 * 60 * 1000,
   max: 500,
   message: "Too many requests, please try again later",
 });
 app.use("/api/", apiLimiter);
 
-// Messages ke liye alag limiter
+// Messages endpoint rate limiter
 const messageLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 60, // 60 messages per minute
@@ -174,23 +174,8 @@ app.get("/health", (req, res) => {
     environment: config.nodeEnv,
   });
 });
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(" Server error:", err);
-
-  // Don't leak error details in production
-  const errorResponse = {
-    message: err.message || "Internal server error",
-  };
-
-  if (config.nodeEnv === "development") {
-    errorResponse.stack = err.stack;
-  }
-
-  res.status(err.status || 500).json(errorResponse);
-});
-
+// Global error handler
+app.use(errorHandler);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

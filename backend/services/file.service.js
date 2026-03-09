@@ -5,7 +5,7 @@ import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "../models/Attachment.js";
 import Conversation from "../models/Conversation.js";
 import Group from "../models/Group.js";
-
+import AppError from "../shared/AppError.js";
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>
   new Promise((resolve, reject) => {
@@ -26,8 +26,7 @@ export const processFileDownload = async (filename, userId) => {
     filename.includes("/") ||
     filename.includes("\\")
   ) {
-    throw new Error("File not found on server");
-  }
+throw new AppError("File not found on server", 404);  }
 
   const possiblePaths = [
     path.join(process.cwd(), "uploads", "messages", filename),
@@ -46,7 +45,7 @@ export const processFileDownload = async (filename, userId) => {
 
   if (!filePath) {
     console.error(" File not found in any location:", filename);
-    throw new Error("File not found on server");
+    throw new AppError("File not found on server", 404);
   }
 
   // Find attachment ( - for permission check)
@@ -82,9 +81,7 @@ export const processFileDownload = async (filename, userId) => {
   }
 
   if (!hasAccess) {
-    throw new Error(
-      "Access denied: You don't have permission to access this file",
-    );
+  throw new AppError("Access denied: You don't have permission to access this file", 403);
   }
 
   return { filePath, attachment };
@@ -106,8 +103,7 @@ export const verifyUserAccess = async (conversationId, userId) => {
     const group = await Group.findById(conversationId);
 
     if (!group) {
-      throw new Error("Conversation or group not found");
-    }
+throw new AppError("Conversation or group not found", 404);    }
 
     // Check if user is group member
     isParticipant = group.members.some(
@@ -116,9 +112,7 @@ export const verifyUserAccess = async (conversationId, userId) => {
   }
 
   if (!isParticipant) {
-    throw new Error(
-      "Access denied: You are not a participant in this conversation",
-    );
+   throw new AppError("Access denied: You are not a participant in this conversation", 403);
   }
 
   return true;

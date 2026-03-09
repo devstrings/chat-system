@@ -28,6 +28,12 @@ export default function ProfileSettings({
 }) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alertDialog, setAlertDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "success",
+  });
   const [coverPhotoPreview, setCoverPhotoPreview] = useState(null);
   const [coverPhotoLoading, setCoverPhotoLoading] = useState(false);
   const coverFileInputRef = useRef(null);
@@ -109,27 +115,15 @@ export default function ProfileSettings({
 
   const loadBlockedUsers = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${API_BASE_URL}/api/friends/blocked`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      setBlockedUsers(data);
+      const res = await axiosInstance.get(`/api/friends/blocked`);
+      setBlockedUsers(res.data);
     } catch (err) {}
   };
 
   const loadPendingRequests = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${API_BASE_URL}/api/friends/requests/pending`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      setPendingRequests(data);
+      const res = await axiosInstance.get(`/api/friends/requests/pending`);
+      setPendingRequests(res.data);
     } catch (err) {}
   };
 
@@ -143,30 +137,18 @@ export default function ProfileSettings({
     if (!file) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
       const formData = new FormData();
       formData.append("image", file);
 
-      const uploadRes = await fetch(
-        `${API_BASE_URL}/api/users/profile/upload`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        },
+      const uploadRes = await axiosInstance.post(
+        `/api/users/profile/upload`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
-      const uploadData = await uploadRes.json();
-      const imageUrl = uploadData.imageUrl;
+      const imageUrl = uploadRes.data.imageUrl;
 
-      await fetch(`${API_BASE_URL}/api/users/profile/update-image`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ profileImage: imageUrl }),
+      await axiosInstance.put(`/api/users/profile/update-image`, {
+        profileImage: imageUrl,
       });
 
       onProfileImageUpdate(imageUrl);
@@ -195,26 +177,15 @@ export default function ProfileSettings({
 
     setCoverPhotoLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
       const formData = new FormData();
       formData.append("coverPhoto", file);
 
-      const uploadRes = await fetch(
-        `${API_BASE_URL}/api/users/profile/upload-cover`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        },
+      const uploadRes = await axiosInstance.post(
+        `/api/users/profile/upload-cover`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
-
-      if (!uploadRes.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const uploadData = await uploadRes.json();
+      const uploadData = uploadRes.data;
       const coverPhotoWithTimestamp = `${uploadData.coverPhotoUrl}?t=${Date.now()}`;
 
       onProfileImageUpdate(coverPhotoWithTimestamp, true);
@@ -242,21 +213,7 @@ export default function ProfileSettings({
   const handleRemoveCoverPhoto = async () => {
     setCoverPhotoLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `${API_BASE_URL}/api/users/profile/remove-cover`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Remove failed");
-      }
-
+      await axiosInstance.delete(`/api/users/profile/remove-cover`);
       onProfileImageUpdate(null, true);
       setCoverPhotoPreview(null);
 
@@ -282,13 +239,7 @@ export default function ProfileSettings({
   const handleRemoveImage = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${API_BASE_URL}/api/users/profile/remove-image`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axiosInstance.delete(`/api/users/profile/remove-image`);
 
       onProfileImageUpdate(null);
       setShowPhotoMenu(false);
@@ -413,13 +364,7 @@ export default function ProfileSettings({
   };
   const handleUnblockUser = async (userId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${API_BASE_URL}/api/friends/unblock/${userId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axiosInstance.delete(`/api/friends/unblock/${userId}`);
       setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
       setAlertDialog({
         isOpen: true,
@@ -440,13 +385,7 @@ export default function ProfileSettings({
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${API_BASE_URL}/api/friends/request/${requestId}/accept`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axiosInstance.post(`/api/friends/request/${requestId}/accept`);
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       setAlertDialog({
         isOpen: true,
@@ -468,13 +407,7 @@ export default function ProfileSettings({
 
   const handleRejectRequest = async (requestId) => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${API_BASE_URL}/api/friends/request/${requestId}/reject`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axiosInstance.delete(`/api/friends/request/${requestId}/reject`);
       setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
       setAlertDialog({
         isOpen: true,
