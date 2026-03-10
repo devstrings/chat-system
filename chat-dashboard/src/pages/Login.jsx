@@ -1,19 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from 'react-redux';
-import { login, clearError } from '../store/slices/authSlice';
+import { useDispatch, useSelector } from "react-redux";
+import { login, clearError } from "../store/slices/authSlice";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
-import API_BASE_URL from "../config/api";
-
+import { useGoogleLogin } from "@react-oauth/google";
+import FacebookLogin from "@greatsumini/react-facebook-login";
+import axiosInstance from "../utils/axiosInstance";
 export default function Login() {
   const navigate = useNavigate();
   const hasNavigated = useRef(false);
   const hasCheckedAuth = useRef(false);
 
-const dispatch = useDispatch();
-const { loading, error, isAuthenticated } = useSelector((state) => state.auth);
-const [formData, setFormData] = useState({ email: "", password: "" });
+  const dispatch = useDispatch();
+  const { loading, error, isAuthenticated } = useSelector(
+    (state) => state.auth,
+  );
+  const [formData, setFormData] = useState({ email: "", password: "" });
 
   useEffect(() => {
     if (hasCheckedAuth.current) return;
@@ -21,7 +24,7 @@ const [formData, setFormData] = useState({ email: "", password: "" });
 
     const accessToken = localStorage.getItem("accessToken");
     const refreshToken = localStorage.getItem("refreshToken");
-    
+
     if (accessToken || refreshToken) {
       if (!hasNavigated.current) {
         hasNavigated.current = true;
@@ -30,31 +33,59 @@ const [formData, setFormData] = useState({ email: "", password: "" });
     }
   }, [navigate]);
 
-const handleChange = (e) => {
-  setFormData({ ...formData, [e.target.name]: e.target.value });
-  dispatch(clearError());  
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  dispatch(clearError());
-  
-  const result = await dispatch(login(formData));
-  
-  if (login.fulfilled.match(result)) {
-    hasNavigated.current = true;
-    navigate("/dashboard", { replace: true });
-  }
-};
-
-  const handleGoogleLogin = () => {
-    console.log(" Google login clicked");
-    window.location.href = `${API_BASE_URL}/api/auth/google`;
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    dispatch(clearError());
   };
 
-  const handleFacebookLogin = () => {
-    console.log(" Facebook login clicked");
-    window.location.href = `${API_BASE_URL}/api/auth/facebook`;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    dispatch(clearError());
+
+    const result = await dispatch(login(formData));
+
+    if (login.fulfilled.match(result)) {
+      hasNavigated.current = true;
+      navigate("/dashboard", { replace: true });
+    }
+  };
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (response) => {
+      try {
+        const result = await axiosInstance.post("/api/auth/google", {
+          code: response.code,
+        });
+        localStorage.setItem("accessToken", result.data.accessToken);
+        localStorage.setItem("refreshToken", result.data.refreshToken);
+        localStorage.setItem("username", result.data.username);
+        if (result.data.profileImage) {
+          localStorage.setItem("profileImage", result.data.profileImage);
+        }
+        navigate("/dashboard", { replace: true });
+      } catch (err) {
+        console.error("Google login error:", err);
+      }
+    },
+    onError: (err) => console.error("Google error:", err),
+    flow: "auth-code",
+  });
+
+  const handleFacebookLogin = async (response) => {
+    try {
+      const result = await axiosInstance.post("/api/auth/facebook", {
+        accessToken: response.accessToken,
+      });
+      localStorage.setItem("accessToken", result.data.accessToken);
+      localStorage.setItem("refreshToken", result.data.refreshToken);
+      localStorage.setItem("username", result.data.username);
+      if (result.data.profileImage) {
+        localStorage.setItem("profileImage", result.data.profileImage);
+      }
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      console.error("Facebook login error:", err);
+    }
   };
 
   return (
@@ -83,14 +114,20 @@ const handleSubmit = async (e) => {
             Continue with Google
           </button>
 
-          <button
-            type="button"
-            onClick={handleFacebookLogin}
-            className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
-          >
-            <FaFacebook className="text-2xl" />
-            Continue with Facebook
-          </button>
+          <FacebookLogin
+            appId="1280660247415742"
+            onSuccess={handleFacebookLogin}
+            onFail={(err) => console.error("Facebook error:", err)}
+            render={({ onClick }) => (
+              <button
+                onClick={onClick}
+                className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
+              >
+                <FaFacebook className="text-2xl" />
+                Continue with Facebook
+              </button>
+            )}
+          />
         </div>
 
         <div className="flex items-center gap-3 mb-6">

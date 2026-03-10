@@ -107,47 +107,146 @@ throw new AppError("Invalid email or password", 401);  }
 };
 
 // GOOGLE OAUTH SERVICE
-export const handleGoogleCallback = async (user) => {
-  const accessToken = generateAccessToken(user._id, user.username);
-  const refreshToken = generateRefreshToken(user._id, user.username);
-  const profileImage = user.profileImage || "";
+export const handleGoogleAuth = async (code) => {
+  const { OAuth2Client } = await import("google-auth-library");
+  const client = new OAuth2Client(
+    config.google.clientId,
+    config.google.clientSecret,
+  );
 
-  // Redis mein save karo
-  try {
-    await redisClient.set(`refresh:${user._id}`, refreshToken, {
-      EX: 30 * 24 * 60 * 60,
+  const { tokens } = await client.getToken({
+    code,
+    redirect_uri: "postmessage",
+  });
+
+  const ticket = await client.verifyIdToken({
+    idToken: tokens.id_token,
+    audience: config.google.clientId,
+  });
+
+  const payload = ticket.getPayload();
+  const email = payload.email;
+  const name = payload.name;
+  const picture = payload.picture;
+  const googleId = payload.sub;
+
+  let user = await User.findOne({ email });
+
+  if (user) {
+    const googleProvider = await AuthProvider.findOne({
+      userId: user._id,
+      provider: "google",
     });
-  } catch (err) {
-    console.error(" Redis refresh token save error:", err);
+
+    if (!googleProvider) {
+      await AuthProvider.create({
+        userId: user._id,
+        provider: "google",
+        providerId: googleId,
+        providerData: { name, picture },
+      });
+
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+        await user.save();
+      }
+    }
+  } else {
+    let username = name || `user_${Date.now()}`;
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) username = `${username}_${Date.now()}`;
+
+    user = await User.create({ email, username, profileImage: picture });
+
+    await AuthProvider.create({
+      userId: user._id,
+      provider: "google",
+      providerId: googleId,
+      providerData: { name, picture },
+    });
   }
 
-  const redirectUrl = `${config.frontend.callbackUrl}?accessToken=${accessToken}&refreshToken=${refreshToken}&username=${encodeURIComponent(user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+  const accessToken = generateAccessToken(user._id, user.username);
+  const refreshToken = generateRefreshToken(user._id, user.username);
 
-  console.log(" Google OAuth success:", user.email);
-  return redirectUrl;
+  await redisClient.set(`refresh:${user._id}`, refreshToken, {
+    EX: 30 * 24 * 60 * 60,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    username: user.username,
+    profileImage: user.profileImage || "",
+  };
 };
 
 // FACEBOOK OAUTH SERVICE
-export const handleFacebookCallback = async (user) => {
-  const accessToken = generateAccessToken(user._id, user.username);
-  const refreshToken = generateRefreshToken(user._id, user.username);
-  const profileImage = user.profileImage || "";
 
-  // Redis mein save karo
-  try {
-    await redisClient.set(`refresh:${user._id}`, refreshToken, {
-      EX: 30 * 24 * 60 * 60,
+export const handleFacebookAuth = async (accessToken) => {
+  const axios = await import("axios");
+  
+  const { data } = await axios.default.get(
+    `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
+  );
+
+  const email = data.email;
+  if (!email) throw new AppError("Email not provided by Facebook", 400);
+
+  const facebookId = data.id;
+  const name = data.name;
+  const picture = data.picture?.data?.url;
+
+  let user = await User.findOne({ email });
+
+  if (user) {
+    const facebookProvider = await AuthProvider.findOne({
+      userId: user._id,
+      provider: "facebook",
     });
-  } catch (err) {
-    console.error(" Redis refresh token save error:", err);
+
+    if (!facebookProvider) {
+      await AuthProvider.create({
+        userId: user._id,
+        provider: "facebook",
+        providerId: facebookId,
+        providerData: { name, picture },
+      });
+
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+        await user.save();
+      }
+    }
+  } else {
+    let username = name || `user_${Date.now()}`;
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) username = `${username}_${Date.now()}`;
+
+    user = await User.create({ email, username, profileImage: picture });
+
+    await AuthProvider.create({
+      userId: user._id,
+      provider: "facebook",
+      providerId: facebookId,
+      providerData: { name, picture },
+    });
   }
 
-  const redirectUrl = `${config.frontend.callbackUrl}?accessToken=${accessToken}&refreshToken=${refreshToken}&username=${encodeURIComponent(user.username)}&profileImage=${encodeURIComponent(profileImage)}`;
+  const jwtAccessToken = generateAccessToken(user._id, user.username);
+  const jwtRefreshToken = generateRefreshToken(user._id, user.username);
 
-  console.log(" Facebook OAuth success:", user.email);
-  return redirectUrl;
+  await redisClient.set(`refresh:${user._id}`, jwtRefreshToken, {
+    EX: 30 * 24 * 60 * 60,
+  });
+
+  return {
+    accessToken: jwtAccessToken,
+    refreshToken: jwtRefreshToken,
+    username: user.username,
+    profileImage: user.profileImage || "",
+  };
 };
-
 // FORGOT PASSWORD SERVICE
 export const processForgotPassword = async (email) => {
   const user = await User.findOne({ email: email.toLowerCase() });

@@ -1,5 +1,5 @@
 import express from "express";
-import passport from "../config/passport.js";
+// import passport from "../config/passport.js";
 import {
   register,
   login,
@@ -24,7 +24,7 @@ import {
   setPasswordValidation,
   changePasswordValidation,
 } from "../validators/index.js";
-import config from "../config/index.js";
+// import config from "../config/index.js";
 
 const router = express.Router();
 
@@ -139,74 +139,13 @@ router.post(
  */
 router.get("/me", verifyToken, getCurrentUser);
 
-/**
- * @swagger
- * /auth/google:
- *   get:
- *     summary: Google OAuth login
- *     tags: [Auth]
- */
-router.get(
-  "/google",
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    session: false,
-  }),
-);
 
-/**
- * @swagger
- * /auth/google/callback:
- *   get:
- *     summary: Google OAuth callback
- *     tags: [Auth]
- */
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: `${config.frontend.loginUrl}?error=google_auth_failed`,
-  }),
-  googleCallback,
-);
 
-/**
- * @swagger
- * /auth/facebook:
- *   get:
- *     summary: Facebook OAuth login
- *     tags: [Auth]
- */
-router.get(
-  "/facebook",
-  passport.authenticate("facebook", {
-    scope: ["email"],
-    session: false,
-  }),
-);
 
-/**
- * @swagger
- * /auth/facebook/callback:
- *   get:
- *     summary: Facebook OAuth callback
- *     tags: [Auth]
- */
-router.get(
-  "/facebook/callback",
-  passport.authenticate("facebook", {
-    session: false,
-    failureRedirect: `${config.frontend.loginUrl}?error=facebook_auth_failed`,
-  }),
-  facebookCallback,
-);
+router.post("/google", googleCallback);
+router.post("/facebook", facebookCallback);
 
-// ERROR HANDLER
-router.use((err, req, res, next) => {
-  console.error(" OAuth error:", err.message);
-  res.redirect(
-    `${config.frontend.loginUrl}?error=${encodeURIComponent(err.message)}`,
-  );
-});
+
+
 
 export default router;

@@ -9,6 +9,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "axios": "^1.13.6",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -20,6 +21,7 @@
     "express-session": "^1.18.2",
     "express-validator": "^7.3.1",
     "get-audio-duration": "^4.0.1",
+    "google-auth-library": "^10.6.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",

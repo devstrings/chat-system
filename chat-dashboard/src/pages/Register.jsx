@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
-import { useDispatch, useSelector } from 'react-redux';
-import { register, clearError } from '../store/slices/authSlice';
-import API_BASE_URL from "../config/api";
+import { useDispatch, useSelector } from "react-redux";
+import { register, clearError } from "../store/slices/authSlice";
+import { useGoogleLogin } from "@react-oauth/google";
+import FacebookLogin from "@greatsumini/react-facebook-login";
+// import axiosInstance from "../utils/axiosInstance";
+// import API_BASE_URL from "../config/api";
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -13,41 +16,71 @@ export default function Register() {
     email: "",
     password: "",
   });
-const dispatch = useDispatch();
-const { loading, error } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.auth);
 
   useEffect(() => {
-const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem("accessToken");
     if (token) {
       navigate("/dashboard", { replace: true });
     }
   }, [navigate]);
 
- const handleChange = (e) => {
-  setFormData({ ...formData, [e.target.name]: e.target.value });
-  dispatch(clearError());
-};
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  dispatch(clearError());
-  
-  const result = await dispatch(register(formData));
-  
-  if (register.fulfilled.match(result)) {
-    alert("Registration successful! Please login.");
-    navigate("/login", { replace: true });
-  }
-};
-  //  GOOGLE SIGNUP
-  const handleGoogleSignup = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/google`;
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    dispatch(clearError());
   };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    dispatch(clearError());
+
+    const result = await dispatch(register(formData));
+
+    if (register.fulfilled.match(result)) {
+      alert("Registration successful! Please login.");
+      navigate("/login", { replace: true });
+    }
+  };
+  //  GOOGLE SIGNUP
+  const handleGoogleSignup = useGoogleLogin({
+    onSuccess: async (response) => {
+      try {
+        const result = await axiosInstance.post("/api/auth/google", {
+          code: response.code,
+        });
+        localStorage.setItem("accessToken", result.data.accessToken);
+        localStorage.setItem("refreshToken", result.data.refreshToken);
+        localStorage.setItem("username", result.data.username);
+        if (result.data.profileImage) {
+          localStorage.setItem("profileImage", result.data.profileImage);
+        }
+        navigate("/dashboard", { replace: true });
+      } catch (err) {
+        console.error("Google signup error:", err);
+      }
+    },
+    onError: (err) => console.error("Google error:", err),
+    flow: "auth-code",
+  });
 
   //  FACEBOOK SIGNUP
-  const handleFacebookSignup = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/facebook`;
-  };
 
+  const handleFacebookSignup = async (response) => {
+    try {
+      const result = await axiosInstance.post("/api/auth/facebook", {
+        accessToken: response.accessToken,
+      });
+      localStorage.setItem("accessToken", result.data.accessToken);
+      localStorage.setItem("refreshToken", result.data.refreshToken);
+      localStorage.setItem("username", result.data.username);
+      if (result.data.profileImage) {
+        localStorage.setItem("profileImage", result.data.profileImage);
+      }
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      console.error("Facebook signup error:", err);
+    }
+  };
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white px-4">
       <div className="bg-gray-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
@@ -67,20 +100,27 @@ const handleSubmit = async (e) => {
         {/*  SOCIAL SIGNUP BUTTONS */}
         <div className="space-y-3 mb-6">
           <button
-            onClick={handleGoogleSignup}
+            onClick={() => handleGoogleSignup()}
             className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-100 transition-all shadow-md hover:shadow-lg"
           >
             <FcGoogle className="text-2xl" />
             Sign up with Google
           </button>
 
-          <button
-            onClick={handleFacebookSignup}
-            className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
-          >
-            <FaFacebook className="text-2xl" />
-            Sign up with Facebook
-          </button>
+          <FacebookLogin
+            appId="1280660247415742"
+            onSuccess={handleFacebookSignup}
+            onFail={(err) => console.error("Facebook error:", err)}
+            render={({ onClick }) => (
+              <button
+                onClick={onClick}
+                className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
+              >
+                <FaFacebook className="text-2xl" />
+                Sign up with Facebook
+              </button>
+            )}
+          />
         </div>
 
         {/* DIVIDER */}

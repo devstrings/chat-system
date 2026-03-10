@@ -79,6 +79,8 @@ axiosInstance.interceptors.request.use(
       "/api/auth/login",
       "/api/auth/register",
       "/api/auth/refresh-token",
+      "/api/auth/google",
+      "/api/auth/facebook",
     ];
     const isPublicRoute = publicRoutes.some((route) =>
       config.url?.includes(route),

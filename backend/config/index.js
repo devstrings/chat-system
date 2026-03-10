@@ -11,7 +11,7 @@ const requiredEnvVars = [
   "MONGO_URI",
   "JWT_SECRET",
   "JWT_REFRESH_SECRET",
-  "SESSION_SECRET",
+  // "SESSION_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "FACEBOOK_APP_ID",
@@ -64,12 +64,11 @@ const config = {
     callbackUrl: facebookCallbackUrl,
   },
 
-  frontend: {
-    url: env("FRONTEND_URL", "http://localhost:5173"),
-    callbackUrl:
-      env("FRONTEND_CALLBACK_URL", "http://localhost:5173/auth/callback"),
-    loginUrl: env("FRONTEND_LOGIN_URL", "http://localhost:5173/login"),
-  },
+ frontend: {
+    url: env("FRONTEND_URL"),
+    callbackUrl: env("FRONTEND_CALLBACK_URL"),
+    loginUrl: env("FRONTEND_LOGIN_URL"),
+},
 
   upload: {
     maxFileSize: parseInt(env("MAX_FILE_SIZE", "52428800")),

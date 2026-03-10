@@ -1,7 +1,8 @@
 import * as authService from "../services/auth.service.js";
-import config from "../config/index.js";
 import { redisClient } from "../config/redis.js";
 import asyncHandler from "express-async-handler";
+import AppError from "../utils/AppError.js";
+
 // REGISTER CONTROLLER
 export const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
@@ -17,15 +18,19 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 // GOOGLE CALLBACK CONTROLLER
-export const googleCallback = asyncHandler(async (req, res) => {
-  const redirectUrl = await authService.handleGoogleCallback(req.user);
-  res.redirect(redirectUrl);
-});
 
+export const googleCallback = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  if (!code) throw new AppError("Google code is required", 400);
+  const result = await authService.handleGoogleAuth(code);
+  res.json(result);
+});
 // FACEBOOK CALLBACK CONTROLLER
 export const facebookCallback = asyncHandler(async (req, res) => {
-  const redirectUrl = await authService.handleFacebookCallback(req.user);
-  res.redirect(redirectUrl);
+  const { accessToken } = req.body;
+  if (!accessToken) throw new AppError("Facebook token is required", 400);
+  const result = await authService.handleFacebookAuth(accessToken);
+  res.json(result);
 });
 
 // FORGOT PASSWORD CONTROLLER

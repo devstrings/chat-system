@@ -6,12 +6,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import hpp from "hpp";
 import compression from "compression";
-import session from "express-session";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
-import passport from "./config/passport.js";
 import connectDB from "./config/db.js";
 import { connectRedis } from "./config/redis.js";
 import routes from "./routes/index.route.js";
@@ -19,8 +14,7 @@ import config from "./config/index.js";
 import { setupSocket } from "./socket/index.js";
 import swaggerSpec from "./swagger.js";
 import errorHandler from "./middleware/errorHandler.js";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +35,7 @@ app.set("io", io);
 //  1. SECURITY HEADERS
 app.use(
   helmet({
+    crossOriginOpenerPolicy: false,  
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -52,7 +47,6 @@ app.use(
     crossOriginEmbedderPolicy: false,
   }),
 );
-
 //  2. CORS
 app.use(
   cors({
@@ -63,6 +57,7 @@ app.use(
         "http://localhost:5173",
         "http://chat_frontend:5173",
         "http://frontend:5173",
+          "http://192.168.0.116:5173", 
       ];
 
       if (!origin) return callback(null, true);
@@ -129,24 +124,9 @@ app.use(hpp());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 console.log(` Swagger docs: http://localhost:${config.port}/api-docs`);
 
-//  8. SESSION WITH SEPARATE SECRET
-app.use(
-  session({
-    secret: config.sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: config.nodeEnv === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: "lax",
-    },
-  }),
-);
 
-// Passport initialization
-app.use(passport.initialize());
-app.use(passport.session());
+
+
 
 // Static files
 app.use("/uploads", express.static("uploads"));
