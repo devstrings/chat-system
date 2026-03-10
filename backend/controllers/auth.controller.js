@@ -39,7 +39,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const result = await authService.processForgotPassword(email);
   res.json({
     message: result.message,
-    ...(result.resetUrl && { resetUrl: result.resetUrl, expiresIn: result.expiresIn }),
+    ...(result.resetUrl && {
+      resetUrl: result.resetUrl,
+      expiresIn: result.expiresIn,
+    }),
   });
 });
 
@@ -69,7 +72,11 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
 export const changePassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const userId = req.user.id;
-  const result = await authService.changeUserPassword(userId, oldPassword, newPassword);
+  const result = await authService.changeUserPassword(
+    userId,
+    oldPassword,
+    newPassword,
+  );
   res.json(result);
 });
 

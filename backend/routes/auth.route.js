@@ -139,13 +139,7 @@ router.post(
  */
 router.get("/me", verifyToken, getCurrentUser);
 
-
-
-
 router.post("/google", googleCallback);
 router.post("/facebook", facebookCallback);
-
-
-
 
 export default router;

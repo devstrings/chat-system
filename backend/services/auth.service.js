@@ -6,6 +6,8 @@ import config from "../config/index.js";
 import crypto from "crypto";
 import { redisClient } from "../config/redis.js";
 import AppError from "../shared/AppError.js";
+import axios from "axios";
+import { OAuth2Client } from "google-auth-library";
 // Token generation helpers
 const generateAccessToken = (userId, username) => {
   return jwt.sign({ id: userId, username }, config.jwtSecret, {
@@ -23,7 +25,7 @@ const generateRefreshToken = (userId, username) => {
 export const registerUser = async (username, email, password) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-throw new AppError("Email already registered", 400);
+    throw new AppError("Email already registered", 400);
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -53,7 +55,7 @@ throw new AppError("Email already registered", 400);
 export const loginUser = async (email, password) => {
   const user = await User.findOne({ email });
   if (!user) {
-throw new AppError("User not found", 404);
+    throw new AppError("User not found", 404);
   }
 
   let localProvider = await AuthProvider.findOne({
@@ -74,12 +76,16 @@ throw new AppError("User not found", 404);
   }
 
   if (!localProvider) {
-  throw new AppError("This account was created with Google or Facebook. Please use social login.", 400);
+    throw new AppError(
+      "This account was created with Google or Facebook. Please use social login.",
+      400,
+    );
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-throw new AppError("Invalid email or password", 401);  }
+    throw new AppError("Invalid email or password", 401);
+  }
 
   // Generate both tokens
   const accessToken = generateAccessToken(user._id, user.username);
@@ -108,7 +114,6 @@ throw new AppError("Invalid email or password", 401);  }
 
 // GOOGLE OAUTH SERVICE
 export const handleGoogleAuth = async (code) => {
-  const { OAuth2Client } = await import("google-auth-library");
   const client = new OAuth2Client(
     config.google.clientId,
     config.google.clientSecret,
@@ -184,10 +189,8 @@ export const handleGoogleAuth = async (code) => {
 // FACEBOOK OAUTH SERVICE
 
 export const handleFacebookAuth = async (accessToken) => {
-  const axios = await import("axios");
-  
-  const { data } = await axios.default.get(
-    `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`
+  const { data } = await axios.get(
+    `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${accessToken}`,
   );
 
   const email = data.email;
@@ -308,7 +311,8 @@ export const processResetPassword = async (token, newPassword) => {
   });
 
   if (!user) {
-throw new AppError("Invalid or expired reset token", 400);  }
+    throw new AppError("Invalid or expired reset token", 400);
+  }
 
   // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -341,11 +345,15 @@ throw new AppError("Invalid or expired reset token", 400);  }
 export const setUserPassword = async (userId, newPassword) => {
   const user = await User.findById(userId);
   if (!user) {
-throw new AppError("User not found", 404);  }
+    throw new AppError("User not found", 404);
+  }
 
   // Check only if password already exists
   if (user.password) {
-   throw new AppError("You already have a password. Use 'Change Password' instead.", 400);
+    throw new AppError(
+      "You already have a password. Use 'Change Password' instead.",
+      400,
+    );
   }
 
   // Hash and set password
@@ -378,7 +386,8 @@ export const fetchCurrentUser = async (userId) => {
   );
 
   if (!user) {
- throw new AppError("User not found", 404);  }
+    throw new AppError("User not found", 404);
+  }
 
   // Check password existence properly
   const hasPassword = !!(user.password && user.password.length > 0);
@@ -422,17 +431,23 @@ export const changeUserPassword = async (userId, oldPassword, newPassword) => {
   // Get user
   const user = await User.findById(userId);
   if (!user || !user.password) {
- throw new AppError("No password set. Use 'Set Password' first.", 400);  }
+    throw new AppError("No password set. Use 'Set Password' first.", 400);
+  }
 
   // Verify old password
   const isMatch = await bcrypt.compare(oldPassword, user.password);
   if (!isMatch) {
-   throw new AppError("Current password is incorrect", 400);  }
+    throw new AppError("Current password is incorrect", 400);
+  }
 
   // Check if new password is same as old
   const isSamePassword = await bcrypt.compare(newPassword, user.password);
   if (isSamePassword) {
-throw new AppError("New password must be different from current password", 400);  }
+    throw new AppError(
+      "New password must be different from current password",
+      400,
+    );
+  }
 
   // Hash and update password
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -452,7 +467,8 @@ export const refreshAccessToken = async (refreshToken) => {
   try {
     const savedToken = await redisClient.get(`refresh:${decoded.id}`);
     if (!savedToken || savedToken !== refreshToken) {
-throw new AppError("Invalid refresh token", 403);    }
+      throw new AppError("Invalid refresh token", 403);
+    }
   } catch (err) {
     if (err.message === "Invalid refresh token") throw err;
     console.error(" Redis check error:", err);
