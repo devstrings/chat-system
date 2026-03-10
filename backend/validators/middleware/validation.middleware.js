@@ -1,15 +1,15 @@
-import Friendship from "../../models/Friendship.js";
-import Conversation from "../../models/Conversation.js";
-import Group from "../../models/Group.js";
-import FriendRequest from "../../models/FriendRequest.js";
-import BlockedUser from "../../models/BlockedUser.js";
-import User from "../../models/User.js";
-import Message from "../../models/Message.js";
-import Status from "../../models/Status.js";
+import Friendship from "#models/Friendship";
+import Conversation from "#models/Conversation";
+import Group from "#models/Group";
+import FriendRequest from "#models/FriendRequest";
+import BlockedUser from "#models/BlockedUser";
+import User from "#models/User";
+import Message from "#models/Message";
+import Status from "#models/Status";
 import {
   MESSAGE_EDIT_LIMIT_MS,
   MESSAGE_DELETE_LIMIT_MS,
-} from "../../utils/constants.js";
+} from "#utils";
 // HELPER FUNCTIONS
 
 const sendError = (res, statusCode, message) => {

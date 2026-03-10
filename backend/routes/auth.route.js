@@ -1,5 +1,4 @@
 import express from "express";
-// import passport from "../config/passport.js";
 import {
   register,
   login,
@@ -12,7 +11,7 @@ import {
   changePassword,
   getCurrentUser,
   refreshToken,
-} from "../controllers/auth.controller.js";
+} from "#controllers/auth.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators//middleware/validate.js";
 import {
@@ -24,7 +23,6 @@ import {
   setPasswordValidation,
   changePasswordValidation,
 } from "../validators/index.js";
-// import config from "../config/index.js";
 
 const router = express.Router();
 

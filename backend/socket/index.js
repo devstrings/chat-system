@@ -1,10 +1,10 @@
 import jwt from "jsonwebtoken";
 import { handleMessage } from "./messageHandler.js";
 import { setupCallHandlers } from "./callHandler.js";
-import config from "../config/index.js";
-import { redisClient } from "../config/redis.js";
-import User from "../models/User.js";
-import Conversation from "../models/Conversation.js";
+import config from "#config/index";
+import { redisClient } from "#config/redis";
+import User from "#models/User";
+import Conversation from "#models/Conversation";
 
 const userSockets = new Map();
 

@@ -1,4 +1,4 @@
-import Call from "../models/Call.js";
+import Call from "#models/Call";
 import AppError from "../shared/AppError.js";
 import mongoose from "mongoose";
 export const fetchUserCallHistory = async (userId, limit = 20, page = 1) => {

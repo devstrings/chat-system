@@ -20,7 +20,7 @@ import {
   clearGroupChat,
   serveGroupImage,
   editGroupMessage,
-} from "../controllers/group.controller.js";
+} from "#controllers/group.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators/middleware/validate.js";
 import {

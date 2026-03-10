@@ -1,5 +1,5 @@
 import * as authService from "../services/auth.service.js";
-import { redisClient } from "../config/redis.js";
+import { redisClient } from "#config/redis";
 import asyncHandler from "express-async-handler";
 import AppError from "../shared/AppError.js";
 // REGISTER CONTROLLER

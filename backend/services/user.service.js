@@ -1,5 +1,5 @@
-import User from "../models/User.js";
-import BlockedUser from "../models/BlockedUser.js";
+import User from "#models/User";
+import BlockedUser from "#models/BlockedUser";
 import fs from "fs";
 import path from "path";
 

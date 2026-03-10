@@ -1,7 +1,7 @@
-import Call from "../models/Call.js";
-import Conversation from "../models/Conversation.js";
-import Message from "../models/Message.js";
-import { redisClient } from "../config/redis.js";
+import Call from "#models/Call";
+import Conversation from "#models/Conversation";
+import Message from "#models/Message";
+import { redisClient } from "#config/redis";
 
 export const setupCallHandlers = (io, socket) => {
   const userId = socket.user.id;

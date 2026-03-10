@@ -1,10 +1,10 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "#models/User";
-import AuthProvider from "../models/AuthProvider.js";
-import config from "../config/index.js";
+import AuthProvider from "#models/AuthProvider";
+import config from "#config/index";
 import crypto from "crypto";
-import { redisClient } from "../config/redis.js";
+import { redisClient } from "#config/redis";
 import AppError from "../shared/AppError.js";
 import axios from "axios";
 import { OAuth2Client } from "google-auth-library";

@@ -1,11 +1,11 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { uploadMessage } from "../config/multer.js";
+import { uploadMessage } from "#config/multer";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators/middleware/validate.js";
-import { downloadFile, uploadFile } from "../controllers/file.controller.js";
-import { serveProfileImage } from "../controllers/user.controller.js";
-import { serveGroupImage } from "../controllers/group.controller.js";
+import { downloadFile, uploadFile } from "#controllers/file.controller";
+import { serveProfileImage } from "#controllers/user.controller";
+import { serveGroupImage } from "#controllers/group.controller";
 import {
   uploadFileValidation,
   downloadFileValidation,

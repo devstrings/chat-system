@@ -17,7 +17,7 @@ import {
   getArchivedConversations,
   getGroupMessages,
   editMessage,
-} from "../controllers/message.controller.js";
+} from "#controllers/message.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators/middleware/validate.js";
 import {

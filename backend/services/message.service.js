@@ -1,8 +1,8 @@
-import Message from "../models/Message.js";
-import Conversation from "../models/Conversation.js";
-import Attachment from "../models/Attachment.js";
-import Friendship from "../models/Friendship.js";
-import Group from "../models/Group.js";
+import Message from "#models/Message";
+import Conversation from "#models/Conversation";
+import Attachment from "#models/Attachment";
+import Friendship from "#models/Friendship";
+import Group from "#models/Group";
 import AppError from "../shared/AppError.js";
 //  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {

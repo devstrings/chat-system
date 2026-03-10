@@ -11,7 +11,7 @@ import {
   getBlockedUsers,
   getRelationshipStatus,
   getFriends,
-} from "../controllers/friend.controller.js";
+} from "#controllers/friend.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators/middleware/validate.js";
 import {

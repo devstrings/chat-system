@@ -1,6 +1,6 @@
-import Status from "../models/Status.js";
-import User from "../models/User.js";
-import Friendship from "../models/Friendship.js";
+import Status from "#models/Status";
+import User from "#models/User";
+import Friendship from "#models/Friendship";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

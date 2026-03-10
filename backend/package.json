@@ -16,9 +16,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
-    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.2.1",
-    "express-session": "^1.18.2",
     "express-validator": "^7.3.1",
     "get-audio-duration": "^4.0.1",
     "google-auth-library": "^10.6.1",
@@ -28,9 +26,7 @@
     "mongoose": "^8.19.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
-    "passport": "^0.7.0",
-    "passport-facebook": "^3.0.0",
-    "passport-google-oauth20": "^2.0.0",
+
     "redis": "^5.9.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
@@ -40,10 +36,12 @@
   "devDependencies": {
     "nodemon": "^3.1.10"
   },
-  "imports": {
-    "#models/*": "./models/*.js",
-    "#routes": "./routes/index.js",
-    "#controllers": "./controllers/*.js",
-    "#utils": "./utils/index.js"
-  }
+ "imports": {
+  "#models/*": "./models/*.js",
+  "#routes": "./routes/index.js",
+  "#routes/*": "./routes/*.js",
+  "#controllers/*": "./controllers/*.js",
+  "#config/*": "./config/*.js",
+  "#utils": "./utils/index.js"
+}
 }

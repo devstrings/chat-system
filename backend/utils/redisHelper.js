@@ -1,6 +1,5 @@
-import { redisClient } from "../config/redis.js";
+import { redisClient } from "#config/redis";
 
-//  User online karo - Redis mein save
 export async function setUserOnline(userId, socketId) {
   try {
     await redisClient.set(`online:${userId}`, socketId);
@@ -10,7 +9,6 @@ export async function setUserOnline(userId, socketId) {
   }
 }
 
-//  User offline karo - Redis se delete
 export async function setUserOffline(userId) {
   try {
     await redisClient.del(`online:${userId}`);
@@ -20,7 +18,7 @@ export async function setUserOffline(userId) {
   }
 }
 
-//  Check if user online hai
+//  Check if user online
 export async function isUserOnline(userId) {
   try {
     const socketId = await redisClient.get(`online:${userId}`);
@@ -31,7 +29,7 @@ export async function isUserOnline(userId) {
   }
 }
 
-//  NEW: Get all online users
+//   Get all online users
 export async function getAllOnlineUsers() {
   try {
     const keys = await redisClient.keys("online:*");

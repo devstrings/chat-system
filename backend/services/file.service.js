@@ -2,9 +2,9 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { getAudioDurationInSeconds } from "get-audio-duration";
-import Attachment from "../models/Attachment.js";
-import Conversation from "../models/Conversation.js";
-import Group from "../models/Group.js";
+import Attachment from "#models/Attachment";
+import Conversation from "#models/Conversation";
+import Group from "#models/Group";
 import AppError from "../shared/AppError.js";
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>

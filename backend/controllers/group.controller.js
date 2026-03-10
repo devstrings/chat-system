@@ -1,5 +1,5 @@
 import * as groupService from "../services/group.service.js";
-import Message from "../models/Message.js";
+import Message from "#models/Message";
 import asyncHandler from "express-async-handler";
 // CREATE GROUP CONTROLLER
 export const createGroup = asyncHandler(async (req, res) => {

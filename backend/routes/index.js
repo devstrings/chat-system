@@ -1,12 +1,13 @@
 import express from "express";
-import authRoutes from "./auth.route.js";
-import userRoutes from "./user.route.js";
-import messageRoutes from "./message.route.js";
-import callRoutes from "./call.route.js";
-import fileRoutes from "./file.route.js";
-import groupRoutes from "./group.route.js";
-import friendRoutes from "./friend.route.js";
-import statusRoutes from "./status.route.js";
+import authRoutes from "#routes/auth.route";
+import userRoutes from "#routes/user.route";
+import messageRoutes from "#routes/message.route";
+import callRoutes from "#routes/call.route";
+import fileRoutes from "#routes/file.route";
+import groupRoutes from "#routes/group.route";
+import friendRoutes from "#routes/friend.route";
+import statusRoutes from "#routes/status.route";
+
 
 export default function (app) {
   const router = express.Router();

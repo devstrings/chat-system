@@ -1,8 +1,8 @@
-import FriendRequest from "../models/FriendRequest.js";
-import Friendship from "../models/Friendship.js";
-import BlockedUser from "../models/BlockedUser.js";
+import FriendRequest from "#models/FriendRequest";
+import Friendship from "#models/Friendship";
+import BlockedUser from "#models/BlockedUser";
 import mongoose from "mongoose";
-import config from "../config/index.js";
+import config from "#config/index";
 import AppError from "../shared/AppError.js";
 //  HELPER FUNCTION TO FORMAT USER WITH FULL IMAGE URL
 const formatUserWithFullImageUrl = (user) => {

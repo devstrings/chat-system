@@ -8,7 +8,7 @@ import {
   clearCallHistory,
   getRecentCalls,
   getCallById
-} from "../controllers/call.controller.js";
+} from "#controllers/call.controller";
 
 const router = express.Router();
 

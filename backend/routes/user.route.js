@@ -10,9 +10,9 @@ import {
   serveProfileImage,
   uploadCoverPhoto,
   removeCoverPhoto,
-} from "../controllers/user.controller.js";
+} from "#controllers/user.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import { uploadProfile } from "../config/multer.js";
+import { uploadProfile } from "#config/multer";
 import { validate } from "../validators/middleware/validate.js";  
 import {
   searchQueryValidation,

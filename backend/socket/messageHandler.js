@@ -1,11 +1,12 @@
-import Message from "../models/Message.js";
-import Conversation from "../models/Conversation.js";
-import Group from "../models/Group.js";
+import Message from "#models/Message";
+import Conversation from "#models/Conversation";
+import Group from "#models/Group";
+import Status from "#models/Status";
 import {
   MESSAGE_EDIT_LIMIT_MS,
   MESSAGE_DELETE_LIMIT_MS,
   GROUP_MESSAGE_EDIT_LIMIT_MS,
-} from "../utils/constants.js";
+} from "#utils";
 export function handleMessage(io, socket) {
   console.log(` User connected: ${socket.user.id}`);
 
@@ -933,7 +934,6 @@ export function handleMessage(io, socket) {
     try {
       console.log(" View status:", statusId, "by user:", socket.user.id);
 
-      const Status = (await import("../models/Status.js")).default;
       const status = await Status.findById(statusId);
 
       if (!status) {
@@ -981,7 +981,6 @@ export function handleMessage(io, socket) {
     try {
       console.log(" Delete status:", statusId);
 
-      const Status = (await import("../models/Status.js")).default;
       const status = await Status.findById(statusId);
 
       if (!status) {

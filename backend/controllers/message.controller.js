@@ -1,5 +1,5 @@
 import * as messageService from "../services/message.service.js";
-import Message from "../models/Message.js";
+import Message from "#models/Message";
 import asyncHandler from "express-async-handler";
 // GET OR CREATE CONVERSATION CONTROLLER
 export const getOrCreateConversation = asyncHandler(async (req, res) => {

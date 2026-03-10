@@ -7,9 +7,9 @@ import {
   deleteStatus,
   getStatusViewers,
   updateStatusPrivacy,
-} from "../controllers/status.controller.js";
+} from "#controllers/status.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import { uploadStatus } from "../config/multer.js";
+import { uploadStatus } from "#config/multer";
 import { validate } from "../validators/middleware/validate.js";
 import { createStatusValidation } from "../validators/index.js";
 import {

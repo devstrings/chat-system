@@ -2,7 +2,12 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "#models/*": ["models/*.js"]
+      "#models/*": ["models/*.js"],
+      "#routes": ["routes/index.js"],
+      "#routes/*": ["routes/*.js"],
+      "#controllers/*": ["controllers/*.js"],
+      "#config/*": ["config/*.js"],
+      "#utils": ["utils/index.js"]
     }
   }
 }
