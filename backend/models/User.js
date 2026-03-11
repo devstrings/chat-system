@@ -45,7 +45,14 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     }
-  ]
+  ],
+  isEmailVerified: 
+  { type: Boolean, default: false },
+emailOTP: 
+{ type: String, default: null },
+emailOTPExpires:
+ { type: Date, default: null },
+
 }, { 
   timestamps: true 
 });

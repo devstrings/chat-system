@@ -91,3 +91,15 @@ export const logout = asyncHandler(async (req, res) => {
   await redisClient.del(`refresh:${userId}`);
   res.json({ message: "Logged out successfully" });
 });
+// VERIFY OTP CONTROLLER
+export const verifyOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const result = await authService.verifyOTPService(email, otp);
+  res.json(result);
+});
+// RESEND OTP CONTROLLER
+export const resendOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await authService.resendOTPService(email);
+  res.json(result);
+});

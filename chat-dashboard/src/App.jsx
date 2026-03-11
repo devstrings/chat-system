@@ -7,10 +7,9 @@ import { fetchCurrentUser } from "./store/slices/authSlice";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-// import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-
+import VerifyOTP from "./pages/VerifyOTP";
 //  useRef to prevent multiple fetches
 function ProtectedRoute({ children }) {
   const dispatch = useDispatch();
@@ -79,6 +78,7 @@ export default function App() {
         {/* <Route path="/auth/callback" element={<AuthCallback />} /> */}
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />  
 
         {/* Protected Routes */}
         <Route

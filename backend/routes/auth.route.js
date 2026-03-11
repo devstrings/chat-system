@@ -11,6 +11,8 @@ import {
   changePassword,
   getCurrentUser,
   refreshToken,
+  verifyOTP,
+  resendOTP,
 } from "#controllers/auth.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators//middleware/validate.js";
@@ -139,5 +141,6 @@ router.get("/me", verifyToken, getCurrentUser);
 
 router.post("/google", googleCallback);
 router.post("/facebook", facebookCallback);
-
+router.post("/verify-otp", verifyOTP);
+router.post("/resend-otp", resendOTP);
 export default router;

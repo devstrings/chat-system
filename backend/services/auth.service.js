@@ -81,7 +81,9 @@ export const loginUser = async (email, password) => {
       400,
     );
   }
-
+if (!user.isEmailVerified) {
+  throw new AppError("Please verify your email first", 403);
+}
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new AppError("Invalid email or password", 401);

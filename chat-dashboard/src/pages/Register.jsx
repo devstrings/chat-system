@@ -36,10 +36,11 @@ export default function Register() {
 
     const result = await dispatch(register(formData));
 
-    if (register.fulfilled.match(result)) {
-      alert("Registration successful! Please login.");
-      navigate("/login", { replace: true });
-    }
+ if (register.fulfilled.match(result)) {
+  navigate("/verify-otp", { 
+    state: { email: formData.email } 
+  });
+}
   };
   //  GOOGLE SIGNUP
   const handleGoogleSignup = useGoogleLogin({
