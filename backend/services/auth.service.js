@@ -8,6 +8,7 @@ import { redisClient } from "#config/redis";
 import AppError from "../shared/AppError.js";
 import axios from "axios";
 import { OAuth2Client } from "google-auth-library";
+import { sendOTPEmail } from "#config/email";
 // Token generation helpers
 const generateAccessToken = (userId, username) => {
   return jwt.sign({ id: userId, username }, config.jwtSecret, {
@@ -40,6 +41,12 @@ export const registerUser = async (username, email, password) => {
     userId: newUser._id,
     provider: "local",
   });
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+newUser.emailOTP = otp;
+newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+await newUser.save();
+await sendOTPEmail(email, otp);
+
 
   console.log(" User registered:", email);
 
@@ -479,4 +486,47 @@ export const refreshAccessToken = async (refreshToken) => {
   const newAccessToken = generateAccessToken(decoded.id, decoded.username);
   console.log("Token refreshed for user:", decoded.username);
   return { accessToken: newAccessToken };
+};
+// VERIFY OTP SERVICE
+export const verifyOTPService = async (email, otp) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new AppError("User not found", 404);
+
+  if (!user.emailOTP || !user.emailOTPExpires) {
+    throw new AppError("OTP not found, please register again", 400);
+  }
+
+  if (user.emailOTPExpires < new Date()) {
+    throw new AppError("OTP expired", 400);
+  }
+
+  if (user.emailOTP !== otp) {
+    throw new AppError("Invalid OTP", 400);
+  }
+
+  user.isEmailVerified = true;
+  user.emailOTP = null;
+  user.emailOTPExpires = null;
+  await user.save();
+
+  return { message: "Email verified successfully" };
+};
+
+// RESEND OTP SERVICE
+export const resendOTPService = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new AppError("User not found", 404);
+
+  if (user.isEmailVerified) {
+    throw new AppError("Email already verified", 400);
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.emailOTP = otp;
+  user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+  await user.save();
+
+  await sendOTPEmail(email, otp);
+
+  return { message: "OTP resent successfully" };
 };
