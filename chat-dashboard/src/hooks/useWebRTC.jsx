@@ -5,8 +5,14 @@ const iceServers = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: "turn:192.168.0.116:3478",
+      username: "chatuser",
+      credential: "chatpassword123",
+    },
   ],
 };
+
 
 export const useWebRTC = () => {
   const socket = useSelector((state) => state.socket.socket);
