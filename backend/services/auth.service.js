@@ -42,10 +42,15 @@ export const registerUser = async (username, email, password) => {
     provider: "local",
   });
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-newUser.emailOTP = otp;
-newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
-await newUser.save();
-await sendOTPEmail(email, otp);
+  newUser.emailOTP = otp;
+  newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+  await newUser.save();
+  try {
+    await sendOTPEmail(email, otp);
+    
+  } catch (error) {
+    console.error(" OTP email send error:", error);
+  }
 
 
   console.log(" User registered:", email);
@@ -88,9 +93,10 @@ export const loginUser = async (email, password) => {
       400,
     );
   }
-if (!user.isEmailVerified) {
-  throw new AppError("Please verify your email first", 403);
-}
+  console.log(user)
+  if (!user.isEmailVerified) {
+    throw new AppError("Please verify your email first", 403);
+  }
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new AppError("Invalid email or password", 401);
