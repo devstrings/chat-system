@@ -1,20 +1,22 @@
-# File Location: chat-dashboard/Dockerfile
-
-FROM node:20-alpine
+# ---------- Build stage ----------
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+RUN npm install --include=dev
 
-# Copy all frontend files
 COPY . .
 
-# Expose port
-EXPOSE 5173
+RUN npm run build
 
-# Start dev server
-CMD ["npm", "run", "dev", "--", "--host"]
+
+# ---------- Production stage ----------
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -62,6 +62,7 @@ export default function IncomingCall({
   const handleAccept = async () => {
     stopRinging();
     if (incomingCall) {
+      console.log(" Accepting call from:", incomingCall);
       await answerCall(
         incomingCall.offer,
         incomingCall.from,

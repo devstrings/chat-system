@@ -86,7 +86,7 @@ export const setupCallHandlers = (io, socket) => {
   };
 
   socket.on("call:initiate", async ({ to, offer, callType }) => {
-    console.log(` Call from ${userId} to ${to}`);
+    console.log(` Call from ${userId} to ${to}`, offer, callType);
     try {
       const callRecord = await Call.create({
         caller: userId,

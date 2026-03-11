@@ -35,8 +35,8 @@ const PORT = env("PORT", 5000);
 const prod_envs = ["production", "staging"];
 const serverUrl = prod_envs.includes(env("NODE_ENV")) ? env("BACKEND_URL") : `http://localhost:${PORT}`;
 
-const googleCallbackUrl = env('GOOGLE_CALLBACK_URL') ? `${serverUrl}${env('GOOGLE_CALLBACK_URL')}` : `${serverUrl}/api/auth/google/callback`;
-const facebookCallbackUrl = env('FACEBOOK_CALLBACK_URL') ? `${serverUrl}${env('FACEBOOK_CALLBACK_URL')}` : `${serverUrl}/api/auth/facebook/callback`;
+// const googleCallbackUrl = env('GOOGLE_CALLBACK_URL') ? `${serverUrl}${env('GOOGLE_CALLBACK_URL')}` : `${serverUrl}/api/auth/google/callback`;
+// const facebookCallbackUrl = env('FACEBOOK_CALLBACK_URL') ? `${serverUrl}${env('FACEBOOK_CALLBACK_URL')}` : `${serverUrl}/api/auth/facebook/callback`;
 
 const config = {
   port: PORT,
@@ -55,20 +55,17 @@ const config = {
   google: {
     clientId: env("GOOGLE_CLIENT_ID"),
     clientSecret: env("GOOGLE_CLIENT_SECRET"),
-    callbackUrl: googleCallbackUrl,
   },
 
   facebook: {
     appId: env("FACEBOOK_APP_ID"),
     appSecret: env("FACEBOOK_APP_SECRET"),
-    callbackUrl: facebookCallbackUrl,
   },
 
- frontend: {
+  frontend: {
     url: env("FRONTEND_URL"),
-    callbackUrl: env("FRONTEND_CALLBACK_URL"),
-    loginUrl: env("FRONTEND_LOGIN_URL"),
-},
+
+  },
 
   upload: {
     maxFileSize: parseInt(env("MAX_FILE_SIZE", "52428800")),

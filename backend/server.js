@@ -57,7 +57,7 @@ app.use(
         "http://localhost:5173",
         "http://chat_frontend:5173",
         "http://frontend:5173",
-          "http://192.168.0.116:5173", 
+        "http://192.168.0.116:5173", 
       ];
 
       if (!origin) return callback(null, true);

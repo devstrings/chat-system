@@ -19,3 +19,7 @@ coverage
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+
+uploads/.gitkeep
+!uploads/**/.gitkeep
