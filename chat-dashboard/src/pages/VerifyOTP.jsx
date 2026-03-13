@@ -52,7 +52,7 @@ export default function VerifyOTP() {
           Verify Email
         </h1>
         <p className="text-center text-gray-400 mb-6 text-sm">
-          OTP bheja gaya hai: <strong>{email}</strong>
+          OTP has been sent to: <strong>{email}</strong>
         </p>
 
         {error && (
@@ -74,7 +74,7 @@ export default function VerifyOTP() {
             </label>
             <input
               type="text"
-              placeholder="6 digit OTP enter karo"
+              placeholder="Enter 6 digit OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               required
