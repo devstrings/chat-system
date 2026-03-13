@@ -17,7 +17,7 @@ import StatusManager from "../components/Status/StatusManager";
 import StatusViewer from "../components/Status/StatusViewer";
 import StatusRingsList from "../components/Status/StatusRingsList";
 import axiosInstance from "../utils/axiosInstance";
-
+import NotificationToast from "../components/NotificationToast";
 import { setUser } from "../store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { logout, fetchCurrentUser } from "../store/slices/authSlice";
@@ -33,6 +33,7 @@ import {
   updateMessageStatus,
   updateMessage,
   updateGroupMessageInSidebar,
+    updateLastMessage,
 } from "../store/slices/chatSlice";
 import {
   addGroupMessage,
@@ -46,7 +47,7 @@ export default function Dashboard() {
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
-
+const [toastNotifications, setToastNotifications] = useState([]);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -61,6 +62,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
   const {
     startCall,
     answerCall,
@@ -78,6 +80,8 @@ export default function Dashboard() {
   const [activeCall, setActiveCall] = useState(null);
   const [searchInChat, setSearchInChat] = useState("");
   const [showSearchBox, setShowSearchBox] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+const [selectedMessages, setSelectedMessages] = useState(new Set());
 
   const selectedUserRef = useRef(null);
   const hasInitialized = useRef(false);
@@ -110,6 +114,29 @@ export default function Dashboard() {
     isOpen: false,
     username: "",
   });
+
+  // Notification sound
+const playNotificationSound = () => {
+  const audio = new Audio('/sounds/notification.mp3');
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
+};
+
+// Show notification
+const showNotification = (title, body, extra = {}) => {
+  const id = Date.now() + Math.random();
+  setToastNotifications((prev) => [
+    ...prev,
+    { id, name: title, message: body, ...extra },
+  ]);
+
+  if (Notification.permission === 'granted' && document.hidden) {
+    new Notification(title, { 
+      body, 
+      icon: '/favicon.ico' 
+    });
+  }
+};
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
@@ -171,7 +198,24 @@ export default function Dashboard() {
           isGroup: false,
         }),
       );
+          // Notification
+if (msg.sender?._id !== currentUserId) {
+  playNotificationSound();
+  if (selectedUserRef.current?._id !== msg.sender?._id) {
+    showNotification(
+      msg.sender?.username || 'New Message',
+      msg.text || '📎 Attachment',
+      {
+        avatar: msg.sender?.profileImage || null,
+        senderId: msg.sender?._id,
+        senderObj: msg.sender,
+        isGroup: false,
+      }
+    );
+  }
+}
     };
+
 
     //  Group message received
     const handleSidebarGroupMessage = (msg) => {
@@ -194,6 +238,19 @@ export default function Dashboard() {
           isGroup: true,
         }),
       );
+ if (msg.sender?._id !== currentUserId) {
+  playNotificationSound();
+  showNotification(
+    msg.sender?.username || 'Unknown',
+    msg.text || '📎 Attachment',
+    {
+      avatar: msg.sender?.profileImage || null,
+      groupName: msg.groupName || 'Group',
+      groupId: msg.groupId,
+      isGroup: true,
+    }
+  );
+}
     };
 
     //  Status update
@@ -253,42 +310,22 @@ export default function Dashboard() {
     socket.on("messageStatusUpdate", handleSidebarStatus);
     socket.on("messageEdited", handleSidebarEdit);
     socket.on("groupMessageEdited", handleSidebarGroupEdit);
+const handleConversationUpdated = (data) => {
+  console.log(" [SIDEBAR] conversationUpdated received:", data);
 
-    const handleConversationUpdated = (data) => {
-      console.log(" [SIDEBAR] conversationUpdated received:", data);
+  const otherUserId = Object.keys(lastMessages).find(
+    (uid) => lastMessages[uid]?.conversationId === data.conversationId,
+  );
 
-      // lastMessages mein se sahi userId dhundo
-      const otherUserId = Object.keys(lastMessages).find(
-        (uid) => lastMessages[uid]?.conversationId === data.conversationId,
-      );
+  if (!otherUserId) return;
 
-      if (!otherUserId) {
-        console.warn(
-          " Could not find userId for conversationId:",
-          data.conversationId,
-        );
-        return;
-      }
-
-      dispatch(
-        addMessage({
-          conversationId: data.conversationId,
-          message: {
-            _id: `update-${Date.now()}`,
-            text: data.lastMessage ?? "",
-            createdAt: new Date(
-              data.lastMessageTime || Date.now(),
-            ).toISOString(),
-            sender: currentUserId,
-            status: "sent",
-            attachments: [],
-            _updated: Date.now(),
-          },
-          userId: otherUserId,
-          isGroup: false,
-        }),
-      );
-    };
+  dispatch(updateLastMessage({
+    userId: otherUserId,
+    conversationId: data.conversationId,
+    text: data.lastMessage ?? "",
+    timestamp: data.lastMessageTime || Date.now(),
+  }));
+};
 
     socket.on("conversationUpdated", handleConversationUpdated);
     //  Call record - sidebar update
@@ -365,6 +402,15 @@ export default function Dashboard() {
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
+useEffect(() => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  // Service Worker register karo
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+}, []);
   useEffect(() => {
     lastMessagesRef.current = lastMessages;
   }, [lastMessages]);
@@ -994,6 +1040,7 @@ export default function Dashboard() {
       socket.off("disconnect");
     };
   }, [socket]);
+
   const handleLogout = () => {
     dispatch(logout());
     navigate("/login", { replace: true });
@@ -1137,6 +1184,30 @@ export default function Dashboard() {
 
   return (
     <>
+
+    <NotificationToast
+  notifications={toastNotifications}
+  onClose={(id) =>
+    setToastNotifications((prev) => prev.filter((n) => n.id !== id))
+  }
+  onSelect={(notif) => {
+    if (notif.isGroup) {
+      const group = groups.find((g) => g._id === notif.groupId);
+      if (group) {
+        setSelectedGroup(group);
+        setSelectedUser(null);
+        setIsGroupChat(true);
+        setConversationId(null);
+      }
+    } else {
+      if (notif.senderObj) {
+        setSelectedUser(notif.senderObj);
+        setSelectedGroup(null);
+        setIsGroupChat(false);
+      }
+    }
+  }}
+/>
       <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
         {/* Status Manager Modal */}
 
@@ -1266,10 +1337,10 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {!isGroupChat &&
+                      {/* {!isGroupChat &&
                         onlineUsers.includes(selectedUser._id) && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                        )}
+                        )} */}
                     </div>
 
                     {/* NAME & STATUS */}
@@ -1357,7 +1428,16 @@ export default function Dashboard() {
                         </button>
                       </>
                     )}
-
+<button
+  onClick={() => setIsSelectionMode(!isSelectionMode)}
+  className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isSelectionMode ? 'text-blue-600' : 'text-black'}`}
+  title="Select Messages"
+>
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+  </svg>
+</button>
                     <button
                       onClick={() => setShowSearchBox(!showSearchBox)}
                       className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-black"
@@ -1409,21 +1489,10 @@ export default function Dashboard() {
                             ></div>
                             <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-20 overflow-hidden">
                               <button
-                                onClick={() => {
-                                  setAlertDialog({
-                                    isOpen: true,
-                                    title: "User Info",
-                                    message: ` ${selectedUser.username}\n📧 ${
-                                      selectedUser.email
-                                    }\n${
-                                      onlineUsers.includes(selectedUser._id)
-                                        ? " Online"
-                                        : " Offline"
-                                    }`,
-                                    type: "info",
-                                  });
-                                  setShowChatMenu(false);
-                                }}
+                           onClick={() => {
+  setShowUserProfile(true);
+  setShowChatMenu(false);
+}}
                                 className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
                               >
                                 <svg
@@ -1527,22 +1596,33 @@ export default function Dashboard() {
               {isGroupChat ? (
                 //  GROUP CHAT
                 <>
-                  <GroupChatWindow
-                    group={selectedGroup}
-                    currentUserId={currentUserId}
-                    searchQuery={searchInChat}
-                  />
-                  <MessageInput groupId={selectedGroup._id} isGroup={true} />
+               <GroupChatWindow
+  group={selectedGroup}
+  currentUserId={currentUserId}
+  searchQuery={searchInChat}
+  isSelectionMode={isSelectionMode}
+  setIsSelectionMode={setIsSelectionMode}
+  selectedMessages={selectedMessages}
+  setSelectedMessages={setSelectedMessages}
+/>
+                  <MessageInput 
+                  groupId={selectedGroup._id}
+                   isGroup={true}
+                    />
                 </>
               ) : (
                 <>
-                  <ChatWindow
-                    conversationId={conversationId}
-                    currentUserId={currentUserId}
-                    searchQuery={searchInChat}
-                    selectedUser={selectedUser}
-                    onUpdateLastMessageStatus={(updateData) => {}}
-                  />
+                 <ChatWindow
+  conversationId={conversationId}
+  currentUserId={currentUserId}
+  searchQuery={searchInChat}
+  selectedUser={selectedUser}
+  onUpdateLastMessageStatus={(updateData) => {}}
+  isSelectionMode={isSelectionMode}
+  setIsSelectionMode={setIsSelectionMode}
+  selectedMessages={selectedMessages}
+  setSelectedMessages={setSelectedMessages}
+/>
                   <MessageInput
                     conversationId={conversationId}
                     selectedUser={selectedUser}
@@ -1629,7 +1709,7 @@ export default function Dashboard() {
         }}
       />
       {/* DIALOGS */}
-      <ConfirmationDialog
+   <ConfirmationDialog
         isOpen={clearChatDialog.isOpen}
         onClose={() =>
           setClearChatDialog({ ...clearChatDialog, isOpen: false })
@@ -1643,6 +1723,57 @@ export default function Dashboard() {
         icon="delete"
         type="danger"
       />
+
+      {showUserProfile && selectedUser && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="fixed inset-0 bg-black/30" onClick={() => setShowUserProfile(false)} />
+          <div className="relative w-80 h-full bg-white shadow-2xl flex flex-col">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-4 flex items-center gap-3">
+              <button onClick={() => setShowUserProfile(false)} className="text-white p-1 hover:bg-white/20 rounded-full">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 className="text-white font-semibold text-lg">Contact Info</h2>
+            </div>
+            <div className="flex flex-col items-center py-8 px-4 bg-gray-50 border-b">
+              <div className="w-24 h-24 rounded-full overflow-hidden shadow-lg mb-3">
+                {selectedUserImage || selectedUser?.profileImage ? (
+                  <img src={selectedUserImage || selectedUser?.profileImage} className="w-full h-full object-cover" alt={selectedUser?.username} crossOrigin="anonymous" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-3xl font-bold">
+                    {selectedUser?.username?.charAt(0)?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">{selectedUser?.username}</h3>
+              <div className="flex items-center gap-1 mt-1">
+                <span className={`w-2 h-2 rounded-full ${onlineUsers.includes(selectedUser?._id) ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                <span className="text-sm text-gray-500">{onlineUsers.includes(selectedUser?._id) ? 'Online' : 'Offline'}</span>
+              </div>
+            </div>
+            <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Email</p>
+                <p className="text-gray-900 text-sm">{selectedUser?.email || 'N/A'}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Status</p>
+                <p className={`text-sm font-medium ${onlineUsers.includes(selectedUser?._id) ? 'text-green-600' : 'text-gray-500'}`}>
+                  {onlineUsers.includes(selectedUser?._id) ? '🟢 Active now' : '⚫ Offline'}
+                </p>
+              </div>
+          
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Member Since</p>
+                <p className="text-gray-900 text-sm">
+                  {selectedUser?.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AlertDialog
         isOpen={alertDialog.isOpen}

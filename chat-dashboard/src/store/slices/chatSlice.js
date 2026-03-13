@@ -291,7 +291,7 @@ const chatSlice = createSlice({
       const targetKey = isGroup ? conversationId : userId;
 
       state.lastMessages[targetKey] = {
-        text: messageText,
+  text: isGroup ? messageText : (messageText || ""),
         time: message.createdAt || new Date().toISOString(),
         sender: senderId,
         status: message.status || "sent",
@@ -407,6 +407,23 @@ const chatSlice = createSlice({
         }
       }
     },
+    clearMessages: (state, action) => {
+  const conversationId = action.payload;
+  if (state.conversations[conversationId]) {
+    state.conversations[conversationId].messages = [];
+  }
+},
+
+updateLastMessage: (state, action) => {
+  const { userId, conversationId, text, timestamp } = action.payload;
+  state.lastMessages[userId] = {
+    ...state.lastMessages[userId],
+    text: text,
+    time: new Date(timestamp).toISOString(),
+    conversationId: conversationId,
+    _updated: timestamp,
+  };
+},
     clearUnreadCount: (state, action) => {
       const userId = action.payload;
       state.unreadCounts[userId] = 0;
@@ -454,6 +471,7 @@ const chatSlice = createSlice({
           state.conversations[conversationId] = { messages: [], loading: true };
         } else {
           state.conversations[conversationId].loading = true;
+              // state.conversations[conversationId].messages = [];
         }
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
@@ -572,6 +590,8 @@ export const {
   clearUnreadCount,
   incrementUnreadCount,
   updateTyping,
+  clearMessages,
+   updateLastMessage,  
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

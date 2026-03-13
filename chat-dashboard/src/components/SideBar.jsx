@@ -284,6 +284,7 @@ export default function Sidebar({
 
   const formatLastMessageText = (message) => {
     if (!message) return "";
+     if (message.text === "" && !message.attachments?.length) return ""; 
     // Call record
     if (message.isCallRecord) {
       const icon = message.callType === "video" ? "📹" : "📞";

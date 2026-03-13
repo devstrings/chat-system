@@ -7,6 +7,7 @@ import {
   addMessage,
   updateMessageStatus,
   bulkDeleteMessages,
+  clearMessages,
 } from "../store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -17,22 +18,26 @@ export default function ChatWindow({
   searchQuery = "",
   onUpdateLastMessageStatus,
   selectedUser = null,
+  isSelectionMode = false,
+  setIsSelectionMode = () => {},
+  selectedMessages = new Set(),
+  setSelectedMessages = () => {},
 }) {
   const dispatch = useDispatch();
   const messages = useSelector(
     (state) => state.chat.conversations[conversationId]?.messages || [],
   );
 
-  const loading = useSelector((state) => state.chat.loading);
-  const messagesEndRef = useRef(null);
+const loading = useSelector(
+  (state) => state.chat.conversations[conversationId]?.loading || false
+);  const messagesEndRef = useRef(null);
   const conversationIdRef = useRef(null);
   const messagesRef = useRef(messages);
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
 
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedMessages, setSelectedMessages] = useState(new Set());
+  
   const [typingUsers, setTypingUsers] = useState(new Set());
 
   const [deleteDialog, setDeleteDialog] = useState({
@@ -48,44 +53,38 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  useEffect(() => {
-    if (!conversationId || !currentUserId) return;
+const hasFetched = useRef(false);
 
-    dispatch(fetchMessages({ conversationId, currentUserId }));
-  }, [dispatch, conversationId, currentUserId]);
+useEffect(() => {
+  if (!conversationId || !currentUserId) return;
+  hasFetched.current = false;
+}, [conversationId]);
+
+useEffect(() => {
+  if (!conversationId || !currentUserId) return;
+  if (hasFetched.current) return;
+  hasFetched.current = true;
+  dispatch(fetchMessages({ conversationId, currentUserId }));
+}, [dispatch, conversationId, currentUserId]);
 
   // CHAT CLEARED SOCKET LISTENER
   useEffect(() => {
     if (!socket || !conversationId) return;
+const handleChatCleared = (data) => {
+  console.log("chatCleared received:", data);
+  console.log("conversationId match:", data.conversationId === conversationId);
+  console.log("clearedFor match:", data.clearedFor === currentUserId);
+  console.log("data.clearedFor:", data.clearedFor);
+  console.log("currentUserId:", currentUserId);
 
-    const handleChatCleared = (data) => {
-      console.log(" [CHATWINDOW] chatCleared received:", data);
-
-      if (
-        data.conversationId === conversationId &&
-        data.clearedFor === currentUserId
-      ) {
-        console.log(" Clearing chat window");
-        dispatch(clearChat.fulfilled(conversationId));
-
-        dispatch(
-          addMessage({
-            conversationId: data.conversationId,
-            message: {
-              _id: `cleared-${Date.now()}`,
-              text: "",
-              createdAt: new Date().toISOString(),
-              sender: currentUserId,
-              status: "sent",
-              attachments: [],
-              _updated: Date.now(),
-            },
-            userId: selectedUser?._id ?? "",
-            isGroup: false,
-          }),
-        );
-      }
-    };
+  if (
+    data.conversationId === conversationId &&
+    data.clearedFor === currentUserId
+  ) {
+    console.log("Clearing chat window");
+    dispatch(clearMessages(conversationId));
+  }
+};
 
     socket.on("chatCleared", handleChatCleared);
 
@@ -94,7 +93,6 @@ export default function ChatWindow({
     };
   }, [socket, conversationId, currentUserId, dispatch]);
 
-  // YEH LAGAO
   useEffect(() => {
     if (!socket) return;
 
@@ -363,7 +361,7 @@ export default function ChatWindow({
           className="flex-1 overflow-y-auto px-3 md:px-6 py-4"
           style={{ minHeight: 0 }}
         >
-          {!isSelectionMode && messages.length > 0 && (
+          {/* {!isSelectionMode && messages.length > 0 && (
             <div className="flex justify-center mb-4 sticky top-0 z-10">
               <button
                 onClick={toggleSelectionMode}
@@ -385,7 +383,7 @@ export default function ChatWindow({
                 Select Messages
               </button>
             </div>
-          )}
+          )} */}
 
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date}>
@@ -463,6 +461,7 @@ export default function ChatWindow({
                     isSelectionMode={isSelectionMode}
                     isSelected={selectedMessages.has(msg._id)}
                     onToggleSelect={toggleMessageSelection}
+                      onEnterSelectionMode={() => setIsSelectionMode(true)}
                   />
                 );
               })}

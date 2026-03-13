@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import axiosInstance from "../utils/axiosInstance";
 import API_BASE_URL from "../config/api";
@@ -8,6 +8,7 @@ export default function Message({
   isSelectionMode,
   isSelected,
   onToggleSelect,
+  onEnterSelectionMode,
 }) {
   const [imageUrls, setImageUrls] = useState({});
   const [imageLoading, setImageLoading] = useState({});
@@ -19,6 +20,23 @@ export default function Message({
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(message.text || "");
   const audioRefs = React.useRef({});
+  const longPressTimer = useRef(null);
+
+const handleTouchStart = () => {
+  longPressTimer.current = setTimeout(() => {
+    onEnterSelectionMode?.();
+    onToggleSelect?.(message._id);
+  }, 500);
+};
+
+const handleTouchEnd = () => {
+  clearTimeout(longPressTimer.current);
+};
+
+const handleContextMenu = (e) => {
+  e.preventDefault();
+  onToggleSelect?.(message._id);
+};
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
@@ -508,10 +526,13 @@ export default function Message({
       } px-2 md:px-0`}
     >
       <div
-        className={`flex items-end gap-2 max-w-[85%] sm:max-w-md ${
-          isOwn ? "flex-row-reverse" : "flex-row"
-        }`}
-      >
+  className={`flex items-end gap-2 max-w-[85%] sm:max-w-md ${
+    isOwn ? "flex-row-reverse" : "flex-row"
+  }`}
+  onTouchStart={handleTouchStart}
+  onTouchEnd={handleTouchEnd}
+  onContextMenu={handleContextMenu}
+>
         {isSelectionMode && (
           <div className="flex items-center">
             <input
@@ -560,8 +581,7 @@ export default function Message({
                     onClick={() => setShowOptions(false)}
                   ></div>
 
-                  <div className="absolute right-0 mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden">
-                    {isOwn && canEdit() && !isEditing && (
+<div className={`absolute mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden ${isOwn ? 'right-0' : 'left-0'}`}>                    {isOwn && canEdit() && !isEditing && (
                       <button
                         onClick={handleEditMessage}
                         className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"

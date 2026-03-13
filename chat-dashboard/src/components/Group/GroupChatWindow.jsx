@@ -14,6 +14,10 @@ export default function GroupChatWindow({
   group,
   currentUserId,
   searchQuery = "",
+  isSelectionMode = false,
+  setIsSelectionMode = () => {},
+  selectedMessages = new Set(),
+  setSelectedMessages = () => {},
 }) {
   //  Redux setup
   const dispatch = useDispatch();
@@ -25,6 +29,38 @@ export default function GroupChatWindow({
 
   const messagesEndRef = useRef(null);
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const toggleMessageSelection = (messageId) => {
+    setSelectedMessages((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllMessages = () => {
+    setSelectedMessages(new Set(messages.map((msg) => msg._id)));
+  };
+
+  const deselectAllMessages = () => {
+    setSelectedMessages(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedMessages.size === 0) return;
+    const messageIds = Array.from(selectedMessages);
+    messageIds.forEach((messageId) => {
+      socket?.emit("deleteGroupMessageForMe", {
+        messageId,
+        groupId: group._id,
+      });
+    });
+    setIsSelectionMode(false);
+    setSelectedMessages(new Set());
+  };
 
   //  Fetch messages
   useEffect(() => {
@@ -207,6 +243,73 @@ export default function GroupChatWindow({
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
+      {isSelectionMode && (
+        <div className="bg-white border-b border-gray-300 shadow-sm px-2 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3 md:gap-4">
+            <button
+              onClick={() => {
+                setIsSelectionMode(false);
+                setSelectedMessages(new Set());
+              }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg
+                className="w-5 h-5 md:w-6 md:h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            <span className="text-gray-900 font-medium text-sm md:text-base">
+              {selectedMessages.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectedMessages.size < filteredMessages.length ? (
+              <button
+                onClick={selectAllMessages}
+                className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
+              >
+                All
+              </button>
+            ) : (
+              <button
+                onClick={deselectAllMessages}
+                className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
+              >
+                None
+              </button>
+            )}
+            <button
+              onClick={handleBulkDelete}
+              disabled={selectedMessages.size === 0}
+              className="px-3 md:px-4 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs md:text-sm"
+            >
+              <svg
+                className="w-3.5 h-3.5 md:w-4 md:h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              <span className="hidden sm:inline">Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-4">
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
@@ -234,6 +337,10 @@ export default function GroupChatWindow({
                     msg.sender === currentUserId
                   }
                   isGroupMessage={true}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedMessages.has(msg._id)}
+                  onToggleSelect={toggleMessageSelection}
+                  onEnterSelectionMode={() => setIsSelectionMode(true)}
                 />
               </div>
             ))}

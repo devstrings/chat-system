@@ -412,9 +412,9 @@ export const fetchAllFriends = async (currentUserId) => {
 
   // Get user details for all friends
   const User = mongoose.model("User");
-  const friends = await User.find({
+ const friends = await User.find({
     _id: { $in: friendIds },
-  }).select("username email profileImage");
+  }).select("username email profileImage isEmailVerified createdAt");
 
   //  Format all friends with full image URLs
   const formattedFriends = friends.map((friend) =>

@@ -41,17 +41,18 @@ export const registerUser = async (username, email, password) => {
     userId: newUser._id,
     provider: "local",
   });
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  newUser.emailOTP = otp;
-  newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
-  await newUser.save();
-  try {
-    await sendOTPEmail(email, otp);
-    
-  } catch (error) {
-    console.error(" OTP email send error:", error);
-  }
-
+ const otp = Math.floor(100000 + Math.random() * 900000).toString();
+const hashedOTP = await bcrypt.hash(otp, 10);
+newUser.emailOTP = hashedOTP;
+newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+await newUser.save();
+console.log(" OTP for testing:", otp);// for testing purposes remove in production
+try {
+  await sendOTPEmail(email, otp);
+} catch (emailErr) {
+  console.error("Email send failed:", emailErr.message);
+  // Don't throw - user is already created
+}
 
   console.log(" User registered:", email);
 
@@ -93,10 +94,9 @@ export const loginUser = async (email, password) => {
       400,
     );
   }
-  console.log(user)
-  if (!user.isEmailVerified) {
-    throw new AppError("Please verify your email first", 403);
-  }
+if (!user.isEmailVerified) {
+  throw new AppError("Please verify your email first", 403);
+}
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new AppError("Invalid email or password", 401);
@@ -152,7 +152,7 @@ export const handleGoogleAuth = async (code) => {
 
   let user = await User.findOne({ email });
 
-  if (user) {
+if (user) {
     const googleProvider = await AuthProvider.findOne({
       userId: user._id,
       provider: "google",
@@ -165,19 +165,22 @@ export const handleGoogleAuth = async (code) => {
         providerId: googleId,
         providerData: { name, picture },
       });
-
-      if (!user.profileImage && picture) {
-        user.profileImage = picture;
-        await user.save();
-      }
     }
-  } else {
+
+    if (!user.profileImage && picture) {
+      user.profileImage = picture;
+    }
+    if (!user.isEmailVerified) {
+      user.isEmailVerified = true;
+    }
+    await user.save();
+  }
+   else {
     let username = name || `user_${Date.now()}`;
     const existingUsername = await User.findOne({ username });
     if (existingUsername) username = `${username}_${Date.now()}`;
 
-    user = await User.create({ email, username, profileImage: picture });
-
+user = await User.create({ email, username, profileImage: picture, isEmailVerified: true });
     await AuthProvider.create({
       userId: user._id,
       provider: "google",
@@ -222,27 +225,28 @@ export const handleFacebookAuth = async (accessToken) => {
       userId: user._id,
       provider: "facebook",
     });
-
-    if (!facebookProvider) {
+if (!facebookProvider) {
       await AuthProvider.create({
         userId: user._id,
         provider: "facebook",
         providerId: facebookId,
         providerData: { name, picture },
       });
-
-      if (!user.profileImage && picture) {
-        user.profileImage = picture;
-        await user.save();
-      }
     }
+
+    if (!user.profileImage && picture) {
+      user.profileImage = picture;
+    }
+    if (!user.isEmailVerified) {
+      user.isEmailVerified = true;
+    }
+    await user.save();
   } else {
     let username = name || `user_${Date.now()}`;
     const existingUsername = await User.findOne({ username });
     if (existingUsername) username = `${username}_${Date.now()}`;
 
-    user = await User.create({ email, username, profileImage: picture });
-
+user = await User.create({ email, username, profileImage: picture, isEmailVerified: true });
     await AuthProvider.create({
       userId: user._id,
       provider: "facebook",
@@ -505,10 +509,11 @@ export const verifyOTPService = async (email, otp) => {
   if (user.emailOTPExpires < new Date()) {
     throw new AppError("OTP expired", 400);
   }
-
-  if (user.emailOTP !== otp) {
-    throw new AppError("Invalid OTP", 400);
-  }
+//
+const isMatch = await bcrypt.compare(otp, user.emailOTP);
+if (!isMatch) {
+  throw new AppError("Invalid OTP", 400);
+}
 
   user.isEmailVerified = true;
   user.emailOTP = null;
@@ -528,7 +533,8 @@ export const resendOTPService = async (email) => {
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  user.emailOTP = otp;
+const hashedOTP = await bcrypt.hash(otp, 10);
+user.emailOTP = hashedOTP;
   user.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
   await user.save();
 

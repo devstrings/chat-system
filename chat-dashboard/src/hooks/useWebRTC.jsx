@@ -31,7 +31,7 @@ export const useWebRTC = () => {
   const callTimeoutRef = useRef(null);
 
   const startRinging = () => {
-    const audio = new Audio("/sounds/ringing.mp3");
+    const audio = new Audio("/sounds/outgoing.mp3");
     audio.loop = true;
     audio.play().catch((e) => console.log("Audio error:", e));
     ringAudioRef.current = audio;
