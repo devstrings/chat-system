@@ -7,7 +7,7 @@ services:
     container_name: chat_backend
     restart: always
     ports:
-      - "${BACKEND_CONTAINER_PORT}:${BACKEND_HOST_PORT}"
+      - "${BACKEND_HOST_PORT}:${BACKEND_CONTAINER_PORT}"
     environment:
       - NODE_ENV=${NODE_ENV}
       - BACKEND_URL=${BACKEND_URL}
@@ -33,7 +33,7 @@ services:
     container_name: chat_frontend
     restart: always
     ports:
-      - "${FRONTEND_CONTAINER_PORT}:${FRONTEND_HOST_PORT}"
+      - "${FRONTEND_HOST_PORT}:${FRONTEND_CONTAINER_PORT}"
     environment:
       - VITE_API_URL=${BACKEND_URL}
       - VITE_SOCKET_URL=${BACKEND_URL}
