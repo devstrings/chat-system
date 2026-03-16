@@ -85,7 +85,6 @@ export const autoAcceptAndCreateFriendship = async (
   senderId,
   receiverId,
 ) => {
-  console.log(" Auto-accepting friend request:", { senderId, receiverId });
 
   //  Create friendship
   await Friendship.create({
@@ -96,7 +95,6 @@ export const autoAcceptAndCreateFriendship = async (
   //  DELETE the opposite request after accepting (cleanup)
   await FriendRequest.findByIdAndDelete(oppositeRequest._id);
 
-  console.log(" Auto-accept completed, old request deleted");
 
   return {
     message: "You are now friends!",
@@ -106,18 +104,15 @@ export const autoAcceptAndCreateFriendship = async (
 
 //  SEND FRIEND REQUEST SERVICE
 export const processSendFriendRequest = async (senderId, receiverId) => {
-  console.log(" Processing friend request:", { senderId, receiverId });
 
   // Check if blocked
   const isBlocked = await checkIfBlocked(senderId, receiverId);
   if (isBlocked) {
-    console.log(" Cannot send: Users blocked");
 throw new AppError("Cannot send request", 403);  }
 
   // Check if already friends
   const alreadyFriends = await checkIfAlreadyFriends(senderId, receiverId);
   if (alreadyFriends) {
-    console.log(" Already friends");
 throw new AppError("Already friends", 400);  }
 
   //  Check for ONLY PENDING requests (ignore accepted/rejected ones)
@@ -146,7 +141,6 @@ throw new AppError("Already friends", 400);  }
 throw new AppError("Request already sent", 400);    }
 
     if (isOppositeDirection) {
-      console.log("Opposite request found, auto-accepting");
       return await autoAcceptAndCreateFriendship(
         existingPendingRequest,
         senderId,
@@ -165,14 +159,12 @@ throw new AppError("Request already sent", 400);    }
   });
 
   // Create new request
-  console.log(" Creating new friend request");
   const friendRequest = await FriendRequest.create({
     sender: senderId,
     receiver: receiverId,
     status: "pending",
   });
 
-  console.log(" Friend request created:", friendRequest._id);
 
   return {
     message: "Friend request sent",
@@ -191,7 +183,6 @@ export const processAcceptFriendRequest = async (friendRequest) => {
   //  DELETE the request (don't just update status)
   await FriendRequest.findByIdAndDelete(friendRequest._id);
 
-  console.log(" Friend request deleted after accepting:", friendRequest._id);
 
   return { message: "Friend request accepted" };
 };
@@ -242,7 +233,6 @@ export const fetchSentRequests = async (currentUserId) => {
 
 //  UNFRIEND SERVICE
 export const processUnfriend = async (currentUserId, friendId) => {
-  console.log(" Unfriend request:", { currentUserId, friendId });
 
   // Delete friendship
   const friendship = await Friendship.findOneAndDelete({
@@ -253,10 +243,8 @@ export const processUnfriend = async (currentUserId, friendId) => {
   });
 
   if (!friendship) {
-    console.log(" Friendship not found");
 throw new AppError("Friendship not found", 404);  }
 
-  console.log(" Friendship deleted:", friendship._id);
 
   //  DELETE ALL friend requests (ALL statuses) - Complete cleanup
   const deletedRequests = await FriendRequest.deleteMany({
@@ -266,7 +254,6 @@ throw new AppError("Friendship not found", 404);  }
     ],
   });
 
-  console.log(" Deleted ALL friend requests:", deletedRequests.deletedCount);
 
   return { message: "Unfriended successfully" };
 };
@@ -394,14 +381,12 @@ export const fetchRelationshipStatus = async (currentUserId, userId) => {
 
 // GET ALL FRIENDS SERVICE
 export const fetchAllFriends = async (currentUserId) => {
-  console.log(" Fetching friends for user:", currentUserId);
 
   // Find all friendships where current user is involved
   const friendships = await Friendship.find({
     $or: [{ user1: currentUserId }, { user2: currentUserId }],
   });
 
-  console.log(` Found ${friendships.length} friendships`);
 
   // Extract friend user IDs
   const friendIds = friendships.map((friendship) => {
@@ -421,7 +406,6 @@ export const fetchAllFriends = async (currentUserId) => {
     formatUserWithFullImageUrl(friend),
   );
 
-  console.log(` Returning ${formattedFriends.length} friends`);
 
   return formattedFriends;
 };

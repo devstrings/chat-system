@@ -32,13 +32,9 @@ export const setupCallHandlers = (io, socket) => {
   });
 
   const saveCallToConversation = async (callRecord, convId) => {
-    console.log(" saveCallToConversation called:", {
-      convId,
-      callId: callRecord._id,
-    });
+ 
     if (!convId) return null;
     try {
-      console.log(" Creating message in DB...");
       const durationText =
         callRecord.duration > 0 ? `${callRecord.duration}s` : "";
       const icon = callRecord.callType === "video" ? "📹" : "📞";
@@ -70,7 +66,6 @@ export const setupCallHandlers = (io, socket) => {
         $set: { createdAt: callTime },
       });
 
-      console.log(" Message saved! ID:", msg._id, "Text:", msg.text);
 
       await Conversation.findByIdAndUpdate(convId, {
         lastMessage: msg.text,
@@ -86,7 +81,6 @@ export const setupCallHandlers = (io, socket) => {
   };
 
   socket.on("call:initiate", async ({ to, offer, callType }) => {
-    console.log(` Call from ${userId} to ${to}`, offer, callType);
     try {
       const callRecord = await Call.create({
         caller: userId,
@@ -136,7 +130,6 @@ export const setupCallHandlers = (io, socket) => {
   });
 
   socket.on("call:answer", ({ to, answer }) => {
-    console.log(` Call answered by ${userId}`);
     io.to(to).emit("call:answered", { from: userId, answer });
   });
 
@@ -145,7 +138,6 @@ export const setupCallHandlers = (io, socket) => {
   });
 
   socket.on("call:end", async ({ to }) => {
-    console.log(` Call ended by ${userId}`);
     try {
       const callKey = `${userId}-${to}`;
       const reverseKey = `${to}-${userId}`;
@@ -187,7 +179,6 @@ export const setupCallHandlers = (io, socket) => {
   });
 
   socket.on("call:reject", async ({ to, callId }) => {
-    console.log(` Call rejected by ${userId}`);
     io.to(to).emit("call:rejected", { from: userId });
 
     try {
@@ -222,7 +213,6 @@ export const setupCallHandlers = (io, socket) => {
   });
 
   socket.on("call:cancel", async ({ to }) => {
-    console.log(` Call cancelled by ${userId}`);
     try {
       const callKey = `${userId}-${to}`;
       const callData = activeCalls.get(callKey);

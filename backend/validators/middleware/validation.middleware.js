@@ -47,11 +47,7 @@ export const validateFriendship = async (req, res, next) => {
     const currentUserId = req.user.id;
     const { otherUserId, skipCreate } = req.body;
 
-    console.log(" Validating friendship:", {
-      currentUserId,
-      otherUserId,
-      skipCreate,
-    });
+ 
 
     if (!otherUserId) {
       return sendError(res, 400, "Other user ID is required");
@@ -59,7 +55,6 @@ export const validateFriendship = async (req, res, next) => {
 
     // Skip friendship check if skipCreate is true
     if (skipCreate === true) {
-      console.log("⏭ Skipping friendship validation (skipCreate=true)");
       return next();
     }
 
@@ -72,15 +67,8 @@ export const validateFriendship = async (req, res, next) => {
       status: "accepted",
     });
 
-    console.log(
-      " Friendship found:",
-      !!friendship,
-      "Status:",
-      friendship?.status || "not found",
-    );
 
     if (!friendship) {
-      console.log(" Not friends or friendship not accepted");
       return sendError(res, 403, "Not friends");
     }
 
@@ -107,14 +95,9 @@ export const validateNotBlocked = async (req, res, next) => {
       req.body.userId ||
       req.params.userId;
 
-    console.log(" Checking block status:", {
-      currentUserId,
-      targetUserId,
-    });
 
     //  Skip if no target user
     if (!targetUserId) {
-      console.log("⏭ No target user ID - skipping block check");
       return next();
     }
 
@@ -237,15 +220,7 @@ export const validateConversationParticipant = async (req, res, next) => {
     const currentUserId = req.user.id;
     const conversation = req.validatedConversation;
 
-    console.log(" [VALIDATE PARTICIPANT] Input:", {
-      currentUserId,
-      conversationId: conversation._id,
-      participants: conversation.participants.map((p) => p.toString()),
-      deletedBy: conversation.deletedBy?.map((d) => ({
-        userId: d.userId?.toString(),
-        deletedAt: d.deletedAt,
-      })),
-    });
+    
 
     //  Check if conversation was deleted by user
     if (
@@ -253,7 +228,6 @@ export const validateConversationParticipant = async (req, res, next) => {
         (d) => d.userId?.toString() === currentUserId.toString(),
       )
     ) {
-      console.log(" [VALIDATE PARTICIPANT] Conversation deleted by user");
       return sendError(res, 404, "Conversation not found");
     }
 
@@ -263,11 +237,7 @@ export const validateConversationParticipant = async (req, res, next) => {
     );
     const userIdAsString = currentUserId.toString();
 
-    console.log(" [VALIDATE PARTICIPANT] Comparison:", {
-      userIdAsString,
-      participantsAsStrings,
-      includes: participantsAsStrings.includes(userIdAsString),
-    });
+ 
 
     const isParticipant = participantsAsStrings.includes(userIdAsString);
 
@@ -278,7 +248,6 @@ export const validateConversationParticipant = async (req, res, next) => {
       return sendError(res, 403, "Not authorized to access this conversation");
     }
 
-    console.log(" [VALIDATE PARTICIPANT] Validation passed");
     next();
   } catch (err) {
     console.error(" [VALIDATE PARTICIPANT] Error:", err);

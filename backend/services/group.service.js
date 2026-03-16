@@ -22,7 +22,6 @@ export const processCreateGroup = async (
 
   await group.populate("members", "username email profileImage");
 
-  console.log(" Group created:", group._id);
   return group;
 };
 
@@ -34,7 +33,6 @@ export const fetchUserGroups = async (userId) => {
     .populate("creator", "username")
     .sort({ lastMessageTime: -1 });
 
-  console.log(` Found ${groups.length} groups for user ${userId}`);
   return groups;
 };
 
@@ -63,7 +61,6 @@ export const processUpdateGroup = async (groupId, name, description) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Updated group ${groupId}`);
   return group;
 };
 
@@ -94,7 +91,6 @@ export const processUpdateGroupImage = async (groupId, file) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Updated group image ${groupId}`);
   return group;
 };
 
@@ -111,7 +107,6 @@ export const processRemoveGroupImage = async (groupId) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Removed group image ${groupId}`);
   return group;
 };
 
@@ -132,7 +127,6 @@ throw new AppError("All users are already members", 400);  }
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Added ${newMembers.length} members to group ${groupId}`);
   return group;
 };
 
@@ -146,7 +140,6 @@ export const processRemoveGroupMember = async (groupId, memberId) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Removed member ${memberId} from group ${groupId}`);
   return group;
 };
 
@@ -159,7 +152,6 @@ export const processLeaveGroup = async (groupId, userId) => {
     if (group.members.length === 1) {
       // Last member leaving, delete group
       await Group.findByIdAndDelete(groupId);
-      console.log(` Deleted empty group ${groupId}`);
       return { message: "Group deleted", deleted: true };
     } else {
       // Transfer ownership to first admin or first member
@@ -180,7 +172,6 @@ export const processLeaveGroup = async (groupId, userId) => {
 
   await group.save();
 
-  console.log(` User ${userId} left group ${groupId}`);
   return { message: "Left group successfully" };
 };
 
@@ -198,7 +189,6 @@ export const processMakeAdmin = async (groupId, memberId) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(` Made ${memberId} admin in group ${groupId}`);
   return group;
 };
 
@@ -212,7 +202,6 @@ export const processRemoveAdmin = async (groupId, memberId) => {
   await group.save();
   await group.populate("members admins creator", "username email profileImage");
 
-  console.log(`Removed ${memberId} from admin in group ${groupId}`);
   return group;
 };
 
@@ -230,7 +219,6 @@ export const processDeleteGroup = async (groupId) => {
   // Delete all group messages
   await Message.deleteMany({ groupId });
 
-  console.log(` Deleted group ${groupId}`);
   return { message: "Group deleted successfully" };
 };
 
@@ -241,7 +229,6 @@ export const processPinGroup = async (groupId, userId) => {
   group.pinnedBy.push({ userId, pinnedAt: new Date() });
   await group.save();
 
-  console.log(` Group pinned: ${groupId} by ${userId}`);
   return { message: "Group pinned successfully", group };
 };
 
@@ -252,7 +239,6 @@ export const processUnpinGroup = async (groupId, userId) => {
   group.pinnedBy = group.pinnedBy.filter((p) => p.userId.toString() !== userId);
   await group.save();
 
-  console.log(` Group unpinned: ${groupId} by ${userId}`);
   return { message: "Group unpinned successfully", group };
 };
 
@@ -263,7 +249,6 @@ export const processArchiveGroup = async (groupId, userId) => {
   group.archivedBy.push({ userId, archivedAt: new Date() });
   await group.save();
 
-  console.log(` Group archived: ${groupId} by ${userId}`);
   return { message: "Group archived successfully", group };
 };
 
@@ -276,7 +261,6 @@ export const processUnarchiveGroup = async (groupId, userId) => {
   );
   await group.save();
 
-  console.log(` Group unarchived: ${groupId} by ${userId}`);
   return { message: "Group unarchived successfully", group };
 };
 
@@ -336,13 +320,11 @@ export const findGroupImageFile = (filename) => {
   for (const tryPath of possiblePaths) {
     if (fs.existsSync(tryPath)) {
       filePath = tryPath;
-      console.log(" Group image found at:", filePath);
       break;
     }
   }
 
   if (!filePath) {
-    console.error(" Group image not found:", cleanFilename);
 throw new AppError("Image not found", 404);  }
 
   return filePath;

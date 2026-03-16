@@ -17,7 +17,6 @@ transporter.verify((error, success) => {
   if (error) {
     console.error(" Email configuration error:", error);
   } else {
-    console.log(" Email service ready");
   }
 });
 
@@ -82,7 +81,6 @@ export const sendPasswordResetEmail = async (email, resetUrl, username) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(" Password reset email sent to:", email);
     return true;
   } catch (error) {
     console.error(" Email sending failed:", error);
@@ -142,7 +140,6 @@ export const sendPasswordSetConfirmation = async (email, username) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(" Password set confirmation sent to:", email);
     return true;
   } catch (error) {
     console.error("Email sending failed:", error);

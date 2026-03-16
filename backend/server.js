@@ -22,7 +22,11 @@ const server = http.createServer(app);
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: config.frontend.url,
+    origin: [
+      config.frontend.url,
+      "https://chat.masaajid.online",
+      "http://localhost:5173",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -58,6 +62,7 @@ app.use(
         "http://chat_frontend:5173",
         "http://frontend:5173",
         "http://192.168.0.116:5173", 
+        "https://chat.masaajid.online",
       ];
 
       if (!origin) return callback(null, true);

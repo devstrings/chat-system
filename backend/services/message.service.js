@@ -10,10 +10,7 @@ export const checkFriendship = async (currentUserId, otherUserId) => {
   const user1 = currentUserId.toString();
   const user2 = otherUserId.toString();
 
-  console.log(" [SERVICE] Checking friendship:", {
-    user1,
-    user2,
-  });
+
 
   const friendship = await Friendship.findOne({
     $or: [
@@ -46,7 +43,6 @@ export const createNewConversation = async (currentUserId, otherUserId) => {
     participants: [currentUserId, otherUserId],
   });
 
-  console.log(" Created NEW conversation:", conversation._id);
   return conversation;
 };
 
@@ -61,7 +57,6 @@ export const processGetOrCreateConversation = async (
 
   //  If skipCreate flag is set, don't create new conversation
   if (!conversation && skipCreate) {
-    console.log(" No conversation found, skipCreate=true, returning null");
     return null;
   }
 
@@ -171,9 +166,6 @@ export const fetchUserConversations = async (currentUserId) => {
 
 // CLEAR CHAT SERVICE
 export const processClearChat = async (conversationId, currentUserId) => {
-  console.log("CLEAR CHAT START");
-  console.log("conversationId:", conversationId);
-  console.log(" userId:", currentUserId);
 
   const conversation = await Conversation.findById(conversationId);
 
@@ -188,14 +180,12 @@ export const processClearChat = async (conversationId, currentUserId) => {
     },
   );
 
-  console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
 
   //  Update conversation lastMessage
   conversation.lastMessage = "";
   conversation.lastMessageTime = new Date();
   await conversation.save();
 
-  console.log(" Conversation updated");
 
   return {
     success: true,
@@ -213,7 +203,6 @@ export const processDeleteConversation = async (
   currentUserId,
   otherUserId,
 ) => {
-  console.log("[DELETE] Starting deletion for:", conversationId);
 
   let conversation;
 
@@ -232,7 +221,6 @@ export const processDeleteConversation = async (
   }
 
   if (!conversation) {
-    console.log("No conversation found");
 throw new AppError("No conversation found to delete", 404);  }
 
   const otherUserIdInConv = conversation.participants.find(
@@ -259,7 +247,6 @@ throw new AppError("No conversation found to delete", 404);  }
       deletedAt: new Date(),
     });
     await conversation.save();
-    console.log(" Added user to deletedBy array");
   }
 
   //  Delete messages ONLY for current user
@@ -272,7 +259,6 @@ throw new AppError("No conversation found to delete", 404);  }
       $addToSet: { deletedFor: currentUserId },
     },
   );
-  console.log(` Marked ${result.modifiedCount} messages as deleted for user`);
 
   //  Check if BOTH users deleted it
   const bothDeleted = conversation.participants.every((p) =>
@@ -280,7 +266,6 @@ throw new AppError("No conversation found to delete", 404);  }
   );
 
   if (bothDeleted) {
-    console.log(" BOTH users deleted, hard deleting conversation & messages");
 
     // Hard delete messages
     await Message.deleteMany({ conversationId: conversation._id });
@@ -294,9 +279,7 @@ throw new AppError("No conversation found to delete", 404);  }
     // Hard delete conversation
     await Conversation.findByIdAndDelete(conversation._id);
 
-    console.log(" Conversation permanently deleted from DB");
   } else {
-    console.log(" Soft deleted for current user only");
   }
 
   return {
@@ -314,7 +297,6 @@ throw new AppError("No conversation found to delete", 404);  }
 
 // DELETE MESSAGE FOR ME SERVICE
 export const processDeleteMessageForMe = async (messageId, currentUserId) => {
-  console.log(" Delete for me - Message:", messageId, "User:", currentUserId);
 
   // Populate conversation to get participants
   const message = await Message.findById(messageId).populate("conversationId");
@@ -336,7 +318,6 @@ export const processDeleteMessageForMe = async (messageId, currentUserId) => {
 
   await message.save();
 
-  console.log(" Message deleted for user");
 
   return {
     message: "Message deleted for you",
@@ -358,7 +339,6 @@ export const processDeleteMessageForEveryone = async (messageId) => {
 
   await message.save();
 
-  console.log(" Message deleted for everyone");
 
   return {
     message: "Message deleted for everyone",
@@ -412,7 +392,6 @@ export const processBulkDeleteMessages = async (messageIds, currentUserId) => {
     }
   }
 
-  console.log(` Bulk delete completed: ${deletedCount} messages`);
 
   return {
     message: `${deletedCount} messages deleted`,
@@ -444,7 +423,6 @@ export const processPinConversation = async (conversationId, userId) => {
 
   await conversation.save();
 
-  console.log(` Conversation pinned: ${conversationId} by ${userId}`);
 
   return {
     message: "Conversation pinned successfully",
@@ -463,7 +441,6 @@ export const processUnpinConversation = async (conversationId, userId) => {
 
   await conversation.save();
 
-  console.log(` Conversation unpinned: ${conversationId} by ${userId}`);
 
   return {
     message: "Conversation unpinned successfully",
@@ -494,7 +471,6 @@ export const processArchiveConversation = async (conversationId, userId) => {
 
   await conversation.save();
 
-  console.log(` Conversation archived: ${conversationId} by ${userId}`);
 
   return {
     message: "Conversation archived successfully",
@@ -513,7 +489,6 @@ export const processUnarchiveConversation = async (conversationId, userId) => {
 
   await conversation.save();
 
-  console.log(` Conversation unarchived: ${conversationId} by ${userId}`);
 
   return {
     message: "Conversation unarchived successfully",

@@ -8,17 +8,12 @@ import {
   GROUP_MESSAGE_EDIT_LIMIT_MS,
 } from "#utils";
 export function handleMessage(io, socket) {
-  console.log(` User connected: ${socket.user.id}`);
 
   socket.on(
     "sendMessage",
     async ({ conversationId, text, attachments = [] }) => {
       try {
-        console.log(" Sending message:", {
-          conversationId,
-          text,
-          senderId: socket.user.id,
-        });
+     
 
         const conversation = await Conversation.findById(
           conversationId,
@@ -36,17 +31,13 @@ export function handleMessage(io, socket) {
           );
 
           if (wasDeleted) {
-            console.log(
-              " Restoring deleted conversation for user:",
-              socket.user.id,
-            );
+        
 
             conversation.deletedBy = conversation.deletedBy.filter(
               (d) => !d.userId || d.userId.toString() !== socket.user.id,
             );
 
             await conversation.save();
-            console.log(" Cleared deletedBy for user:", socket.user.id);
 
             socket.emit("conversationRestored", {
               conversationId: conversationId.toString(),
@@ -61,14 +52,11 @@ export function handleMessage(io, socket) {
           attachmentIds = attachments
             .map((att) => att.attachmentId)
             .filter(Boolean);
-          console.log(" Attachment IDs:", attachmentIds);
         }
 
         // Check if conversation is archived for any user
         if (conversation.archivedBy && conversation.archivedBy.length > 0) {
-          console.log(
-            ` Conversation ${conversationId} is archived by ${conversation.archivedBy.length} user(s)`,
-          );
+        
 
           // Store who had it archived before clearing
           const usersWhoArchived = conversation.archivedBy.map((a) =>
@@ -79,7 +67,6 @@ export function handleMessage(io, socket) {
           conversation.archivedBy = [];
           await conversation.save();
 
-          console.log(` Auto-unarchived conversation ${conversationId}`);
 
           // Notify all participants that chat is unarchived
           for (const participant of conversation.participants) {
@@ -96,7 +83,6 @@ export function handleMessage(io, socket) {
                   conversationId: conversationId,
                   reason: "newMessage",
                 });
-                console.log(` Notified user ${participantId} about unarchive`);
               }
             }
           }
@@ -116,7 +102,6 @@ export function handleMessage(io, socket) {
           status: "sent",
         });
 
-        console.log(" Message created:", msg._id);
 
         // Populate sender AND attachments with ALL required fields
         await msg.populate("sender", "username email");
@@ -138,7 +123,6 @@ export function handleMessage(io, socket) {
           updatedAt: new Date(now), //  Also update updatedAt
         });
 
-        console.log(` Updated conversation ${conversationId} timestamp:`, now);
 
         // Transform attachments with complete data including duration
         const transformedAttachments =
@@ -179,34 +163,17 @@ export function handleMessage(io, socket) {
           createdAt: msg.createdAt,
         };
 
-        console.log(
-          " Broadcasting message:",
-          JSON.stringify({
-            messageId: msg._id,
-            conversationId: msg.conversationId,
-            senderId: msg.sender._id,
-            receiverId: receiverId,
-            hasReceiver: !!receiverId,
-          }),
-        );
-
+   
         // Add receiver as object (not just ID)
         const enhancedMessageData = {
           ...messageData,
           receiver: receiverId ? { _id: receiverId } : null,
         };
 
-        console.log(
-          " Enhanced message data:",
-          JSON.stringify({
-            hasReceiver: !!enhancedMessageData.receiver,
-            receiverId: enhancedMessageData.receiver?._id,
-          }),
-        );
+     
 
         //   Emit to sender FIRST with enhanced data
         socket.emit("receiveMessage", enhancedMessageData);
-        console.log(" Message sent to SENDER socket:", socket.id);
 
         // Emit to receiver (if online)
         if (receiverId) {
@@ -215,12 +182,8 @@ export function handleMessage(io, socket) {
           );
 
           if (receiverSocket) {
-            console.log(
-              ` Receiver ONLINE, sending to socket:`,
-              receiverSocket.id,
-            );
+          
             receiverSocket.emit("receiveMessage", enhancedMessageData);
-            console.log(" Message broadcasted to RECEIVER");
             // Mark as delivered after 500ms
             setTimeout(async () => {
               try {
@@ -229,7 +192,6 @@ export function handleMessage(io, socket) {
                   deliveredAt: new Date(),
                 });
 
-                console.log(" Message delivered:", msg._id);
 
                 const statusUpdate = {
                   messageId: msg._id,
@@ -245,7 +207,6 @@ export function handleMessage(io, socket) {
               }
             }, 500);
           } else {
-            console.log(`Receiver OFFLINE, message stays 'sent'`);
           }
         }
       } catch (err) {
@@ -258,7 +219,6 @@ export function handleMessage(io, socket) {
 
   socket.on("userOnline", async () => {
     try {
-      console.log(` User ${socket.user.id} came online`);
 
       const conversations = await Conversation.find({
         participants: socket.user.id,
@@ -271,7 +231,6 @@ export function handleMessage(io, socket) {
         }).populate("sender", "username");
 
         if (pendingMessages.length > 0) {
-          console.log(` Delivering ${pendingMessages.length} pending messages`);
 
           await Message.updateMany(
             {
@@ -310,7 +269,6 @@ export function handleMessage(io, socket) {
 
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
-      console.log(` Marking read in conversation: ${conversationId}`);
 
       const conversation = await Conversation.findById(conversationId).populate(
         "participants",
@@ -335,7 +293,6 @@ export function handleMessage(io, socket) {
       );
 
       if (result.modifiedCount > 0) {
-        console.log(` Marked ${result.modifiedCount} messages as read`);
 
         const readMessages = await Message.find({
           conversationId,
@@ -383,7 +340,6 @@ export function handleMessage(io, socket) {
   // DELETE FOR ME
   socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
     try {
-      console.log(" Delete for me request:", messageId);
 
       const message =
         await Message.findById(messageId).populate("conversationId");
@@ -417,7 +373,6 @@ export function handleMessage(io, socket) {
         await message.save();
 
         await Message.findByIdAndDelete(messageId);
-        console.log(" Message physically deleted from DB");
       } else {
         await message.save();
       }
@@ -455,7 +410,6 @@ export function handleMessage(io, socket) {
         }
       }
 
-      console.log(" Message deleted for user");
 
       //  UPDATE SIDEBAR if this was the last message
       if (allDeleted) {
@@ -481,7 +435,6 @@ export function handleMessage(io, socket) {
               : Date.now(),
           updateType: "delete",
         });
-        console.log(` Sent sidebar update to current user`);
       }
     } catch (err) {
       console.error(" Delete for me error:", err);
@@ -492,7 +445,6 @@ export function handleMessage(io, socket) {
     "deleteMessageForEveryone",
     async ({ messageId, conversationId }) => {
       try {
-        console.log(" Delete for everyone request:", messageId);
 
         const message =
           await Message.findById(messageId).populate("conversationId");
@@ -569,7 +521,6 @@ export function handleMessage(io, socket) {
           });
         }
 
-        console.log(" Message deleted for everyone");
 
         //  Notify all participants about lastMessage change
         for (const participant of message.conversationId.participants) {
@@ -592,7 +543,6 @@ export function handleMessage(io, socket) {
                   : Date.now(),
               updateType: "delete",
             });
-            console.log(` Sent sidebar update to ${participant}`);
           }
         }
       } catch (err) {
@@ -604,7 +554,6 @@ export function handleMessage(io, socket) {
   // Socket events section mein ye add karo:
   socket.on("editMessage", async ({ messageId, text, conversationId }) => {
     try {
-      console.log(" Edit message request:", messageId);
 
       const message =
         await Message.findById(messageId).populate("conversationId");
@@ -665,7 +614,6 @@ export function handleMessage(io, socket) {
         }
       }
 
-      console.log(" Message edited successfully");
     } catch (err) {
       console.error(" Edit message error:", err);
       socket.emit("errorMessage", { message: "Failed to edit message" });
@@ -758,7 +706,6 @@ export function handleMessage(io, socket) {
       };
 
       //  Emit to all group members with CORRECT event name
-      console.log(" Broadcasting to", group.members.length, "members");
 
       for (const member of group.members) {
         const memberSockets = [...io.sockets.sockets.values()].filter(
@@ -773,11 +720,9 @@ export function handleMessage(io, socket) {
 
         for (const s of memberSockets) {
           s.emit("receiveGroupMessage", messageData);
-          console.log(" Sent to socket:", s.id);
         }
       }
 
-      console.log(" Group message broadcast complete");
     } catch (err) {
       console.error(" sendGroupMessage error:", err);
       socket.emit("errorMessage", { message: "Failed to send message" });
@@ -816,7 +761,6 @@ export function handleMessage(io, socket) {
   // DELETE GROUP MESSAGE FOR ME
   socket.on("deleteGroupMessageForMe", async ({ messageId, groupId }) => {
     try {
-      console.log(" Delete group message for me:", messageId);
 
       const message = await Message.findById(messageId);
       if (!message || !message.isGroupMessage) {
@@ -859,7 +803,6 @@ export function handleMessage(io, socket) {
         deletedFor: [userId],
       });
 
-      console.log(" Group message deleted for user");
     } catch (err) {
       console.error(" Delete group message error:", err);
       socket.emit("errorMessage", { message: "Failed to delete message" });
@@ -869,7 +812,6 @@ export function handleMessage(io, socket) {
   // DELETE GROUP MESSAGE FOR EVERYONE
   socket.on("deleteGroupMessageForEveryone", async ({ messageId, groupId }) => {
     try {
-      console.log(" Delete group message for everyone:", messageId);
 
       const message = await Message.findById(messageId);
       if (!message || !message.isGroupMessage) {
@@ -922,7 +864,6 @@ export function handleMessage(io, socket) {
         }
       }
 
-      console.log("Group message deleted for everyone");
     } catch (err) {
       console.error(" Delete group message for everyone error:", err);
       socket.emit("errorMessage", { message: "Failed to delete message" });
@@ -932,7 +873,6 @@ export function handleMessage(io, socket) {
   // View status
   socket.on("viewStatus", async ({ statusId }) => {
     try {
-      console.log(" View status:", statusId, "by user:", socket.user.id);
 
       const status = await Status.findById(statusId);
 
@@ -970,7 +910,6 @@ export function handleMessage(io, socket) {
         });
       }
 
-      console.log(" Status marked as viewed");
     } catch (err) {
       console.error(" View status error:", err);
     }
@@ -979,7 +918,6 @@ export function handleMessage(io, socket) {
   // Delete status
   socket.on("deleteStatus", async ({ statusId }) => {
     try {
-      console.log(" Delete status:", statusId);
 
       const status = await Status.findById(statusId);
 
@@ -999,7 +937,6 @@ export function handleMessage(io, socket) {
       // Broadcast to all users
       io.emit("statusDeleted", { statusId });
 
-      console.log(" Status deleted successfully");
     } catch (err) {
       console.error("Delete status error:", err);
     }
@@ -1068,7 +1005,6 @@ export function handleMessage(io, socket) {
         editedAt: message.editedAt,
       };
 
-      console.log(" Broadcasting groupMessageEdited to all group members");
 
       // Emit to all group members
       for (const member of group.members) {
@@ -1078,11 +1014,9 @@ export function handleMessage(io, socket) {
 
         for (const s of memberSockets) {
           s.emit("groupMessageEdited", editData);
-          console.log(`Sent edit to ${member._id}`);
         }
       }
 
-      console.log(" Group message edited successfully");
     } catch (err) {
       console.error(" Edit group message error:", err);
       socket.emit("errorMessage", { message: "Failed to edit message" });

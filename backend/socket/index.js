@@ -62,18 +62,13 @@ export const setupSocket = (io) => {
 
   io.on("connection", async (socket) => {
     const userId = socket.user.id;
-    console.log(` Socket connected: ${socket.id} (User: ${userId})`);
-    console.log(` [SOCKET] User ${userId} joining their personal room`);
     socket.join(userId);
 
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(socket.id);
-    console.log(
-      ` User ${userId} has ${userSockets.get(userId).size} active socket(s)`,
-    );
-
+   
     try {
       await redisClient.hSet("onlineUsers", userId, socket.id);
     } catch (err) {
@@ -84,12 +79,9 @@ export const setupSocket = (io) => {
     let onlineUsersDetails = [];
     try {
       onlineUserIds = await redisClient.hKeys("onlineUsers");
-      console.log(` Total online users in Redis: ${onlineUserIds.length}`);
 
       onlineUsersDetails = await getOnlineUsersWithDetails(onlineUserIds);
-      console.log(
-        ` Loaded details for ${onlineUsersDetails.length} online users`,
-      );
+     
     } catch (err) {
       console.error(" Redis hKeys error:", err);
     }
@@ -113,9 +105,7 @@ export const setupSocket = (io) => {
     //  TYPING INDICATOR
     socket.on("typing", async ({ conversationId, isTyping }) => {
       try {
-        console.log(
-          `${isTyping ? "⌨️" : "✋"} User ${userId} ${isTyping ? "started" : "stopped"} typing in conversation ${conversationId}`,
-        );
+     
 
         const conversation = await Conversation.findById(
           conversationId,
@@ -126,10 +116,7 @@ export const setupSocket = (io) => {
           return;
         }
 
-        console.log(
-          " Participants:",
-          conversation.participants.map((p) => p._id.toString()),
-        );
+      
 
         const receiverId = conversation.participants.find(
           (p) => p._id.toString() !== userId,
@@ -140,16 +127,13 @@ export const setupSocket = (io) => {
           return;
         }
 
-        console.log(" Target receiver:", receiverId.toString());
 
         //  Find ALL sockets for the receiver (no Redis dependency)
         const receiverSockets = Array.from(io.sockets.sockets.values()).filter(
           (s) => s.user && s.user.id === receiverId.toString(),
         );
 
-        console.log(
-          `Found ${receiverSockets.length} socket(s) for receiver ${receiverId}`,
-        );
+      
 
         if (receiverSockets.length > 0) {
           receiverSockets.forEach((receiverSocket) => {
@@ -158,12 +142,9 @@ export const setupSocket = (io) => {
               conversationId,
               isTyping,
             });
-            console.log(` Sent typing to socket: ${receiverSocket.id}`);
           });
         } else {
-          console.log(
-            ` Receiver ${receiverId} has no active sockets (offline)`,
-          );
+       
         }
       } catch (err) {
         console.error(" Typing handler error:", err);
@@ -172,27 +153,20 @@ export const setupSocket = (io) => {
     });
 
     socket.on("disconnect", async (reason) => {
-      console.log(
-        ` Socket ${socket.id} disconnected (${reason}) - User: ${userId}`,
-      );
+  
 
       try {
         if (userSockets.has(userId)) {
           userSockets.get(userId).delete(socket.id);
           const remainingSockets = userSockets.get(userId).size;
 
-          console.log(
-            ` User ${userId} has ${remainingSockets} remaining socket(s)`,
-          );
+        
 
           if (remainingSockets === 0) {
-            console.log(
-              ` User ${userId} has NO remaining sockets - marking offline`,
-            );
+           
             userSockets.delete(userId);
 
             const result = await redisClient.hDel("onlineUsers", userId);
-            console.log(` Removed ${userId} from Redis (result: ${result})`);
 
             let updatedOnline = [];
             let updatedOnlineDetails = [];
@@ -200,10 +174,7 @@ export const setupSocket = (io) => {
               updatedOnline = await redisClient.hKeys("onlineUsers");
               updatedOnlineDetails =
                 await getOnlineUsersWithDetails(updatedOnline);
-              console.log(
-                ` Online users count: ${updatedOnline.length}`,
-                updatedOnline,
-              );
+            
             } catch (err) {
               console.error(" Redis hKeys error:", err);
             }
@@ -212,11 +183,8 @@ export const setupSocket = (io) => {
               userId,
               onlineUsers: updatedOnlineDetails,
             });
-            console.log(`Broadcasted userOffline for ${userId}`);
           } else {
-            console.log(
-              ` User ${userId} still has ${remainingSockets} socket(s) - staying online`,
-            );
+          
           }
         }
       } catch (err) {

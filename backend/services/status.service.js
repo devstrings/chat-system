@@ -76,7 +76,6 @@ export const broadcastStatusToFriends = async (io, userId, status) => {
     const friendships = await fetchUserFriendships(userId);
     const friendIds = getFriendIds(friendships, userId);
 
-    console.log(" Broadcasting status to", friendIds.length, "friends");
 
     // Broadcast to friends
     for (const friendId of friendIds) {
@@ -98,7 +97,6 @@ export const broadcastStatusToFriends = async (io, userId, status) => {
       socket.emit("newStatus", { status });
     }
 
-    console.log(" Status broadcast complete");
   } catch (err) {
     console.error(" Broadcast error:", err);
   }
@@ -215,7 +213,6 @@ export const deleteStatusFile = (status) => {
     const filePath = path.join(__dirname, "..", status.content);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(" File deleted:", filePath);
     }
   }
 };

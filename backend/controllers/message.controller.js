@@ -123,9 +123,7 @@ if (userSocket) {
     clearedFor: currentUserId,
     action: "clearedForMe",
   });
-  console.log("chatCleared emitted to socket:", userSocket.id);
 } else {
-  console.log("User socket NOT found for:", currentUserId);
 }
     io.to(currentUserId).emit("conversationUpdated", {
       conversationId: conversationId.toString(),

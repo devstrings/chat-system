@@ -15,7 +15,6 @@ export const fetchUserCallHistory = async (userId, limit = 20, page = 1) => {
     $or: [{ caller: userId }, { receiver: userId }]
   });
 
-  console.log(` Fetched ${calls.length} calls for user ${userId}`);
   
   return {
     calls,
@@ -71,7 +70,6 @@ throw new AppError("Call not found", 404);
 
   await Call.findByIdAndDelete(callId);
   
-  console.log(` Call deleted: ${callId}`);
   return { message: "Call deleted successfully" };
 };
 
@@ -80,7 +78,6 @@ export const processClearCallHistory = async (userId) => {
     $or: [{ caller: userId }, { receiver: userId }]
   });
 
-  console.log(` Cleared ${result.deletedCount} calls`);
   
   return {
     message: "Call history cleared successfully",

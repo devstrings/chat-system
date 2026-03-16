@@ -95,7 +95,6 @@ export const checkFileExists = (filepath) => {
 export const deleteFile = (filepath) => {
   if (fs.existsSync(filepath)) {
     fs.unlinkSync(filepath);
-    console.log(" File deleted from server:", filepath);
     return true;
   }
   return false;
@@ -162,8 +161,6 @@ export const processRemoveCoverPhoto = async (userId) => {
     return null;
   }
 
-  console.log(" User found:", user.username);
-  console.log("Current cover photo:", user.coverPhoto);
 
   // Delete file if exists
   if (user.coverPhoto) {
@@ -177,7 +174,6 @@ export const processRemoveCoverPhoto = async (userId) => {
 
     const fileDeleted = deleteFile(filepath);
     if (!fileDeleted) {
-      console.log(" File not found on server (might be already deleted)");
     }
   } else {
     console.log(" No cover photo to delete");
@@ -187,7 +183,6 @@ export const processRemoveCoverPhoto = async (userId) => {
   user.coverPhoto = null;
   await user.save();
 
-  console.log("Cover photo removed from database");
 
   return {
     _id: user._id,

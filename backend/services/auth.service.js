@@ -46,7 +46,6 @@ const hashedOTP = await bcrypt.hash(otp, 10);
 newUser.emailOTP = hashedOTP;
 newUser.emailOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
 await newUser.save();
-console.log(" OTP for testing:", otp);// for testing purposes remove in production
 try {
   await sendOTPEmail(email, otp);
 } catch (emailErr) {
@@ -54,7 +53,6 @@ try {
   // Don't throw - user is already created
 }
 
-  console.log(" User registered:", email);
 
   return {
     _id: newUser._id,
@@ -78,14 +76,12 @@ export const loginUser = async (email, password) => {
 
   // Auto-migration fallback
   if (!localProvider && user.password) {
-    console.log(" Auto-creating local provider for:", email);
 
     localProvider = await AuthProvider.create({
       userId: user._id,
       provider: "local",
     });
 
-    console.log(" Local provider auto-created");
   }
 
   if (!localProvider) {
@@ -117,7 +113,6 @@ if (!user.isEmailVerified) {
     console.error(" Redis refresh token save error:", err);
   }
 
-  console.log(" User logged in:", email);
 
   return {
     accessToken,
@@ -297,16 +292,7 @@ export const processForgotPassword = async (email) => {
   // Create reset URL
   const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
 
-  //  CONSOLE LOGGING
-  console.log("\n" + "=".repeat(80));
-  console.log(" PASSWORD RESET REQUEST");
-  console.log("=".repeat(80));
-  console.log(" User Email:", user.email);
-  console.log(" Username:", user.username);
-  console.log(" Reset Link:");
-  console.log(resetUrl);
-  console.log(" Expires in:", config.resetToken.expiryMinutes, "minutes");
-  console.log("=".repeat(80) + "\n");
+ 
 
   return {
     message: "Password reset link generated successfully",
@@ -355,7 +341,6 @@ export const processResetPassword = async (token, newPassword) => {
     });
   }
 
-  console.log(" Password reset successful for:", user.email);
 
   return { message: "Password reset successful" };
 };
@@ -393,7 +378,6 @@ export const setUserPassword = async (userId, newPassword) => {
     });
   }
 
-  console.log(" Password set for SSO user:", user.email);
 
   return { message: "Password set successfully" };
 };
@@ -421,14 +405,8 @@ export const fetchCurrentUser = async (userId) => {
   const primaryProvider =
     authProviders.length > 0 ? authProviders[0].provider : "local";
 
-  // : Console log for debugging
-  console.log(" User Check:", {
-    email: user.email,
-    hasPasswordInDB: hasPassword,
-    passwordField: user.password ? "EXISTS" : "NULL",
-    hasLocalAuth,
-    primaryProvider,
-  });
+  
+
 
   return {
     _id: user._id,
@@ -473,7 +451,6 @@ export const changeUserPassword = async (userId, oldPassword, newPassword) => {
   user.password = hashedPassword;
   await user.save();
 
-  console.log(" Password changed for:", user.email);
 
   return { message: "Password changed successfully" };
 };
@@ -494,7 +471,6 @@ export const refreshAccessToken = async (refreshToken) => {
   }
 
   const newAccessToken = generateAccessToken(decoded.id, decoded.username);
-  console.log("Token refreshed for user:", decoded.username);
   return { accessToken: newAccessToken };
 };
 // VERIFY OTP SERVICE

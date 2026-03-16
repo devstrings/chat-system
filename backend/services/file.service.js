@@ -18,7 +18,6 @@ const calculateFileHash = (filePath) =>
 
 // DOWNLOAD FILE SERVICE
 export const processFileDownload = async (filename, userId) => {
-  console.log(" Download request:", { filename, userId });
 
   // Extra safety check
   if (
@@ -35,16 +34,13 @@ throw new AppError("File not found on server", 404);  }
 
   let filePath = null;
   for (const tryPath of possiblePaths) {
-    console.log(" Checking path:", tryPath);
     if (fs.existsSync(tryPath)) {
       filePath = tryPath;
-      console.log("File found at:", filePath);
       break;
     }
   }
 
   if (!filePath) {
-    console.error(" File not found in any location:", filename);
     throw new AppError("File not found on server", 404);
   }
 
@@ -58,7 +54,6 @@ throw new AppError("File not found on server", 404);  }
     return { filePath, attachment: null };
   }
 
-  console.log(" Attachment found in database");
 
   //  Check both Conversation and Group
   let hasAccess = false;
@@ -125,15 +120,12 @@ export const calculateAudioDuration = async (file) => {
 
   if (file.mimetype.startsWith("audio/")) {
     try {
-      console.log(" Calculating audio duration...");
       audioDuration = await getAudioDurationInSeconds(file.path);
       audioDuration = Math.floor(audioDuration);
 
       isVoiceMessage = file.originalname.includes("voice_") || false; // This will be set from request body in controller
 
-      console.log(
-        `Audio duration: ${audioDuration}s, Voice: ${isVoiceMessage}`,
-      );
+    
     } catch (err) {
       console.error(" Duration calculation failed:", err);
     }
@@ -160,9 +152,6 @@ export const processFileUpload = async (
   userId,
   isVoiceMessageFlag,
 ) => {
-  console.log(" Upload started");
-  console.log(" File:", file);
-  console.log(" User ID extracted:", userId);
 
   // Calculate audio duration for audio files
   const { audioDuration, isVoiceMessage: audioIsVoice } =
@@ -172,15 +161,12 @@ export const processFileUpload = async (
   const isVoiceMessage = isVoiceMessageFlag === "true" || audioIsVoice;
 
   // Calculate hash
-  console.log(" Calculating file hash...");
   const fileHash = await calculateFileHash(file.path);
-  console.log(" Hash:", fileHash);
 
   // Check for duplicate in the same conversation
   const existingAttachment = await checkDuplicateFile(fileHash, conversationId);
 
   if (existingAttachment) {
-    console.log(" Duplicate file found, reusing existing");
 
     // Clean up uploaded file since we're using existing one
     if (fs.existsSync(file.path)) {
@@ -201,7 +187,6 @@ export const processFileUpload = async (
   }
 
   // Save new attachment
-  console.log(" Saving new attachment to database...");
   const attachment = await Attachment.create({
     conversationId,
     fileName: file.originalname,
@@ -215,7 +200,6 @@ export const processFileUpload = async (
     status: "completed",
   });
 
-  console.log(" Upload successful:", attachment._id);
 
   return {
     url: `/api/file/get/${file.filename}`,
@@ -233,6 +217,5 @@ export const processFileUpload = async (
 export const cleanupFile = (filePath) => {
   if (filePath && fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
-    console.log("Cleaned up uploaded file");
   }
 };
