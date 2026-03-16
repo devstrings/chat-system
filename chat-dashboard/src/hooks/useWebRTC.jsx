@@ -6,9 +6,14 @@ const iceServers = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     {
-      urls: "turn:192.168.0.116:3478",
-      username: "chatuser",
-      credential: "chatpassword123",
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
     },
   ],
 };

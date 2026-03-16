@@ -237,19 +237,22 @@ export default function Dashboard() {
           isGroup: true,
         }),
       );
-      if (msg.sender?._id !== currentUserId) {
-        playNotificationSound();
-        showNotification(
-          msg.sender?.username || "Unknown",
-          msg.text || "📎 Attachment",
-          {
-            avatar: msg.sender?.profileImage || null,
-            groupName: msg.groupName || "Group",
-            groupId: msg.groupId,
-            isGroup: true,
-          },
-        );
-      }
+ if (msg.sender?._id !== currentUserId) {
+  const isCurrentGroupOpen = selectedUserRef.current?._id === msg.groupId;
+  if (!isCurrentGroupOpen) {
+    playNotificationSound();
+    showNotification(
+      msg.sender?.username || "Unknown",
+      msg.text || "📎 Attachment",
+      {
+        avatar: msg.sender?.profileImage || null,
+        groupName: msg.groupName || "Group",
+        groupId: msg.groupId,
+        isGroup: true,
+      },
+    );
+  }
+}
     };
 
     //  Status update
