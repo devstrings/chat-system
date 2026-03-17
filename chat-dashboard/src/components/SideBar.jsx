@@ -78,13 +78,6 @@ export default function Sidebar({
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
 
-  //  Debug logs
-  console.log(" Sidebar Redux Data:", {
-    usersCount: users?.length || 0,
-    groupsCount: groups?.length || 0,
-    lastMessagesCount: Object.keys(lastMessages || {}).length,
-    unreadCountsCount: Object.keys(unreadCounts || {}).length,
-  });
   function ProfileImageWithAuth({
     imageUrl,
     username,
@@ -284,7 +277,7 @@ export default function Sidebar({
 
   const formatLastMessageText = (message) => {
     if (!message) return "";
-     if (message.text === "" && !message.attachments?.length) return ""; 
+    if (message.text === "" && !message.attachments?.length) return "";
     // Call record
     if (message.isCallRecord) {
       const icon = message.callType === "video" ? "📹" : "📞";

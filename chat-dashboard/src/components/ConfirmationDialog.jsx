@@ -207,8 +207,8 @@ export default function ConfirmationDialog({
             {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
+            onClick={async () => {
+              await onConfirm();
               onClose();
             }}
             className={`flex-1 px-6 py-3 ${getConfirmButtonClass()} rounded-lg font-medium ${

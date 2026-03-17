@@ -210,10 +210,12 @@ export default function StatusManager({
       title: "Delete Status?",
       message: "Are you sure you want to delete this status?",
       type: "danger",
+
       onConfirm: async () => {
         try {
           await axiosInstance.delete(`/api/status/${statusId}`);
           setMyStatuses((prev) => prev.filter((s) => s._id !== statusId));
+          await loadMyStatuses();
           setAlertDialog({
             isOpen: true,
             title: "Deleted!",
@@ -344,9 +346,12 @@ export default function StatusManager({
                           </div>
                         ) : status.type === "image" ? (
                           <img
-                            src={`${API_BASE_URL}${status.content}`}
+                            src={`${API_BASE_URL}${status.content}?t=${Date.now()}`}
                             alt="status"
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
                           />
                         ) : (
                           <video
@@ -522,6 +527,14 @@ export default function StatusManager({
             </div>
           </div>
         )}
+        <ConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+        />
       </>
     );
   }

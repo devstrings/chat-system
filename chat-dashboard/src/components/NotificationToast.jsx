@@ -1,8 +1,24 @@
 import { useEffect, useState } from "react";
 import API_BASE_URL from "../config/api";
-export default function NotificationToast({ notifications, onClose, onSelect }) {
+
+export default function NotificationToast({
+  notifications,
+  onClose,
+  onSelect,
+}) {
   return (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+    <div
+      style={{
+        position: "fixed",
+        top: "16px",
+        right: "16px",
+        zIndex: 999999,
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        pointerEvents: "auto",
+      }}
+    >
       {notifications.map((notif) => (
         <ToastItem
           key={notif.id}
@@ -19,52 +35,111 @@ function ToastItem({ notif, onClose, onSelect }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Slide in
-    setTimeout(() => setVisible(true), 10);
-
-    // Auto close after 4 seconds
-    const timer = setTimeout(() => {
+    const showTimer = setTimeout(() => setVisible(true), 10);
+    const hideTimer = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onClose(notif.id), 300);
-    }, 4000);
+    }, 8000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
   }, []);
 
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect(notif);
+    onClose(notif.id);
+  };
   return (
     <div
-      onClick={() => {
-        onSelect(notif);
-        onClose(notif.id);
+      onClick={handleClick}
+      style={{
+        pointerEvents: "auto",
+        cursor: "pointer",
+        transform: visible ? "translateX(0)" : "translateX(100%)",
+        opacity: visible ? 1 : 0,
+        transition: "all 300ms ease",
+        width: "320px",
+        backgroundColor: "white",
+        borderRadius: "12px",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+        border: "1px solid #f0f0f0",
+        padding: "12px",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
       }}
-      className={`cursor-pointer w-80 bg-white rounded-xl shadow-2xl border border-gray-100 p-3 flex items-center gap-3 transition-all duration-300 ${
-        visible ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-      }`}
     >
       {/* Avatar */}
-      <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden">
-     {notif.avatar ? (
-  <img
-    src={notif.avatar.startsWith('http') 
-      ? notif.avatar 
-      : `${API_BASE_URL}${notif.avatar}`}   
-    className="w-full h-full object-cover"
-    crossOrigin="anonymous"
-    onError={(e) => { e.target.style.display = 'none'; }}  
-  />
-) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold text-sm">
+      <div
+        style={{
+          width: "40px",
+          height: "40px",
+          borderRadius: "50%",
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
+      >
+        {notif.avatar ? (
+          <img
+            src={
+              notif.avatar.startsWith("http")
+                ? notif.avatar
+                : `${API_BASE_URL}${notif.avatar}`
+            }
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            crossOrigin="anonymous"
+            onError={(e) => {
+              e.target.style.display = "none";
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "14px",
+            }}
+          >
             {notif.name?.charAt(0)?.toUpperCase()}
           </div>
         )}
       </div>
 
       {/* Text */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">
-          {notif.isGroup ? `${notif.groupName}` : notif.name}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#111",
+            margin: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {notif.isGroup ? notif.groupName : notif.name}
         </p>
-        <p className="text-xs text-gray-500 truncate">
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#666",
+            margin: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {notif.isGroup ? `${notif.name}: ${notif.message}` : notif.message}
         </p>
       </div>
@@ -73,12 +148,32 @@ function ToastItem({ notif, onClose, onSelect }) {
       <button
         onClick={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           onClose(notif.id);
         }}
-        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#999",
+          flexShrink: 0,
+          padding: "4px",
+          pointerEvents: "auto",
+        }}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <svg
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </div>

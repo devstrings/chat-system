@@ -49,10 +49,16 @@ export const markAsViewed = asyncHandler(async (req, res) => {
 });
 
 // DELETE STATUS CONTROLLER
+
 export const deleteStatus = asyncHandler(async (req, res) => {
   const { statusId } = req.params;
   const userId = req.user.id;
   const result = await statusService.processDeleteStatus(statusId, userId);
+
+  if (!result) {
+    return res.status(404).json({ message: "Status not found" });
+  }
+
   const io = req.app.get("io");
   if (io) {
     statusService.broadcastStatusDeleted(io, result.statusId, result.userId);

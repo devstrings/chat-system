@@ -48,6 +48,7 @@ export default function Dashboard() {
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [toastNotifications, setToastNotifications] = useState([]);
+  const toastNotificationsRef = useRef([]);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -123,20 +124,49 @@ export default function Dashboard() {
   };
 
   // Show notification
-  const showNotification = (title, body, extra = {}) => {
-    const id = Date.now() + Math.random();
-    setToastNotifications((prev) => [
-      ...prev,
-      { id, name: title, message: body, ...extra },
-    ]);
-
-    if (Notification.permission === "granted" && document.hidden) {
-      new Notification(title, {
-        body,
-        icon: "/favicon.ico",
+  const showNotification = useCallback(
+    (title, body, extra = {}) => {
+      const id = Date.now() + Math.random();
+      setToastNotifications((prev) => {
+        const newList = [...prev, { id, name: title, message: body, ...extra }];
+        console.log("Toast list updated:", newList.length);
+        return newList;
       });
-    }
-  };
+
+      if (Notification.permission === "granted" && document.hidden) {
+        const browserNotif = new Notification(title, {
+          body,
+          icon: "/favicon.ico",
+          tag: extra.senderId || extra.groupId || "message",
+          data: extra,
+        });
+
+        browserNotif.onclick = () => {
+          window.focus();
+          browserNotif.close();
+          if (extra.isGroup) {
+            const group = groups.find((g) => g._id === extra.groupId);
+            if (group) {
+              setSelectedGroup(group);
+              setSelectedUser(null);
+              setIsGroupChat(true);
+              setConversationId(null);
+            }
+          } else {
+            const senderId = extra.senderId?._id || extra.senderId;
+            const user =
+              users.find((u) => u._id === senderId) || extra.senderObj;
+            if (user) {
+              setSelectedUser(user);
+              setSelectedGroup(null);
+              setIsGroupChat(false);
+            }
+          }
+        };
+      }
+    },
+    [setToastNotifications],
+  );
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
@@ -198,10 +228,21 @@ export default function Dashboard() {
           isGroup: false,
         }),
       );
+      
       // Notification
       if (msg.sender?._id !== currentUserId) {
+        console.log(
+          "Sender check passed:",
+          msg.sender?._id,
+          "!=",
+          currentUserId,
+        );
         playNotificationSound();
-        if (selectedUserRef.current?._id !== msg.sender?._id) {
+        const senderIdStr =
+          msg.sender?._id?.toString() || msg.sender?.toString();
+        const selectedIdStr = selectedUserRef.current?._id?.toString();
+        if (selectedIdStr !== senderIdStr) {
+          console.log("Calling showNotification!");
           showNotification(
             msg.sender?.username || "New Message",
             msg.text || "📎 Attachment",
@@ -212,7 +253,11 @@ export default function Dashboard() {
               isGroup: false,
             },
           );
+        } else {
+          console.log("Chat open — skip notification");
         }
+      } else {
+        console.log("Own message — skip");
       }
     };
 
@@ -237,22 +282,22 @@ export default function Dashboard() {
           isGroup: true,
         }),
       );
- if (msg.sender?._id !== currentUserId) {
-  const isCurrentGroupOpen = selectedUserRef.current?._id === msg.groupId;
-  if (!isCurrentGroupOpen) {
-    playNotificationSound();
-    showNotification(
-      msg.sender?.username || "Unknown",
-      msg.text || "📎 Attachment",
-      {
-        avatar: msg.sender?.profileImage || null,
-        groupName: msg.groupName || "Group",
-        groupId: msg.groupId,
-        isGroup: true,
-      },
-    );
-  }
-}
+      if (msg.sender?._id !== currentUserId) {
+        const isCurrentGroupOpen = selectedUserRef.current?._id === msg.groupId;
+        if (!isCurrentGroupOpen) {
+          playNotificationSound();
+          showNotification(
+            msg.sender?.username || "Unknown",
+            msg.text || "📎 Attachment",
+            {
+              avatar: msg.sender?.profileImage || null,
+              groupName: msg.groupName || "Group",
+              groupId: msg.groupId,
+              isGroup: true,
+            },
+          );
+        }
+      }
     };
 
     //  Status update
@@ -1188,29 +1233,6 @@ export default function Dashboard() {
 
   return (
     <>
-      <NotificationToast
-        notifications={toastNotifications}
-        onClose={(id) =>
-          setToastNotifications((prev) => prev.filter((n) => n.id !== id))
-        }
-        onSelect={(notif) => {
-          if (notif.isGroup) {
-            const group = groups.find((g) => g._id === notif.groupId);
-            if (group) {
-              setSelectedGroup(group);
-              setSelectedUser(null);
-              setIsGroupChat(true);
-              setConversationId(null);
-            }
-          } else {
-            if (notif.senderObj) {
-              setSelectedUser(notif.senderObj);
-              setSelectedGroup(null);
-              setIsGroupChat(false);
-            }
-          }
-        }}
-      />
       <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
         {/* Status Manager Modal */}
 
@@ -1896,6 +1918,36 @@ export default function Dashboard() {
           </div>
         </>
       )}
+      <NotificationToast
+        notifications={toastNotifications}
+        onClose={(id) => {
+          setToastNotifications((prev) => prev.filter((n) => n.id !== id));
+        }}
+        onSelect={(notif) => {
+          console.log("=== NOTIFICATION CLICKED ===", notif);
+          if (notif.isGroup) {
+            const group = groups.find((g) => g._id === notif.groupId);
+            if (group) {
+              setSelectedGroup(group);
+              setSelectedUser(null);
+              setIsGroupChat(true);
+              setConversationId(null);
+              setIsMobileSidebarOpen(false);
+            }
+          } else {
+            const senderId = notif.senderId?._id || notif.senderId;
+            const user =
+              users.find((u) => u._id === senderId) || notif.senderObj;
+            console.log("User found:", user, "senderId:", senderId);
+            if (user) {
+              setSelectedUser(user);
+              setSelectedGroup(null);
+              setIsGroupChat(false);
+              setIsMobileSidebarOpen(false);
+            }
+          }
+        }}
+      />
     </>
   );
 }

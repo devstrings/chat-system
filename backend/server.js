@@ -39,13 +39,14 @@ app.set("io", io);
 //  1. SECURITY HEADERS
 app.use(
   helmet({
-    crossOriginOpenerPolicy: false,  
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
+        imgSrc: ["'self'", "data:", "https:", "http:"],
       },
     },
     crossOriginEmbedderPolicy: false,
