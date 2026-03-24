@@ -199,13 +199,6 @@ export default function Dashboard() {
 
     //  Individual message received
     const handleSidebarMessage = (msg) => {
-      console.log(" [DASHBOARD] Individual message received:", {
-        id: msg._id,
-        conversationId: msg.conversationId,
-        sender: msg.sender?._id,
-        receiver: msg.receiver?._id,
-        text: msg.text,
-      });
 
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver?._id || msg.receiver;
@@ -247,12 +240,7 @@ export default function Dashboard() {
 
       // Notification
       if (msg.sender?._id !== currentUserId) {
-        console.log(
-          "Sender check passed:",
-          msg.sender?._id,
-          "!=",
-          currentUserId,
-        );
+        
         playNotificationSound();
         const senderIdStr =
           msg.sender?._id?.toString() || msg.sender?.toString();

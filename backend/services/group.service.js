@@ -284,9 +284,6 @@ export const processClearGroupChat = async (groupId, userId) => {
     lastMessageSender: null,
   });
 
-  console.log(
-    ` Marked ${result.modifiedCount} messages as deleted for user ${userId} in group ${groupId}`,
-  );
 
   return {
     message: "Group chat cleared for you",

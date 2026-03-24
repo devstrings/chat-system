@@ -77,12 +77,7 @@ export default function ProfileSettings({
 
   const checkLocalAuth = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
       const response = await axiosInstance.get(`${API_BASE_URL}/api/auth/me`);
-      console.log(" User info:", response.data);
-      console.log(" primaryProvider:", response.data.primaryProvider);
-      console.log(" hasPassword:", response.data.hasPassword);
-      console.log(" hasLocalAuth:", response.data.hasLocalAuth);
 
       setAuthProvider(response.data.primaryProvider);
       setHasPassword(response.data.hasPassword);
@@ -337,7 +332,6 @@ export default function ProfileSettings({
     setChangePasswordLoading(true);
 
     try {
-      const token = localStorage.getItem("accessToken");
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/auth/change-password`,
         { oldPassword, newPassword },

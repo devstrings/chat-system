@@ -20,11 +20,6 @@ export const checkFriendship = async (currentUserId, otherUserId) => {
     status: "accepted",
   });
 
-  console.log(" [SERVICE] Friendship result:", {
-    found: !!friendship,
-    status: friendship?.status || "not found",
-  });
-
   return friendship;
 };
 
@@ -82,12 +77,6 @@ export const findOtherUserInConversation = (conversation, currentUserId) => {
   const otherUser = conversation.participants.find(
     (p) => p.toString() !== currentUserStr,
   );
-
-  console.log(" [SERVICE] Finding other user:", {
-    currentUserId: currentUserStr,
-    participants: conversation.participants.map((p) => p.toString()),
-    otherUser: otherUser?.toString(),
-  });
 
   // Return as string, not ObjectId
   return otherUser?.toString();
@@ -226,11 +215,6 @@ throw new AppError("No conversation found to delete", 404);  }
   const otherUserIdInConv = conversation.participants.find(
     (p) => p.toString() !== currentUserId,
   );
-
-  console.log(" Participants:", {
-    currentUser: currentUserId,
-    otherUser: otherUserIdInConv,
-  });
 
   // Add current user to deletedBy array
   if (!conversation.deletedBy) {

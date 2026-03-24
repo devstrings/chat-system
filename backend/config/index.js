@@ -4,9 +4,6 @@ dotenv.config();
 
 const env = (key, defaultValue) => process.env[key] || defaultValue;
 
-
-console.log("Loading config...");
-
 const requiredEnvVars = [
   "MONGO_URI",
   "JWT_SECRET",
@@ -86,8 +83,6 @@ const config = {
   },
 };
 
-console.log("Config loaded successfully");
-console.log("Email configured:", !!config.email.user);
 
 Object.freeze(config);
 
