@@ -3,7 +3,6 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import hpp from "hpp";
 import compression from "compression";
 import swaggerUi from "swagger-ui-express";
@@ -75,21 +74,7 @@ app.use(
   }),
 );
 
-//  3. RATE LIMITING
-const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 500,
-  message: "Too many requests, please try again later",
-});
-app.use("/api/", apiLimiter);
 
-// Messages endpoint rate limiter
-const messageLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // 60 messages per minute
-  message: "Too many messages, slow down!",
-});
-app.use("/api/messages/send", messageLimiter);
 
 //  4. COMPRESSION
 app.use(compression());
@@ -125,11 +110,6 @@ app.use(hpp());
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 console.log(` Swagger docs: http://localhost:${config.port}/api-docs`);
-
-
-
-
-
 
 
 

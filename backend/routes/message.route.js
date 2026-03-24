@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import {
   getOrCreateConversation,
   getMessages,
@@ -44,6 +45,13 @@ import {
 } from "../validators/middleware/validation.middleware.js";
 
 const router = express.Router();
+
+const messageLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 messages per minute
+  message: "Too many messages, slow down!",
+});
+
 
 /**
  * @swagger
@@ -134,6 +142,7 @@ router.post(
  */
 router.post(
   "/send",
+  messageLimiter,
   verifyToken,
   sendMessageValidation,
   validate,
