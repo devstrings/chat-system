@@ -7,6 +7,8 @@ export default function MessageInput({
   groupId,
   isGroup = false,
   selectedUser = null,
+  replyTo = null,
+  onCancelReply = () => {},
 }) {
   const dispatch = useDispatch();
   const currentUserId = useSelector((state) => state.auth.currentUserId);
@@ -21,6 +23,7 @@ export default function MessageInput({
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const recordingTimeRef = useRef(0);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const recordingIntervalRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -148,7 +151,19 @@ export default function MessageInput({
       }
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
+  useEffect(() => {
+    if (!isRecording) return;
 
+    recordingTimeRef.current = 0;
+    setRecordingTime(0);
+
+    const interval = setInterval(() => {
+      recordingTimeRef.current += 1;
+      setRecordingTime((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRecording]);
   const handleSendMessage = async (attachments = []) => {
     if (!socket || (!text.trim() && attachments.length === 0) || sending)
       return;
@@ -161,12 +176,21 @@ export default function MessageInput({
     } else if (conversationId) {
       socket.emit("typing", { conversationId, isTyping: false });
     }
-
     if (!isGroup && conversationId) {
       socket.emit("sendMessage", {
         conversationId,
         text: text.trim(),
         attachments,
+        replyTo: replyTo
+          ? {
+              _id: replyTo._id,
+              text: replyTo.text,
+              sender: {
+                _id: replyTo.sender?._id || replyTo.sender,
+                username: replyTo.sender?.username || "Unknown",
+              },
+            }
+          : null,
       });
     }
 
@@ -175,10 +199,21 @@ export default function MessageInput({
         groupId,
         text: text.trim(),
         attachments,
+        replyTo: replyTo
+          ? {
+              _id: replyTo._id,
+              text: replyTo.text,
+              sender: {
+                _id: replyTo.sender?._id || replyTo.sender,
+                username: replyTo.sender?.username || "Unknown",
+              },
+            }
+          : null,
       });
     }
 
     setText("");
+    onCancelReply();
     setTimeout(() => setSending(false), 100);
   };
   const handleEmojiClick = (emoji) => {
@@ -274,8 +309,7 @@ export default function MessageInput({
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        await uploadVoiceMessage(audioBlob, recordingTime);
-
+        await uploadVoiceMessage(audioBlob, recordingTimeRef.current);
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -283,6 +317,7 @@ export default function MessageInput({
       setMediaRecorder(recorder);
       setIsRecording(true);
       setRecordingTime(0);
+      recordingTimeRef.current = 0;
 
       //  Stop typing indicator when recording
       if (socket) {
@@ -293,9 +328,7 @@ export default function MessageInput({
         }
       }
 
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
+      recordingTimeRef.current = 0;
     } catch (err) {
       console.error("Microphone error:", err);
       alert("Please allow microphone access to record voice messages");
@@ -383,9 +416,52 @@ export default function MessageInput({
 
   return (
     <div className="bg-white border-t border-gray-200 p-3 md:p-4">
+      {replyTo && (
+        <div className="flex items-center gap-2 bg-blue-50 border-l-4 border-blue-500 rounded-lg px-3 py-2 mb-2 max-w-4xl mx-auto">
+          <svg
+            className="w-4 h-4 text-blue-500 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+            />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-blue-600">
+              {replyTo.sender?.username || "Unknown"}
+            </p>
+            <p className="text-xs text-gray-500 truncate">
+              {replyTo.text || "📎 Attachment"}
+            </p>
+          </div>
+          <button
+            onClick={onCancelReply}
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3">
         {isRecording ? (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+          <div className="flex items-end w-full">
             <div className="w-full bg-white border-t border-gray-200 p-3 md:p-4">
               <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-3">
                 <button
@@ -649,9 +725,7 @@ export default function MessageInput({
           {uploading ? (
             <span className="text-blue-400">Uploading...</span>
           ) : isRecording ? (
-            <span className="text-red-400">
-              Recording... Click send to finish
-            </span>
+            <span></span>
           ) : (
             <span className="hidden md:inline">
               Press{" "}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import API_BASE_URL from "../config/api";
 import axiosInstance from "../utils/axiosInstance";
 import { useAuthImage } from "../hooks/useAuthImage";
@@ -1054,7 +1054,16 @@ export function AddFriendModal({
   onSendRequest,
 }) {
   if (!isOpen) return null;
+const debounceRef = useRef(null);
 
+useEffect(() => {
+  if (!searchUsers.trim()) return;
+  clearTimeout(debounceRef.current);
+  debounceRef.current = setTimeout(() => {
+    onSearch();
+  }, 500);
+  return () => clearTimeout(debounceRef.current);
+}, [searchUsers]);
   return (
     <>
       <div

@@ -11,7 +11,6 @@ import {
 } from "../store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
-
 export default function ChatWindow({
   conversationId,
   currentUserId,
@@ -22,23 +21,25 @@ export default function ChatWindow({
   setIsSelectionMode = () => {},
   selectedMessages = new Set(),
   setSelectedMessages = () => {},
+  onReply = () => {},
 }) {
   const dispatch = useDispatch();
   const messages = useSelector(
     (state) => state.chat.conversations[conversationId]?.messages || [],
   );
 
-const loading = useSelector(
-  (state) => state.chat.conversations[conversationId]?.loading || false
-);  const messagesEndRef = useRef(null);
+  const loading = useSelector(
+    (state) => state.chat.conversations[conversationId]?.loading || false,
+  );
+  const messagesEndRef = useRef(null);
   const conversationIdRef = useRef(null);
   const messagesRef = useRef(messages);
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
 
-  
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const [replyTo, setReplyTo] = useState(null);
 
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
@@ -53,38 +54,41 @@ const loading = useSelector(
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-const hasFetched = useRef(false);
+  const hasFetched = useRef(false);
 
-useEffect(() => {
-  if (!conversationId || !currentUserId) return;
-  hasFetched.current = false;
-}, [conversationId]);
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
+    hasFetched.current = false;
+  }, [conversationId]);
 
-useEffect(() => {
-  if (!conversationId || !currentUserId) return;
-  if (hasFetched.current) return;
-  hasFetched.current = true;
-  dispatch(fetchMessages({ conversationId, currentUserId }));
-}, [dispatch, conversationId, currentUserId]);
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    dispatch(fetchMessages({ conversationId, currentUserId }));
+  }, [dispatch, conversationId, currentUserId]);
 
   // CHAT CLEARED SOCKET LISTENER
   useEffect(() => {
     if (!socket || !conversationId) return;
-const handleChatCleared = (data) => {
-  console.log("chatCleared received:", data);
-  console.log("conversationId match:", data.conversationId === conversationId);
-  console.log("clearedFor match:", data.clearedFor === currentUserId);
-  console.log("data.clearedFor:", data.clearedFor);
-  console.log("currentUserId:", currentUserId);
+    const handleChatCleared = (data) => {
+      console.log("chatCleared received:", data);
+      console.log(
+        "conversationId match:",
+        data.conversationId === conversationId,
+      );
+      console.log("clearedFor match:", data.clearedFor === currentUserId);
+      console.log("data.clearedFor:", data.clearedFor);
+      console.log("currentUserId:", currentUserId);
 
-  if (
-    data.conversationId === conversationId &&
-    data.clearedFor === currentUserId
-  ) {
-    console.log("Clearing chat window");
-    dispatch(clearMessages(conversationId));
-  }
-};
+      if (
+        data.conversationId === conversationId &&
+        data.clearedFor === currentUserId
+      ) {
+        console.log("Clearing chat window");
+        dispatch(clearMessages(conversationId));
+      }
+    };
 
     socket.on("chatCleared", handleChatCleared);
 
@@ -174,7 +178,7 @@ const handleChatCleared = (data) => {
     try {
       const messageIds = Array.from(selectedMessages);
 
-      //  Redux async thunk 
+      //  Redux async thunk
       await dispatch(
         bulkDeleteMessages({
           messageIds,
@@ -461,7 +465,8 @@ const handleChatCleared = (data) => {
                     isSelectionMode={isSelectionMode}
                     isSelected={selectedMessages.has(msg._id)}
                     onToggleSelect={toggleMessageSelection}
-                      onEnterSelectionMode={() => setIsSelectionMode(true)}
+                    onEnterSelectionMode={() => setIsSelectionMode(true)}
+                    onReply={onReply}
                   />
                 );
               })}
@@ -490,7 +495,6 @@ const handleChatCleared = (data) => {
                       style={{ animationDelay: "300ms" }}
                     />
                   </div>
-                  <span className="text-xs text-gray-500 ml-1">typing...</span>
                 </div>
               </div>
             </div>

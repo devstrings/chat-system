@@ -21,5 +21,6 @@ coverage
 !.vscode/extensions.json
 
 
+
 uploads/.gitkeep
-!uploads/**/.gitkeep
+!uploads/*

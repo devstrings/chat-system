@@ -15,6 +15,7 @@ import {
   removeMessageForEveryone,
   updateMessage,
   incrementUnreadCount,
+  updateLastMessage,
 } from "../slices/chatSlice";
 import {
   addGroupMessage,
@@ -180,7 +181,11 @@ const socketMiddleware = (store) => {
                 sender: newLast?.sender ?? currentUserId,
                 status: newLast?.status ?? "sent",
                 attachments: newLast?.attachments ?? [],
-                _updated: Date.now(),
+                _updated: newLast
+                  ? new Date(newLast.createdAt).getTime()
+                  : new Date(
+                      state.chat.lastMessages[otherUserId]?.time,
+                    ).getTime(),
               },
               userId: otherUserId,
               isGroup: false,
@@ -190,7 +195,7 @@ const socketMiddleware = (store) => {
       });
 
       socket.on("messageDeletedForEveryone", (data) => {
-        console.log(" Message deleted for everyone:", data.messageId);
+        // Pehle message remove karo
         store.dispatch(
           removeMessageForEveryone({
             conversationId: data.conversationId,
@@ -198,41 +203,38 @@ const socketMiddleware = (store) => {
           }),
         );
 
-        const state = store.getState();
-        const messages =
-          state.chat.conversations[data.conversationId]?.messages || [];
+        // Ab updated state lo
+        setTimeout(() => {
+          const state = store.getState();
+          const messages =
+            state.chat.conversations[data.conversationId]?.messages || [];
 
-        const remaining = messages.filter(
-          (m) => m._id !== data.messageId && !m.deletedForEveryone,
-        );
-
-        const newLast =
-          remaining.length > 0 ? remaining[remaining.length - 1] : null;
-
-        const otherUserId = Object.keys(state.chat.lastMessages).find(
-          (uid) =>
-            state.chat.lastMessages[uid]?.conversationId ===
-            data.conversationId,
-        );
-
-        if (otherUserId) {
-          store.dispatch(
-            addMessage({
-              conversationId: data.conversationId,
-              message: {
-                _id: `sidebar-update-${Date.now()}`,
-                text: newLast?.text ?? "",
-                createdAt: newLast?.createdAt ?? new Date().toISOString(),
-                sender: newLast?.sender ?? currentUserId,
-                status: newLast?.status ?? "sent",
-                attachments: newLast?.attachments ?? [],
-                _updated: Date.now(),
-              },
-              userId: otherUserId,
-              isGroup: false,
-            }),
+          const remaining = messages.filter(
+            (m) => m._id !== data.messageId && !m.deletedForEveryone,
           );
-        }
+
+          const newLast =
+            remaining.length > 0 ? remaining[remaining.length - 1] : null;
+
+          const otherUserId = Object.keys(state.chat.lastMessages).find(
+            (uid) =>
+              state.chat.lastMessages[uid]?.conversationId ===
+              data.conversationId,
+          );
+
+          if (otherUserId) {
+            store.dispatch(
+              updateLastMessage({
+                userId: otherUserId,
+                conversationId: data.conversationId,
+                text: newLast?.text ?? "",
+                timestamp: newLast
+                  ? new Date(newLast.createdAt).getTime()
+                  : Date.now(),
+              }),
+            );
+          }
+        }, 50);
       });
       socket.on("groupMessageEdited", (data) => {
         console.log(" Group message edited:", data.messageId);
@@ -261,6 +263,26 @@ const socketMiddleware = (store) => {
         console.log(" Chat cleared:", data.conversationId);
       });
 
+      socket.on("conversationUpdated", (data) => {
+        const state = store.getState();
+        const otherUserId = Object.keys(state.chat.lastMessages).find(
+          (uid) =>
+            state.chat.lastMessages[uid]?.conversationId ===
+            data.conversationId,
+        );
+        if (otherUserId) {
+          store.dispatch(
+            updateLastMessage({
+              userId: otherUserId,
+              conversationId: data.conversationId,
+              text: data.lastMessage ?? "",
+              timestamp: data.lastMessageTime
+                ? new Date(data.lastMessageTime).getTime()
+                : Date.now(),
+            }),
+          );
+        }
+      });
       socket.on("conversationDeleted", (data) => {
         console.log(" Conversation deleted:", data.conversationId);
       });

@@ -5,6 +5,19 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
   const result = await friendService.processSendFriendRequest(senderId, receiverId);
+    const io = req.app.get("io");
+  if (io) {
+    const receiverSocket = [...io.sockets.sockets.values()].find(
+      (s) => s.user && s.user.id === receiverId
+    );
+    if (receiverSocket) {
+      receiverSocket.emit("friendRequestReceived", {
+        senderId: req.user.id,
+        senderName: req.user.username,
+      });
+    }
+  }
+
   res.json(result);
 });
 

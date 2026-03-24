@@ -21,7 +21,10 @@ import NotificationToast from "../components/NotificationToast";
 import { setUser } from "../store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { logout, fetchCurrentUser } from "../store/slices/authSlice";
-import { fetchFriendsList } from "../store/slices/userSlice";
+import {
+  fetchFriendsList,
+  fetchPendingRequests,
+} from "../store/slices/userSlice";
 import { fetchGroups } from "../store/slices/groupSlice";
 import {
   fetchConversation,
@@ -42,6 +45,9 @@ import {
 } from "../store/slices/groupSlice";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
+  const [savedSelectedUserId] = useState(
+    () => localStorage.getItem("selectedUserId") || null,
+  );
   const [conversationId, setConversationId] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const socket = useSelector((state) => state.socket.socket);
@@ -51,7 +57,7 @@ export default function Dashboard() {
   const toastNotificationsRef = useRef([]);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
+  const [replyTo, setReplyTo] = useState(null);
   // Redux state
   const { currentUser, currentUserId, isAuthenticated } = useSelector(
     (state) => state.auth,
@@ -87,6 +93,7 @@ export default function Dashboard() {
   const selectedUserRef = useRef(null);
   const hasInitialized = useRef(false);
   const lastMessagesRef = useRef({});
+  const hasRestored = useRef(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
   const [archivedConversations, setArchivedConversations] = useState(new Set());
@@ -95,7 +102,12 @@ export default function Dashboard() {
   const [sharedProfileImage, setSharedProfileImage] = useState(null);
   const [sharedCoverPhoto, setSharedCoverPhoto] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [isGroupChat, setIsGroupChat] = useState(false);
+  const [savedSelectedGroupId] = useState(
+    () => localStorage.getItem("selectedGroupId") || null,
+  );
+  const [isGroupChat, setIsGroupChat] = useState(() => {
+    return localStorage.getItem("isGroupChat") === "true";
+  });
   const [currentUserCoverPhoto, setCurrentUserCoverPhoto] = useState(null);
   const [profileSettingsView, setProfileSettingsView] = useState("all");
 
@@ -133,7 +145,11 @@ export default function Dashboard() {
         return newList;
       });
 
-      if (Notification.permission === "granted" && document.hidden) {
+      if (
+        Notification.permission === "granted" &&
+        document.hidden &&
+        !extra.isFriendRequest
+      ) {
         const browserNotif = new Notification(title, {
           body,
           icon: "/favicon.ico",
@@ -228,7 +244,7 @@ export default function Dashboard() {
           isGroup: false,
         }),
       );
-      
+
       // Notification
       if (msg.sender?._id !== currentUserId) {
         console.log(
@@ -351,32 +367,20 @@ export default function Dashboard() {
         }),
       );
     };
-
+    const handleFriendRequest = (data) => {
+      dispatch(fetchPendingRequests());
+      playNotificationSound();
+      showNotification(`${data.senderName} `, "Sent you a friend request!", {
+        isFriendRequest: true,
+      });
+    };
+    socket.on("friendRequestReceived", handleFriendRequest);
     socket.on("receiveMessage", handleSidebarMessage);
     socket.on("receiveGroupMessage", handleSidebarGroupMessage);
     socket.on("messageStatusUpdate", handleSidebarStatus);
     socket.on("messageEdited", handleSidebarEdit);
     socket.on("groupMessageEdited", handleSidebarGroupEdit);
-    const handleConversationUpdated = (data) => {
-      console.log(" [SIDEBAR] conversationUpdated received:", data);
 
-      const otherUserId = Object.keys(lastMessages).find(
-        (uid) => lastMessages[uid]?.conversationId === data.conversationId,
-      );
-
-      if (!otherUserId) return;
-
-      dispatch(
-        updateLastMessage({
-          userId: otherUserId,
-          conversationId: data.conversationId,
-          text: data.lastMessage ?? "",
-          timestamp: data.lastMessageTime || Date.now(),
-        }),
-      );
-    };
-
-    socket.on("conversationUpdated", handleConversationUpdated);
     //  Call record - sidebar update
     const handleCallRecord = async ({ callMessage, otherUserId }) => {
       console.log(" Call record received:", callMessage);
@@ -423,8 +427,8 @@ export default function Dashboard() {
       socket.off("messageStatusUpdate", handleSidebarStatus);
       socket.off("messageEdited", handleSidebarEdit);
       socket.off("groupMessageEdited", handleSidebarGroupEdit);
-      socket.off("conversationUpdated", handleConversationUpdated);
       socket.off("call:record", handleCallRecord);
+      socket.off("friendRequestReceived", handleFriendRequest);
     };
   }, [socket, currentUserId, dispatch, lastMessages]); // Load all statuses
   useEffect(() => {
@@ -451,6 +455,19 @@ export default function Dashboard() {
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
+  useEffect(() => {
+    if (selectedUser?._id) {
+      localStorage.setItem("selectedUserId", selectedUser._id);
+      console.log(" Saved selectedUserId:", selectedUser._id);
+    }
+  }, [selectedUser]);
+  useEffect(() => {
+    if (selectedGroup?._id) {
+      localStorage.setItem("selectedGroupId", selectedGroup._id);
+      localStorage.setItem("isGroupChat", "true");
+      console.log(" Saved selectedGroupId:", selectedGroup._id);
+    }
+  }, [selectedGroup]);
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -856,6 +873,37 @@ export default function Dashboard() {
 
     loadInitialData();
   }, [dispatch, navigate]);
+  useEffect(() => {
+    console.log("🔍 Restore check:", {
+      loading,
+      hasRestored: hasRestored.current,
+      savedSelectedUserId,
+      savedSelectedGroupId,
+      usersCount: users.length,
+      groupsCount: groups.length,
+    });
+
+    if (loading) return;
+    if (hasRestored.current) return;
+    if (!savedSelectedUserId && !savedSelectedGroupId) return;
+    if (users.length === 0 && groups.length === 0) return;
+
+    if (savedSelectedGroupId && isGroupChat) {
+      const group = groups.find((g) => g._id === savedSelectedGroupId);
+      if (group) {
+        setSelectedGroup(group);
+        setIsGroupChat(true);
+        hasRestored.current = true;
+      }
+    } else if (savedSelectedUserId) {
+      const user = users.find((u) => u._id === savedSelectedUserId);
+      if (user) {
+        setSelectedUser(user);
+        setIsGroupChat(false);
+        hasRestored.current = true;
+      }
+    }
+  }, [users, groups, loading]);
 
   useEffect(() => {
     if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
@@ -1091,6 +1139,9 @@ export default function Dashboard() {
   }, [socket]);
 
   const handleLogout = () => {
+    localStorage.removeItem("selectedUserId");
+    localStorage.removeItem("selectedGroupId");
+    localStorage.removeItem("isGroupChat");
     dispatch(logout());
     navigate("/login", { replace: true });
   };
@@ -1638,8 +1689,14 @@ export default function Dashboard() {
                     setIsSelectionMode={setIsSelectionMode}
                     selectedMessages={selectedMessages}
                     setSelectedMessages={setSelectedMessages}
+                    onReply={(msg) => setReplyTo(msg)}
                   />
-                  <MessageInput groupId={selectedGroup._id} isGroup={true} />
+                  <MessageInput
+                    groupId={selectedGroup._id}
+                    isGroup={true}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
+                  />
                 </>
               ) : (
                 <>
@@ -1653,10 +1710,13 @@ export default function Dashboard() {
                     setIsSelectionMode={setIsSelectionMode}
                     selectedMessages={selectedMessages}
                     setSelectedMessages={setSelectedMessages}
+                    onReply={(msg) => setReplyTo(msg)}
                   />
                   <MessageInput
                     conversationId={conversationId}
                     selectedUser={selectedUser}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
                   />
                 </>
               )}

@@ -18,6 +18,7 @@ export default function GroupChatWindow({
   setIsSelectionMode = () => {},
   selectedMessages = new Set(),
   setSelectedMessages = () => {},
+    onReply = () => {},
 }) {
   //  Redux setup
   const dispatch = useDispatch();
@@ -341,6 +342,7 @@ export default function GroupChatWindow({
                   isSelected={selectedMessages.has(msg._id)}
                   onToggleSelect={toggleMessageSelection}
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
+                   onReply={onReply}
                 />
               </div>
             ))}
@@ -366,11 +368,7 @@ export default function GroupChatWindow({
                     style={{ animationDelay: "300ms" }}
                   />
                 </div>
-                <span className="text-xs text-gray-500 ml-1">
-                  {typingUserNames.length === 1
-                    ? `${typingUserNames[0]} is typing...`
-                    : `${typingUserNames.join(", ")} are typing...`}
-                </span>
+              
               </div>
             </div>
           </div>

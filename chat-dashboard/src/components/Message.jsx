@@ -9,6 +9,7 @@ export default function Message({
   isSelected,
   onToggleSelect,
   onEnterSelectionMode,
+  onReply,
 }) {
   const [imageUrls, setImageUrls] = useState({});
   const [imageLoading, setImageLoading] = useState({});
@@ -21,6 +22,29 @@ export default function Message({
   const [editedText, setEditedText] = useState(message.text || "");
   const audioRefs = React.useRef({});
   const longPressTimer = useRef(null);
+const [swipeOffset, setSwipeOffset] = useState(0);
+const isDragging = useRef(false);
+const startX = useRef(0);
+
+const handleDragStart = (clientX) => {
+  startX.current = clientX;
+  isDragging.current = true;
+};
+
+const handleDragMove = (clientX) => {
+  if (!isDragging.current) return;
+  const diff = clientX - startX.current;
+  if (isOwn && diff < 0) setSwipeOffset(Math.max(diff, -70));
+  if (!isOwn && diff > 0) setSwipeOffset(Math.min(diff, 70));
+};
+
+const handleDragEnd = () => {
+  if (Math.abs(swipeOffset) > 50) {
+    onReply?.(message);
+  }
+  setSwipeOffset(0);
+  isDragging.current = false;
+};
 
 const handleTouchStart = () => {
   longPressTimer.current = setTimeout(() => {
@@ -525,12 +549,17 @@ const handleContextMenu = (e) => {
         isOwn ? "justify-end" : "justify-start"
       } px-2 md:px-0`}
     >
-      <div
+<div
   className={`flex items-end gap-2 max-w-[85%] sm:max-w-md ${
     isOwn ? "flex-row-reverse" : "flex-row"
   }`}
-  onTouchStart={handleTouchStart}
-  onTouchEnd={handleTouchEnd}
+  style={{ 
+    transform: `translateX(${swipeOffset}px)`, 
+    transition: isDragging.current ? 'none' : 'transform 0.3s ease' 
+  }}
+  onTouchStart={(e) => { handleTouchStart(); handleDragStart(e.touches[0].clientX); }}
+  onTouchMove={(e) => handleDragMove(e.touches[0].clientX)}
+  onTouchEnd={() => { handleTouchEnd(); handleDragEnd(); }}
   onContextMenu={handleContextMenu}
 >
         {isSelectionMode && (
@@ -549,7 +578,13 @@ const handleContextMenu = (e) => {
             {getSenderInitial()}
           </div>
         )}
-
+{Math.abs(swipeOffset) > 20 && (
+  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+    </svg>
+  </div>
+)}
         <div
           className={`relative px-3 md:px-4 py-2 rounded-2xl shadow-lg transition-all hover:shadow-xl group ${
             isOwn
@@ -581,7 +616,17 @@ const handleContextMenu = (e) => {
                     onClick={() => setShowOptions(false)}
                   ></div>
 
-<div className={`absolute mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden ${isOwn ? 'right-0' : 'left-0'}`}>                    {isOwn && canEdit() && !isEditing && (
+<div className={`absolute mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden ${isOwn ? 'right-0' : 'left-0'}`}> 
+  <button
+  onClick={() => { onReply?.(message); setShowOptions(false); }}
+  className="w-full px-3 md:px-4 py-2 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
+>
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+  </svg>
+  Reply
+</button>           
+          {isOwn && canEdit() && !isEditing && (
                       <button
                         onClick={handleEditMessage}
                         className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
@@ -629,14 +674,33 @@ const handleContextMenu = (e) => {
               )}
             </div>
           )}
+{!isOwn && (
+  <p className="text-xs font-semibold text-blue-400 mb-1">
+    {getSenderName()}
+  </p>
+)}
 
-          {!isOwn && (
-            <p className="text-xs font-semibold text-blue-400 mb-1">
-              {getSenderName()}
-            </p>
-          )}
+{message.replyTo && message.replyTo._id && (
+    <div className={`flex items-start gap-1 mb-2 p-2 rounded-lg border-l-4 ${
+    isOwn 
+      ? "bg-white/10 border-white/40" 
+      : "bg-gray-100 border-blue-400"
+  }`}>
+    <svg className={`w-3 h-3 mt-0.5 flex-shrink-0 ${isOwn ? "text-white/70" : "text-blue-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+    </svg>
+    <div className="min-w-0 flex-1">
+      <p className={`text-xs font-semibold truncate ${isOwn ? "text-white/80" : "text-blue-500"}`}>
+        {message.replyTo.sender?.username || "Unknown"}
+      </p>
+      <p className={`text-xs truncate ${isOwn ? "text-white/60" : "text-gray-500"}`}>
+        {message.replyTo.text || "📎 Attachment"}
+      </p>
+    </div>
+  </div>
+)}
 
-          {message.attachments && message.attachments.length > 0 && (
+{message.attachments && message.attachments.length > 0 && (
             <div className="mb-2">
               {message.attachments.map((file, index) => {
                 const fileName = getFileName(file);

@@ -8,13 +8,10 @@ import {
   GROUP_MESSAGE_EDIT_LIMIT_MS,
 } from "#utils";
 export function handleMessage(io, socket) {
-
   socket.on(
     "sendMessage",
-    async ({ conversationId, text, attachments = [] }) => {
+    async ({ conversationId, text, attachments = [], replyTo = null }) => {
       try {
-     
-
         const conversation = await Conversation.findById(
           conversationId,
         ).populate("participants", "_id username email");
@@ -31,8 +28,6 @@ export function handleMessage(io, socket) {
           );
 
           if (wasDeleted) {
-        
-
             conversation.deletedBy = conversation.deletedBy.filter(
               (d) => !d.userId || d.userId.toString() !== socket.user.id,
             );
@@ -56,8 +51,6 @@ export function handleMessage(io, socket) {
 
         // Check if conversation is archived for any user
         if (conversation.archivedBy && conversation.archivedBy.length > 0) {
-        
-
           // Store who had it archived before clearing
           const usersWhoArchived = conversation.archivedBy.map((a) =>
             a.userId.toString(),
@@ -66,7 +59,6 @@ export function handleMessage(io, socket) {
           // Clear the archive for all users
           conversation.archivedBy = [];
           await conversation.save();
-
 
           // Notify all participants that chat is unarchived
           for (const participant of conversation.participants) {
@@ -100,8 +92,8 @@ export function handleMessage(io, socket) {
           text: text || "",
           attachments: attachmentIds,
           status: "sent",
+          replyTo: replyTo || null,
         });
-
 
         // Populate sender AND attachments with ALL required fields
         await msg.populate("sender", "username email");
@@ -122,7 +114,6 @@ export function handleMessage(io, socket) {
           lastMessageSender: socket.user.id,
           updatedAt: new Date(now), //  Also update updatedAt
         });
-
 
         // Transform attachments with complete data including duration
         const transformedAttachments =
@@ -161,16 +152,14 @@ export function handleMessage(io, socket) {
           attachments: transformedAttachments,
           status: msg.status,
           createdAt: msg.createdAt,
+          replyTo: replyTo || null,
         };
 
-   
         // Add receiver as object (not just ID)
         const enhancedMessageData = {
           ...messageData,
           receiver: receiverId ? { _id: receiverId } : null,
         };
-
-     
 
         //   Emit to sender FIRST with enhanced data
         socket.emit("receiveMessage", enhancedMessageData);
@@ -182,7 +171,6 @@ export function handleMessage(io, socket) {
           );
 
           if (receiverSocket) {
-          
             receiverSocket.emit("receiveMessage", enhancedMessageData);
             // Mark as delivered after 500ms
             setTimeout(async () => {
@@ -191,7 +179,6 @@ export function handleMessage(io, socket) {
                   status: "delivered",
                   deliveredAt: new Date(),
                 });
-
 
                 const statusUpdate = {
                   messageId: msg._id,
@@ -219,7 +206,6 @@ export function handleMessage(io, socket) {
 
   socket.on("userOnline", async () => {
     try {
-
       const conversations = await Conversation.find({
         participants: socket.user.id,
       });
@@ -231,7 +217,6 @@ export function handleMessage(io, socket) {
         }).populate("sender", "username");
 
         if (pendingMessages.length > 0) {
-
           await Message.updateMany(
             {
               conversationId: conv._id,
@@ -269,7 +254,6 @@ export function handleMessage(io, socket) {
 
   socket.on("markAsRead", async ({ conversationId }) => {
     try {
-
       const conversation = await Conversation.findById(conversationId).populate(
         "participants",
         "_id",
@@ -293,7 +277,6 @@ export function handleMessage(io, socket) {
       );
 
       if (result.modifiedCount > 0) {
-
         const readMessages = await Message.find({
           conversationId,
           sender: { $ne: socket.user.id },
@@ -340,7 +323,6 @@ export function handleMessage(io, socket) {
   // DELETE FOR ME
   socket.on("deleteMessageForMe", async ({ messageId, conversationId }) => {
     try {
-
       const message =
         await Message.findById(messageId).populate("conversationId");
       if (!message) {
@@ -410,7 +392,6 @@ export function handleMessage(io, socket) {
         }
       }
 
-
       //  UPDATE SIDEBAR if this was the last message
       if (allDeleted) {
         const remainingMessages = await Message.find({
@@ -445,7 +426,6 @@ export function handleMessage(io, socket) {
     "deleteMessageForEveryone",
     async ({ messageId, conversationId }) => {
       try {
-
         const message =
           await Message.findById(messageId).populate("conversationId");
         if (!message) {
@@ -521,7 +501,6 @@ export function handleMessage(io, socket) {
           });
         }
 
-
         //  Notify all participants about lastMessage change
         for (const participant of message.conversationId.participants) {
           const targetSocket = [...io.sockets.sockets.values()].find(
@@ -554,7 +533,6 @@ export function handleMessage(io, socket) {
   // Socket events section mein ye add karo:
   socket.on("editMessage", async ({ messageId, text, conversationId }) => {
     try {
-
       const message =
         await Message.findById(messageId).populate("conversationId");
       if (!message) {
@@ -613,121 +591,123 @@ export function handleMessage(io, socket) {
           targetSocket.emit("messageEdited", editData);
         }
       }
-
     } catch (err) {
       console.error(" Edit message error:", err);
       socket.emit("errorMessage", { message: "Failed to edit message" });
     }
   });
   /// GROUP MESSAGE HANDLER
-  socket.on("sendGroupMessage", async ({ groupId, text, attachments = [] }) => {
-    try {
-      console.log(" Sending group message:", {
-        groupId,
-        text,
-        senderId: socket.user.id,
-      });
-
-      const group = await Group.findById(groupId).populate(
-        "members",
-        "_id username email profileImage",
-      );
-      if (!group)
-        return socket.emit("errorMessage", { message: "Group not found" });
-
-      if (!group.members.some((m) => m._id.toString() === socket.user.id)) {
-        return socket.emit("errorMessage", {
-          message: "Not a member of this group",
+  socket.on(
+    "sendGroupMessage",
+    async ({ groupId, text, attachments = [], replyTo = null }) => {
+      try {
+        console.log(" Sending group message:", {
+          groupId,
+          text,
+          senderId: socket.user.id,
         });
-      }
 
-      //  Check if only admins can send
-      if (group.settings?.onlyAdminsCanSend) {
-        const isAdmin = group.admins.some(
-          (a) => a.toString() === socket.user.id,
+        const group = await Group.findById(groupId).populate(
+          "members",
+          "_id username email profileImage",
         );
-        if (!isAdmin) {
+        if (!group)
+          return socket.emit("errorMessage", { message: "Group not found" });
+
+        if (!group.members.some((m) => m._id.toString() === socket.user.id)) {
           return socket.emit("errorMessage", {
-            message: "Only admins can send messages",
+            message: "Not a member of this group",
           });
         }
-      }
 
-      const attachmentIds =
-        attachments?.map((att) => att.attachmentId).filter(Boolean) || [];
-
-      const msg = await Message.create({
-        groupId,
-        sender: socket.user.id,
-        text: text || "",
-        attachments: attachmentIds,
-        isGroupMessage: true,
-        status: "sent",
-      });
-
-      await msg.populate("sender", "username email profileImage");
-      await msg.populate({
-        path: "attachments",
-        select:
-          "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
-      });
-
-      await Group.findByIdAndUpdate(groupId, {
-        lastMessage: text || "📎 Attachment",
-        lastMessageTime: Date.now(),
-        lastMessageSender: socket.user.id,
-      });
-
-      const transformedAttachments =
-        msg.attachments?.map((att) => ({
-          url: `/api/file/get/${att.serverFileName}`,
-          filename: att.fileName,
-          fileType: att.fileType,
-          fileSize: att.sizeInKilobytes * 1024,
-          attachmentId: att._id,
-          duration: att.duration || 0,
-          isVoiceMessage: att.isVoiceMessage || false,
-        })) || [];
-
-      const messageData = {
-        _id: msg._id,
-        groupId: msg.groupId,
-        sender: {
-          _id: msg.sender._id,
-          username: msg.sender.username,
-          email: msg.sender.email,
-          profileImage: msg.sender.profileImage,
-        },
-        text: msg.text,
-        attachments: transformedAttachments,
-        status: msg.status,
-        createdAt: msg.createdAt,
-        isGroupMessage: true,
-      };
-
-      //  Emit to all group members with CORRECT event name
-
-      for (const member of group.members) {
-        const memberSockets = [...io.sockets.sockets.values()].filter(
-          (s) => s.user?.id === member._id.toString(),
-        );
-
-        console.log(
-          ` Member ${member.username}:`,
-          memberSockets.length,
-          "sockets",
-        );
-
-        for (const s of memberSockets) {
-          s.emit("receiveGroupMessage", messageData);
+        //  Check if only admins can send
+        if (group.settings?.onlyAdminsCanSend) {
+          const isAdmin = group.admins.some(
+            (a) => a.toString() === socket.user.id,
+          );
+          if (!isAdmin) {
+            return socket.emit("errorMessage", {
+              message: "Only admins can send messages",
+            });
+          }
         }
-      }
 
-    } catch (err) {
-      console.error(" sendGroupMessage error:", err);
-      socket.emit("errorMessage", { message: "Failed to send message" });
-    }
-  });
+        const attachmentIds =
+          attachments?.map((att) => att.attachmentId).filter(Boolean) || [];
+        const msg = await Message.create({
+          groupId,
+          sender: socket.user.id,
+          text: text || "",
+          attachments: attachmentIds,
+          isGroupMessage: true,
+          status: "sent",
+          replyTo: replyTo || null,
+        });
+
+        await msg.populate("sender", "username email profileImage");
+        await msg.populate({
+          path: "attachments",
+          select:
+            "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+        });
+
+        await Group.findByIdAndUpdate(groupId, {
+          lastMessage: text || "📎 Attachment",
+          lastMessageTime: Date.now(),
+          lastMessageSender: socket.user.id,
+        });
+
+        const transformedAttachments =
+          msg.attachments?.map((att) => ({
+            url: `/api/file/get/${att.serverFileName}`,
+            filename: att.fileName,
+            fileType: att.fileType,
+            fileSize: att.sizeInKilobytes * 1024,
+            attachmentId: att._id,
+            duration: att.duration || 0,
+            isVoiceMessage: att.isVoiceMessage || false,
+          })) || [];
+
+        const messageData = {
+          _id: msg._id,
+          groupId: msg.groupId,
+          sender: {
+            _id: msg.sender._id,
+            username: msg.sender.username,
+            email: msg.sender.email,
+            profileImage: msg.sender.profileImage,
+          },
+          text: msg.text,
+          attachments: transformedAttachments,
+          status: msg.status,
+          createdAt: msg.createdAt,
+          isGroupMessage: true,
+          replyTo: replyTo || null,
+        };
+
+        //  Emit to all group members with CORRECT event name
+
+        for (const member of group.members) {
+          const memberSockets = [...io.sockets.sockets.values()].filter(
+            (s) => s.user?.id === member._id.toString(),
+          );
+
+          console.log(
+            ` Member ${member.username}:`,
+            memberSockets.length,
+            "sockets",
+          );
+
+          for (const s of memberSockets) {
+            s.emit("receiveGroupMessage", messageData);
+          }
+        }
+      } catch (err) {
+        console.error(" sendGroupMessage error:", err);
+        socket.emit("errorMessage", { message: "Failed to send message" });
+      }
+    },
+  );
 
   // GROUP TYPING INDICATOR
   socket.on("groupTyping", async ({ groupId, isTyping }) => {
@@ -761,7 +741,6 @@ export function handleMessage(io, socket) {
   // DELETE GROUP MESSAGE FOR ME
   socket.on("deleteGroupMessageForMe", async ({ messageId, groupId }) => {
     try {
-
       const message = await Message.findById(messageId);
       if (!message || !message.isGroupMessage) {
         socket.emit("errorMessage", { message: "Message not found" });
@@ -802,7 +781,6 @@ export function handleMessage(io, socket) {
         groupId,
         deletedFor: [userId],
       });
-
     } catch (err) {
       console.error(" Delete group message error:", err);
       socket.emit("errorMessage", { message: "Failed to delete message" });
@@ -812,7 +790,6 @@ export function handleMessage(io, socket) {
   // DELETE GROUP MESSAGE FOR EVERYONE
   socket.on("deleteGroupMessageForEveryone", async ({ messageId, groupId }) => {
     try {
-
       const message = await Message.findById(messageId);
       if (!message || !message.isGroupMessage) {
         socket.emit("errorMessage", { message: "Message not found" });
@@ -863,7 +840,6 @@ export function handleMessage(io, socket) {
           });
         }
       }
-
     } catch (err) {
       console.error(" Delete group message for everyone error:", err);
       socket.emit("errorMessage", { message: "Failed to delete message" });
@@ -873,7 +849,6 @@ export function handleMessage(io, socket) {
   // View status
   socket.on("viewStatus", async ({ statusId }) => {
     try {
-
       const status = await Status.findById(statusId);
 
       if (!status) {
@@ -909,7 +884,6 @@ export function handleMessage(io, socket) {
           },
         });
       }
-
     } catch (err) {
       console.error(" View status error:", err);
     }
@@ -918,7 +892,6 @@ export function handleMessage(io, socket) {
   // Delete status
   socket.on("deleteStatus", async ({ statusId }) => {
     try {
-
       const status = await Status.findById(statusId);
 
       if (!status) {
@@ -936,7 +909,6 @@ export function handleMessage(io, socket) {
 
       // Broadcast to all users
       io.emit("statusDeleted", { statusId });
-
     } catch (err) {
       console.error("Delete status error:", err);
     }
@@ -1005,7 +977,6 @@ export function handleMessage(io, socket) {
         editedAt: message.editedAt,
       };
 
-
       // Emit to all group members
       for (const member of group.members) {
         const memberSockets = [...io.sockets.sockets.values()].filter(
@@ -1016,7 +987,6 @@ export function handleMessage(io, socket) {
           s.emit("groupMessageEdited", editData);
         }
       }
-
     } catch (err) {
       console.error(" Edit group message error:", err);
       socket.emit("errorMessage", { message: "Failed to edit message" });

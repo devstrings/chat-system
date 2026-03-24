@@ -109,7 +109,25 @@ const messageSchema = new mongoose.Schema({
             type: Date,
             default: Date.now
         }
-    }]
+    }],
+replyTo: {
+    _id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message"
+    },
+    text: {
+        type: String,
+        default: ""
+    },
+    sender: {
+        username: String,
+        _id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }
+    }
+}
+
 });
 
 // Index for faster queries
