@@ -22,5 +22,5 @@ coverage
 
 
 
-uploads/.gitkeep
-!uploads/*
+!uploads/.gitkeep
+uploads/*
