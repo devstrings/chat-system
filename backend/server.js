@@ -33,6 +33,7 @@ const io = new Server(server, {
 });
 
 app.set("io", io);
+app.set('trust proxy', 1);
 
 //  1. SECURITY HEADERS
 app.use(

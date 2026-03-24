@@ -64,11 +64,13 @@ export default function VideoCall({
     };
   }, [socket]);
 
-  const handleEndCall = () => {
-    onEndCall?.();
-    onClose?.();
-  };
-
+const handleEndCall = () => {
+  if (socket && remoteUser?._id) {
+    socket.emit("call:cancel", { to: remoteUser._id });
+  }
+  onEndCall?.();
+  onClose?.();
+};
   return (
     <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
       {/* STATUS BAR */}
