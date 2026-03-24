@@ -1,23 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSelector } from "react-redux";
+import axiosInstance from "../utils/axiosInstance";
 
-const iceServers = {
+const defaultIceServers = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
   ],
 };
-
 
 export const useWebRTC = () => {
   const socket = useSelector((state) => state.socket.socket);
@@ -28,12 +18,26 @@ export const useWebRTC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [receiverOnline, setReceiverOnline] = useState(false);
+  const [iceServersConfig, setIceServersConfig] = useState(defaultIceServers);
 
   const peerConnection = useRef(null);
   const remoteUserIdRef = useRef(null);
   const iceCandidateQueue = useRef([]);
   const ringAudioRef = useRef(null);
   const callTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    const fetchTurnCredentials = async () => {
+      try {
+        const res = await axiosInstance.get('/api/calls/turn-credentials');
+        setIceServersConfig({ iceServers: res.data.iceServers });
+        console.log(" TURN credentials loaded");
+      } catch (err) {
+        console.error('TURN fetch error — using default:', err);
+      }
+    };
+    fetchTurnCredentials();
+  }, []);
 
   const startRinging = () => {
     const audio = new Audio("/sounds/outgoing.mp3");
@@ -51,7 +55,7 @@ export const useWebRTC = () => {
   };
 
   const createPeerConnection = useCallback(() => {
-    const pc = new RTCPeerConnection(iceServers);
+    const pc = new RTCPeerConnection(iceServersConfig);
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket && remoteUserIdRef.current) {
@@ -75,7 +79,7 @@ export const useWebRTC = () => {
 
     peerConnection.current = pc;
     return pc;
-  }, [socket]);
+  }, [socket, iceServersConfig]);
 
   const endCall = useCallback(() => {
     stopRinging();
@@ -133,7 +137,6 @@ export const useWebRTC = () => {
 
       socket.emit("call:initiate", { to: remoteUserId, offer, callType });
 
-      // Check receiver online status
       socket.once("call:receiver_status", ({ isOnline }) => {
         setReceiverOnline(isOnline);
         if (isOnline) {
@@ -141,7 +144,6 @@ export const useWebRTC = () => {
         }
       });
 
-      // 30 sec timeout - auto cancel
       callTimeoutRef.current = setTimeout(() => {
         if (!remoteStream) {
           socket.emit("call:cancel", { to: remoteUserId });
@@ -243,6 +245,7 @@ export const useWebRTC = () => {
       stopRinging();
       endCall();
     });
+
     socket.on("call:rejected", () => {
       stopRinging();
       if (callTimeoutRef.current) {

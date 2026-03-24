@@ -26,22 +26,22 @@
     "mongoose": "^8.19.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
-
     "redis": "^5.9.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "twilio": "^5.13.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
   },
- "imports": {
-  "#models/*": "./models/*.js",
-  "#routes": "./routes/index.js",
-  "#routes/*": "./routes/*.js",
-  "#controllers/*": "./controllers/*.js",
-  "#config/*": "./config/*.js",
-  "#utils": "./utils/index.js"
-}
+  "imports": {
+    "#models/*": "./models/*.js",
+    "#routes": "./routes/index.js",
+    "#routes/*": "./routes/*.js",
+    "#controllers/*": "./controllers/*.js",
+    "#config/*": "./config/*.js",
+    "#utils": "./utils/index.js"
+  }
 }
