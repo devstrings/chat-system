@@ -73,13 +73,7 @@ export default function ChatWindow({
     if (!socket || !conversationId) return;
     const handleChatCleared = (data) => {
       console.log("chatCleared received:", data);
-      console.log(
-        "conversationId match:",
-        data.conversationId === conversationId,
-      );
-      console.log("clearedFor match:", data.clearedFor === currentUserId);
-      console.log("data.clearedFor:", data.clearedFor);
-      console.log("currentUserId:", currentUserId);
+
 
       if (
         data.conversationId === conversationId &&

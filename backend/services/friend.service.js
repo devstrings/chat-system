@@ -69,13 +69,6 @@ export const checkExistingRequest = async (senderId, receiverId) => {
     status: "pending",
   });
 
-  console.log(
-    " checkExistingRequest result:",
-    existingRequest
-      ? `Found: ${existingRequest.sender} → ${existingRequest.receiver} (${existingRequest.status})`
-      : "Not found",
-  );
-
   return existingRequest;
 };
 

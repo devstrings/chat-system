@@ -291,7 +291,7 @@ const chatSlice = createSlice({
       const targetKey = isGroup ? conversationId : userId;
 
       state.lastMessages[targetKey] = {
-  text: isGroup ? messageText : (messageText || ""),
+        text: isGroup ? messageText : (messageText || ""),
         time: message.createdAt || new Date().toISOString(),
         sender: senderId,
         status: message.status || "sent",
@@ -306,21 +306,6 @@ const chatSlice = createSlice({
         callDuration: message.callDuration || 0,
       };
 
-      console.log(`[REDUX] Set _updated for ${targetKey}:`, {
-        timestamp,
-        messageCreatedAt: message.createdAt,
-        isNewMessage: !message._loadedTimestamp,
-      });
-
-      console.log(
-        ` [REDUX] addMessage - Updated lastMessages["${targetKey}"]`,
-        {
-          text: messageText.substring(0, 20),
-          timestamp,
-          conversationId,
-          isGroup,
-        },
-      );
     },
     updateMessageStatus: (state, action) => {
       const { conversationId, messageId, status } = action.payload;
@@ -398,32 +383,26 @@ const chatSlice = createSlice({
           state.lastMessages[groupId].isEdited = true;
           state.lastMessages[groupId].editedAt = editedAt;
           state.lastMessages[groupId]._updated = Date.now(); // Trigger re-sort
-
-          console.log(` [REDUX] Updated group message in sidebar:`, {
-            groupId,
-            messageId,
-            newText: text.substring(0, 30),
-          });
         }
       }
     },
     clearMessages: (state, action) => {
-  const conversationId = action.payload;
-  if (state.conversations[conversationId]) {
-    state.conversations[conversationId].messages = [];
-  }
-},
+      const conversationId = action.payload;
+      if (state.conversations[conversationId]) {
+        state.conversations[conversationId].messages = [];
+      }
+    },
 
-updateLastMessage: (state, action) => {
-  const { userId, conversationId, text, timestamp } = action.payload;
-  state.lastMessages[userId] = {
-    ...state.lastMessages[userId],
-    text: text,
-    time: new Date(timestamp).toISOString(),
-    conversationId: conversationId,
-    _updated: timestamp,
-  };
-},
+    updateLastMessage: (state, action) => {
+      const { userId, conversationId, text, timestamp } = action.payload;
+      state.lastMessages[userId] = {
+        ...state.lastMessages[userId],
+        text: text,
+        time: new Date(timestamp).toISOString(),
+        conversationId: conversationId,
+        _updated: timestamp,
+      };
+    },
     clearUnreadCount: (state, action) => {
       const userId = action.payload;
       state.unreadCounts[userId] = 0;
@@ -471,7 +450,7 @@ updateLastMessage: (state, action) => {
           state.conversations[conversationId] = { messages: [], loading: true };
         } else {
           state.conversations[conversationId].loading = true;
-              // state.conversations[conversationId].messages = [];
+          // state.conversations[conversationId].messages = [];
         }
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
@@ -591,7 +570,7 @@ export const {
   incrementUnreadCount,
   updateTyping,
   clearMessages,
-   updateLastMessage,  
+  updateLastMessage,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

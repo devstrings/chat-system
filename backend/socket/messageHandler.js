@@ -601,11 +601,6 @@ export function handleMessage(io, socket) {
     "sendGroupMessage",
     async ({ groupId, text, attachments = [], replyTo = null }) => {
       try {
-        console.log(" Sending group message:", {
-          groupId,
-          text,
-          senderId: socket.user.id,
-        });
 
         const group = await Group.findById(groupId).populate(
           "members",
@@ -692,11 +687,7 @@ export function handleMessage(io, socket) {
             (s) => s.user?.id === member._id.toString(),
           );
 
-          console.log(
-            ` Member ${member.username}:`,
-            memberSockets.length,
-            "sockets",
-          );
+
 
           for (const s of memberSockets) {
             s.emit("receiveGroupMessage", messageData);
