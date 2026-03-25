@@ -7,10 +7,9 @@ export default function VideoCall({
   onClose,
   localStream,
   remoteStream,
-  isMuted,
+  
   isVideoOff,
   onEndCall,
-  onToggleMute,
   onToggleVideo,
   receiverOnline,
 }) {
@@ -70,7 +69,7 @@ const handleEndCall = () => {
   }
   onEndCall?.();
   onClose?.();
-};c
+};
   return (
     <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
       {/* STATUS BAR */}
