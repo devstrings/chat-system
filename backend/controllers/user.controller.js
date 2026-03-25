@@ -1,4 +1,4 @@
-import * as userService from "../services/user.service.js";
+import { userService } from "#services";
 import path from "path";
 import fs from "fs";
 import asyncHandler from "express-async-handler";

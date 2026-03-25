@@ -8,7 +8,7 @@ export const redisClient = createClient({
 
 redisClient.on("error", (err) => console.error(" Redis Client Error:", err));
 redisClient.on("connect", () => console.log(" Connecting to Redis..."));
-redisClient.on("ready", () => console.log(" Redis is ready!"));
+redisClient.on("ready", () => {});
 
 // Function to connect once (called in server.js)
 export async function connectRedis() {

@@ -1,47 +1,49 @@
 import {
-  fetchUserCallHistory,
-  fetchCallStats,
-  processDeleteCall,
-  processClearCallHistory,
-  fetchRecentCalls,
-  fetchCallById
-} from "../services/call.service.js";
+  callService
+} from "#services";
 import asyncHandler from "express-async-handler";
+
+
+export const getTurnCredentials = asyncHandler(async (req, res) => {
+  const credentials = await callService.fetchTurnCredentials();
+  res.json({ iceServers: credentials });
+});
+
 
 export const getCallHistory = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { limit = 20, page = 1 } = req.query;
-  const result = await fetchUserCallHistory(userId, limit, page);
+  const result = await callService.fetchUserCallHistory(userId, limit, page);
   res.json(result);
 });
 
 export const getCallStats = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const stats = await fetchCallStats(userId);
+  const stats = await callService.fetchCallStats(userId);
   res.json(stats);
 });
 
 export const deleteCallHistory = asyncHandler(async (req, res) => {
   const { callId } = req.params;
   const userId = req.user.id;
-  const result = await processDeleteCall(callId, userId);
+  const result = await callService.processDeleteCall(callId, userId);
   res.json(result);
 });
 
 export const clearCallHistory = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const result = await processClearCallHistory(userId);
+  const result = await callService.processClearCallHistory(userId);
   res.json(result);
 });
 export const getRecentCalls = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const calls = await fetchRecentCalls(userId);
+  const calls = await callService.fetchRecentCalls(userId);
   res.json({ calls });
 });
 
 export const getCallById = asyncHandler(async (req, res) => {
   const { callId } = req.params;
   const userId = req.user.id;
-  const call = await fetchCallById(callId, userId);
+  const call = await callService.fetchCallById(callId, userId);
   res.json({ call });
 });

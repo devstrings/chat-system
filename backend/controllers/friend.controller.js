@@ -1,11 +1,11 @@
-import * as friendService from "../services/friend.service.js";
+import { friendService } from "#services";
 import asyncHandler from "express-async-handler";
 // SEND FRIEND REQUEST CONTROLLER
 export const sendFriendRequest = asyncHandler(async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
   const result = await friendService.processSendFriendRequest(senderId, receiverId);
-    const io = req.app.get("io");
+  const io = req.app.get("io");
   if (io) {
     const receiverSocket = [...io.sockets.sockets.values()].find(
       (s) => s.user && s.user.id === receiverId

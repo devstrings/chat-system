@@ -55,16 +55,23 @@ services:
     container_name: chat_coturn
     restart: always
     ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "5349:5349/tcp"
-      - "5349:5349/udp"
-      - "49152-49200:49152-49200/udp"
+      # TURN/STUN standard ports
+      - "${COTURN_PORT}:${COTURN_CONTAINER_PORT}/tcp"
+      - "${COTURN_PORT}:${COTURN_CONTAINER_PORT}/udp"
+
+      # TURN over TLS (optional if you enable TLS later)
+      - "${COTURN_TLS_PORT}:${COTURN_CONTAINER_TLS_PORT}/tcp"
+      - "${COTURN_TLS_PORT}:${COTURN_CONTAINER_TLS_PORT}/udp"
+      
+      # Relay ports (VERY IMPORTANT for WebRTC)
+      # "49152-49200:49152-49200/udp"
+      - "${COTURN_RELAY_PORT_START}-${COTURN_RELAY_PORT_END}:${COTURN_CONTAINER_RELAY_PORT_START}-${COTURN_CONTAINER_RELAY_PORT_END}/udp"
+    
     command: >
       -n
       --log-file=stdout
-      --min-port=49152
-      --max-port=49200
+      --min-port=${COTURN_CONTAINER_RELAY_PORT_START}
+      --max-port=${COTURN_CONTAINER_RELAY_PORT_END}
       --realm=${COTURN_REALM}
       --user=${COTURN_USER}:${COTURN_PASSWORD}
       --lt-cred-mech

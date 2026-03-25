@@ -1,4 +1,4 @@
-import * as statusService from "../services/status.service.js";
+import { statusService } from "#services";
 import asyncHandler from "express-async-handler";
 
 // CREATE STATUS CONTROLLER

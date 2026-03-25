@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn_server
+    restart: always
+
+    ports:
+      # TURN/STUN standard ports
+      - "${COTURN_PORT}:${COTURN_CONTAINER_PORT}/tcp"
+      - "${COTURN_PORT}:${COTURN_CONTAINER_PORT}/udp"
+
+      # TURN over TLS (optional if you enable TLS later)
+      - "${COTURN_TLS_PORT}:${COTURN_CONTAINER_TLS_PORT}/tcp"
+      - "${COTURN_TLS_PORT}:${COTURN_CONTAINER_TLS_PORT}/udp"
+      
+      # Relay ports (VERY IMPORTANT for WebRTC)
+      # "49152-49200:49152-49200/udp"
+      - "${COTURN_RELAY_PORT_START}-${COTURN_RELAY_PORT_END}:${COTURN_CONTAINER_RELAY_PORT_START}-${COTURN_CONTAINER_RELAY_PORT_END}/udp"
+
+    command: >
+      -n
+      --log-file=stdout
+      --min-port=${COTURN_CONTAINER_RELAY_PORT_START}
+      --max-port=${COTURN_CONTAINER_RELAY_PORT_END}
+      --realm=${COTURN_REALM}
+      --user=${COTURN_USER}:${COTURN_PASSWORD}
+      --lt-cred-mech
+      --fingerprint
+      --no-multicast-peers
+      --no-cli
+      --no-tls
+      --no-dtls
+      --listening-ip=${COTURN_LISTEN_IP}
+      --external-ip=${COTURN_EXTERNAL_IP}
+      --allow-loopback-peers

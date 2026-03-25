@@ -1,4 +1,4 @@
-import * as messageService from "../services/message.service.js";
+import { messageService } from "#services";
 import Message from "#models/Message";
 import asyncHandler from "express-async-handler";
 // GET OR CREATE CONVERSATION CONTROLLER
@@ -111,20 +111,20 @@ export const clearChat = asyncHandler(async (req, res) => {
   const result = await messageService.processClearChat(conversationId, currentUserId);
   const io = req.app.get("io");
   if (io) {
-   // NAYA
-const userSocket = [...io.sockets.sockets.values()].find(
-  (s) => s.user && s.user.id === currentUserId
-);
+    // NAYA
+    const userSocket = [...io.sockets.sockets.values()].find(
+      (s) => s.user && s.user.id === currentUserId
+    );
 
-if (userSocket) {
-  userSocket.emit("chatCleared", {
-    conversationId: conversationId.toString(),
-    clearedBy: currentUserId,
-    clearedFor: currentUserId,
-    action: "clearedForMe",
-  });
-} else {
-}
+    if (userSocket) {
+      userSocket.emit("chatCleared", {
+        conversationId: conversationId.toString(),
+        clearedBy: currentUserId,
+        clearedFor: currentUserId,
+        action: "clearedForMe",
+      });
+    } else {
+    }
     io.to(currentUserId).emit("conversationUpdated", {
       conversationId: conversationId.toString(),
       lastMessage: "",

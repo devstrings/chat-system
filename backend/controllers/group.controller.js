@@ -1,4 +1,4 @@
-import * as groupService from "../services/group.service.js";
+import { groupService } from "#services";
 import Message from "#models/Message";
 import asyncHandler from "express-async-handler";
 // CREATE GROUP CONTROLLER

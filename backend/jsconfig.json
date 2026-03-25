@@ -7,7 +7,8 @@
       "#routes/*": ["routes/*.js"],
       "#controllers/*": ["controllers/*.js"],
       "#config/*": ["config/*.js"],
-      "#utils": ["utils/index.js"]
+      "#utils": ["utils/index.js"],
+      "#services": ["services/index.js"]
     }
   }
 }

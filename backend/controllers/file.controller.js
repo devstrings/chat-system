@@ -1,4 +1,4 @@
-import * as fileService from "../services/file.service.js";
+import { fileService } from "#services";
 import asyncHandler from "express-async-handler";
 // DOWNLOAD FILE CONTROLLER
 export const downloadFile = asyncHandler(async (req, res) => {
