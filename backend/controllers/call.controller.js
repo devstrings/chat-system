@@ -6,7 +6,12 @@ import asyncHandler from "express-async-handler";
 
 export const getTurnCredentials = asyncHandler(async (req, res) => {
   const credentials = await callService.fetchTurnCredentials();
-  res.json({ iceServers: credentials });
+  res.json({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      credentials
+    ]
+  });
 });
 
 
