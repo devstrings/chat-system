@@ -11,8 +11,13 @@ const requiredEnvVars = [
   // "SESSION_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+
   "FACEBOOK_APP_ID",
   "FACEBOOK_APP_SECRET",
+
+  'TURN_SERVER',
+  'TURN_USERNAME',
+  'TURN_PASSWORD'
 ];
 
 const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
@@ -78,6 +83,12 @@ const config = {
     from: env("EMAIL_FROM", "Chat System <noreply@chatsystem.com>"),
   },
 
+  turn: {
+    server: env("TURN_SERVER"),
+    username: env("TURN_USERNAME"),
+    password: env("TURN_PASSWORD"),
+  },
+  
   resetToken: {
     expiryMinutes: parseInt(env("RESET_TOKEN_EXPIRY", "15")),
   },

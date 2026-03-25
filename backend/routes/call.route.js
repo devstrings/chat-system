@@ -13,19 +13,7 @@ import {
 
 const router = express.Router();
 router.get("/turn-credentials", verifyToken, getTurnCredentials);
-// router.get("/turn-credentials", async (req, res) => {
-//   try {
-//     const client = twilio(
-//       process.env.TWILIO_ACCOUNT_SID,
-//       process.env.TWILIO_AUTH_TOKEN
-//     );
-//     const token = await client.tokens.create();
-//     res.json({ iceServers: token.iceServers });
-//   } catch (err) {
-//     console.error('Twilio error:', err);
-//     res.status(500).json({ message: 'Failed to get TURN credentials' });
-//   }
-// });
+
 /**
  * @swagger
  * /calls/history:

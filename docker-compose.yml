@@ -16,8 +16,6 @@ services:
       - TURN_SERVER=turn:${COTURN_REALM}:${COTURN_PORT}
       - TURN_USERNAME=${COTURN_USER}
       - TURN_PASSWORD=${COTURN_PASSWORD}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
-      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

@@ -1,6 +1,19 @@
+import mongoose from "mongoose";
+
+import config from "#config/index";
+
 import Call from "#models/Call";
 import AppError from "../shared/AppError.js";
-import mongoose from "mongoose";
+
+
+export const fetchTurnCredentials = async () => {
+  const turnCredentials = {
+    username: config.turn.username,
+    credential: config.turn.password,
+    urls: config.turn.server ? config.turn.server.split(",") : []
+  };
+  return turnCredentials;
+};
 export const fetchUserCallHistory = async (userId, limit = 20, page = 1) => {
   const calls = await Call.find({
     $or: [{ caller: userId }, { receiver: userId }]

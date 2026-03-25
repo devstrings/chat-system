@@ -862,14 +862,6 @@ export default function Dashboard() {
     loadInitialData();
   }, [dispatch, navigate]);
   useEffect(() => {
-    console.log("🔍 Restore check:", {
-      loading,
-      hasRestored: hasRestored.current,
-      savedSelectedUserId,
-      savedSelectedGroupId,
-      usersCount: users.length,
-      groupsCount: groups.length,
-    });
 
     if (loading) return;
     if (hasRestored.current) return;

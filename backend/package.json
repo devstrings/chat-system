@@ -30,18 +30,17 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1",
-    "twilio": "^5.13.0"
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
   },
   "imports": {
+    "#config/*": "./config/*.js",
     "#models/*": "./models/*.js",
     "#routes": "./routes/index.js",
     "#routes/*": "./routes/*.js",
     "#controllers/*": "./controllers/*.js",
-    "#config/*": "./config/*.js",
     "#utils": "./utils/index.js",
     "#services": "./services/index.js"
   }
