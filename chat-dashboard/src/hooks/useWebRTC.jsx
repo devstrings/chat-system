@@ -20,6 +20,7 @@ export const useWebRTC = () => {
   const [receiverOnline, setReceiverOnline] = useState(false);
   const [iceServersConfig, setIceServersConfig] = useState(defaultIceServers);
 
+  console.log("Ice servers config:", iceServersConfig);
   const peerConnection = useRef(null);
   const remoteUserIdRef = useRef(null);
   const iceCandidateQueue = useRef([]);
@@ -30,7 +31,11 @@ export const useWebRTC = () => {
     const fetchTurnCredentials = async () => {
       try {
         const res = await axiosInstance.get('/api/calls/turn-credentials');
-        setIceServersConfig({ iceServers: res.data.iceServers });
+        setIceServersConfig({
+          iceServers: Array.isArray(res.data.iceServers)
+            ? res.data.iceServers
+            : [res.data.iceServers],
+        });
         console.log(" TURN credentials loaded");
       } catch (err) {
         console.error('TURN fetch error — using default:', err);
