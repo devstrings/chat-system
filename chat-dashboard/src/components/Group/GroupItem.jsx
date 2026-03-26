@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { useAuthImage } from "../../hooks/useAuthImage";
+import { useAuthImage } from "@/hooks/useAuthImage";
 import ConfirmationDialog, { AlertDialog } from "../ConfirmationDialog";
-import axiosInstance from "../../utils/axiosInstance";
+import axiosInstance from "@/utils/axiosInstance";
 import GroupProfile from "./GroupProfile";
-import API_BASE_URL from "../../config/api";
+import API_BASE_URL from "@/config/api";
 export default function GroupItem({
   group,
   selected,

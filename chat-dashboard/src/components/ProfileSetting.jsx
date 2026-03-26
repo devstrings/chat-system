@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useAuthImage } from "../hooks/useAuthImage";
-import axiosInstance from "../utils/axiosInstance";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import axiosInstance from "@/utils/axiosInstance";
 import { AlertDialog } from "./ConfirmationDialog";
-import API_BASE_URL from "../config/api";
+import API_BASE_URL from "@/config/api";
 
 function AuthImage({ imageUrl, username, className }) {
   const { imageSrc, loading } = useAuthImage(imageUrl);

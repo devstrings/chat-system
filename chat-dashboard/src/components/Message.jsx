@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
-import axiosInstance from "../utils/axiosInstance";
-import API_BASE_URL from "../config/api";
+import axiosInstance from "@/utils/axiosInstance";
+import API_BASE_URL from "@/config/api";
 export default function Message({
   message,
   isOwn,

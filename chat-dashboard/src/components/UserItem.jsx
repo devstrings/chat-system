@@ -1,9 +1,9 @@
 import React, { useState, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
-import axiosInstance from "../utils/axiosInstance";
-import { useAuthImage } from "../hooks/useAuthImage";
-import API_BASE_URL from "../config/api";
+import axiosInstance from "@/utils/axiosInstance";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import API_BASE_URL from "@/config/api";
 const UserItem = memo(function UserItem({
   user,
   selected,

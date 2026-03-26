@@ -3,19 +3,16 @@ import Message from "./Message";
 import ConfirmationDialog from "./ConfirmationDialog";
 import {
   fetchMessages,
-  clearChat,
-  addMessage,
   updateMessageStatus,
   bulkDeleteMessages,
   clearMessages,
-} from "../store/slices/chatSlice";
+} from "@/store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
 export default function ChatWindow({
   conversationId,
   currentUserId,
   searchQuery = "",
-  onUpdateLastMessageStatus,
   selectedUser = null,
   isSelectionMode = false,
   setIsSelectionMode = () => {},

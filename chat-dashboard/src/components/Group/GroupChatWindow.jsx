@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import Message from "../Message";
+import Message from "@/Message";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchGroupMessages,
@@ -7,9 +7,9 @@ import {
   deleteGroupMessage,
   clearGroupChatMessages,
   updateGroupMessage,
-} from "../../store/slices/groupSlice";
-import API_BASE_URL from "../../config/api";
-import axiosInstance from "../../utils/axiosInstance";
+} from "@/store/slices/groupSlice";
+import API_BASE_URL from "@/config/api";
+import axiosInstance from "@/utils/axiosInstance";
 export default function GroupChatWindow({
   group,
   currentUserId,

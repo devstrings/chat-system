@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import UserItem from "./UserItem";
 import GroupItem from "./Group/GroupItem";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance from "@/utils/axiosInstance";
 import { AlertDialog } from "./ConfirmationDialog";
-import { useAuthImage } from "../hooks/useAuthImage";
-import API_BASE_URL from "../config/api";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchPendingRequests,
@@ -12,7 +12,7 @@ import {
   acceptFriendRequest,
   rejectFriendRequest,
   unblockUser,
-} from "../store/slices/userSlice";
+} from "@/store/slices/userSlice";
 import {
   CreateGroupDialog,
   BlockedUsersModal,

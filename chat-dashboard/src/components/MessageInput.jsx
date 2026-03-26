@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import axiosInstance from "../utils/axiosInstance";
-import API_BASE_URL from "../config/api";
+import axiosInstance from "@/utils/axiosInstance";
+import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 export default function MessageInput({
   conversationId,

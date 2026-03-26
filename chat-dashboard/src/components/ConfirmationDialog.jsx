@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import API_BASE_URL from "../config/api";
-import axiosInstance from "../utils/axiosInstance";
-import { useAuthImage } from "../hooks/useAuthImage";
+import API_BASE_URL from "@/config/api";
+import axiosInstance from "@/utils/axiosInstance";
+import { useAuthImage } from "@/hooks/useAuthImage";
 const DIALOG_THEME = {
   // Overlay (background blur)
   overlay: "bg-black bg-opacity-50 backdrop-blur-sm",
