@@ -1,25 +1,35 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load env file based on mode
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
     plugins: [react()],
+
+    resolve: {
+      alias: {
+        "@": resolve(__dirname, "src"),
+      },
+    },
 
     server: {
       port: 5173,
       host: true,
       proxy: {
         "/api": {
-          target: env.VITE_API_URL || "http://backend:5000", // ← localhost → backend
+          target: env.VITE_API_URL || "http://backend:5000",
           changeOrigin: true,
           secure: false,
         },
         "/socket.io": {
-          target: env.VITE_API_URL || "http://backend:5000", // ← localhost → backend
+          target: env.VITE_API_URL || "http://backend:5000",
           changeOrigin: true,
           ws: true,
         },
