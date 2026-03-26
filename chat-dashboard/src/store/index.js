@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { enableMapSet } from "immer";
-import { injectStore } from "../utils/axiosInstance";
+import { injectStore } from "@/utils/axiosInstance";
 
 enableMapSet();
 

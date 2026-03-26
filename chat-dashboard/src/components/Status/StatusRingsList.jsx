@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import API_BASE_URL from "../../config/api";
-import axiosInstance from "../../utils/axiosInstance";
+import API_BASE_URL from "@/config/api";
+import axiosInstance from "@/utils/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
   const [imageSrc, setImageSrc] = useState(null);

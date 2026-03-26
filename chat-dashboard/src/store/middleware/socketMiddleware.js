@@ -7,7 +7,7 @@ import {
   addOnlineUser,
   removeOnlineUser,
   clearSocket,
-} from "../slices/socketSlice";
+} from "@/store/slices/socketSlice";
 import {
   addMessage,
   updateMessageStatus,
@@ -16,13 +16,13 @@ import {
   updateMessage,
   incrementUnreadCount,
   updateLastMessage,
-} from "../slices/chatSlice";
+} from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
   deleteGroupMessage,
   updateGroupTyping,
   updateGroupMessage,
-} from "../slices/groupSlice";
+} from "@/store/slices/groupSlice";
 
 const socketMiddleware = (store) => {
   let socket = null;

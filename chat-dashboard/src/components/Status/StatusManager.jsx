@@ -1,8 +1,8 @@
 //(Upload + Privacy + My Status)
 import React, { useState, useRef, useEffect } from "react";
-import API_BASE_URL from "../../config/api";
+import API_BASE_URL from "@/config/api";
 import ConfirmationDialog from "../ConfirmationDialog";
-import axiosInstance from "../../utils/axiosInstance";
+import axiosInstance from "@/utils/axiosInstance";
 export default function StatusManager({
   currentUser,
   onClose,

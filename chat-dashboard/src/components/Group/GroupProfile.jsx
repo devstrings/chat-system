@@ -1,9 +1,9 @@
 import React, { useState, useRef } from "react";
 import axios from "axios";
-import { useAuthImage } from "../../hooks/useAuthImage";
-import API_BASE_URL from "../../config/api";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import API_BASE_URL from "@/config/api";
 import { useDispatch } from "react-redux";
-import { updateGroup } from "../../store/slices/groupSlice";
+import { updateGroup } from "@/store/slices/groupSlice";
 
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {

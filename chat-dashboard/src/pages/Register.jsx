@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance from "@/utils/axiosInstance";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import { register, clearError } from "../store/slices/authSlice";
+import { register, clearError } from "@/store/slices/authSlice";
 import { useGoogleLogin } from "@react-oauth/google";
 import FacebookLogin from "@greatsumini/react-facebook-login";
-// import axiosInstance from "../utils/axiosInstance";
-// import API_BASE_URL from "../config/api";
+
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({

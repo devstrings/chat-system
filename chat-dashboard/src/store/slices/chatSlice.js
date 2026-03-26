@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axiosInstance from "../../utils/axiosInstance";
-import API_BASE_URL from "../../config/api";
+import axiosInstance from "@/utils/axiosInstance";
+import API_BASE_URL from "@/config/api";
 
 // ASYNC THUNKS
 

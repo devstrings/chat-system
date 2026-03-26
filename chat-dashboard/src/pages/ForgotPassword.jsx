@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FiMail, FiArrowLeft, FiCopy } from "react-icons/fi";
 import API_BASE_URL from "../config/api";
+
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");

@@ -1,7 +1,7 @@
 // StatusViewer.jsx - VIEWER ONLY
 import React, { useState, useEffect, useRef } from "react";
-import API_BASE_URL from "../../config/api";
-import axiosInstance from "../../utils/axiosInstance";
+import API_BASE_URL from "@/config/api";
+import axiosInstance from "@/utils/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
   const [imageSrc, setImageSrc] = useState(null);
