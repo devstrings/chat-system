@@ -1,9 +1,8 @@
 import axiosInstance from "@/utils/axiosInstance";
-import API_BASE_URL from "@/config/api";
 
 const fetchUser = async () => {
     try {
-        const response = await axiosInstance.get(`${API_BASE_URL}/api/users/me`);
+        const response = await axiosInstance.get(`/api/users/me`);
         return response.data;
     } catch (error) {
         console.error("Error fetching user:", error);
@@ -13,7 +12,7 @@ const fetchUser = async () => {
 
 const updateProfile = async (data) => {
     try {
-        const response = await axiosInstance.put(`${API_BASE_URL}/api/users/profile`, data);
+        const response = await axiosInstance.put(`/api/users/profile`, data);
         return response.data;
     } catch (error) {
         console.error("Error updating profile:", error);
@@ -23,7 +22,7 @@ const updateProfile = async (data) => {
 
 const getFriendStatus = async (friendId) => {
     try {
-        const response = await axiosInstance.get(`${API_BASE_URL}/api/friends/status/${friendId}`);
+        const response = await axiosInstance.get(`/api/friends/status/${friendId}`);
         return response.data;
     }
 
@@ -33,8 +32,32 @@ const getFriendStatus = async (friendId) => {
     }
 }
 
+const sendFriendRequest = async (friendId) => {
+    try {
+        const response = await axiosInstance.post(`/api/friends/request/send`, { receiverId: friendId });
+        return response.data;
+    } catch (error) {
+        console.error("Error sending friend request:", error);
+        throw error;
+    }
+}
+
+const unblockFriend = async (friendId) => {
+    try {
+        const response = await axiosInstance.delete(`/api/friends/unblock/${friendId}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error unblocking friend:", error);
+        throw error;
+    }
+}
+
+
+
 export default {
     fetchUser,
     updateProfile,
-    getFriendStatus
+    getFriendStatus,
+    sendFriendRequest,
+    unblockFriend,
 };

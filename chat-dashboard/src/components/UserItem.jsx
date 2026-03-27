@@ -4,7 +4,7 @@ import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axiosInstance from "@/utils/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
-import {default as apiActions} from "@/store/apiActions";
+import { default as apiActions } from "@/store/apiActions";
 
 const UserItem = memo(function UserItem({
   user,
@@ -21,9 +21,9 @@ const UserItem = memo(function UserItem({
   isPinned = false,
   isArchived = false,
   conversationId,
-  onPinConversation = () => {},
-  onArchiveConversation = () => {},
-  onConversationDeleted = () => {},
+  onPinConversation = () => { },
+  onArchiveConversation = () => { },
+  onConversationDeleted = () => { },
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
@@ -167,9 +167,8 @@ const UserItem = memo(function UserItem({
 
   const handleSendRequest = async () => {
     try {
-      const res = await axiosInstance.post(`/api/friends/request/send`, {
-        receiverId: user._id,
-      });
+      await apiActions.sendFriendRequest(user._id);
+
 
       setRelationshipStatus("request_sent");
 
@@ -326,7 +325,8 @@ const UserItem = memo(function UserItem({
       type: "success",
       onConfirm: async () => {
         try {
-          await axiosInstance.delete(`/api/friends/unblock/${user._id}`);
+          await apiActions.unblockFriend(user._id);
+          // await axiosInstance.delete(`/api/friends/unblock/${user._id}`);
 
           setRelationshipStatus("none");
 
@@ -356,7 +356,6 @@ const UserItem = memo(function UserItem({
 
     if (!convId) {
       try {
-        const token = localStorage.getItem("accessToken");
         const response = await axiosInstance.post(
           `${API_BASE_URL}/api/messages/conversation`,
           { otherUserId: user._id },
@@ -526,11 +525,10 @@ const UserItem = memo(function UserItem({
   return (
     <>
       <div
-        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${
-          selected
+        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${selected
             ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
             : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
-        }`}
+          }`}
         onClick={(e) => {
           if (relationshipStatus === "friends") {
             onClick();
@@ -548,9 +546,8 @@ const UserItem = memo(function UserItem({
         {/* AVATAR WITH PROFILE PICTURE */}
         <div className="relative">
           <div
-            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${
-              selected ? "ring-2 ring-white ring-opacity-40" : ""
-            }`}
+            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${selected ? "ring-2 ring-white ring-opacity-40" : ""
+              }`}
             onClick={(e) => {
               e.stopPropagation();
               handleShowProfile();
@@ -603,13 +600,12 @@ const UserItem = memo(function UserItem({
             {/* Left side: username + pin icon */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
-                className={`font-semibold truncate ${
-                  selected
+                className={`font-semibold truncate ${selected
                     ? "text-white"
                     : unreadCount > 0
                       ? "text-white"
                       : "text-gray-900"
-                }`}
+                  }`}
               >
                 {user.username}
               </h3>
@@ -630,13 +626,12 @@ const UserItem = memo(function UserItem({
             {/* Right side: timestamp */}
             {lastMessageTime && relationshipStatus === "friends" && (
               <span
-                className={`text-xs flex-shrink-0 ml-2 ${
-                  selected
+                className={`text-xs flex-shrink-0 ml-2 ${selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
                       ? "text-blue-600 font-bold"
                       : "text-gray-700"
-                }`}
+                  }`}
               >
                 {formatTime(lastMessageTime)}
               </span>
@@ -648,13 +643,12 @@ const UserItem = memo(function UserItem({
             <div className="flex items-center">
               {getMessageStatusIcon()}
               <p
-                className={`text-xs truncate ${
-                  selected
+                className={`text-xs truncate ${selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
                       ? "text-gray-900 font-semibold"
                       : "text-gray-600"
-                }`}
+                  }`}
               >
                 {displayMessage}
               </p>
@@ -671,11 +665,10 @@ const UserItem = memo(function UserItem({
               e.stopPropagation();
               setShowOptionsModal(true);
             }}
-            className={`p-2 rounded-lg transition-colors ${
-              selected
+            className={`p-2 rounded-lg transition-colors ${selected
                 ? "hover:bg-white/20 text-white"
                 : "hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
             title="Options"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
