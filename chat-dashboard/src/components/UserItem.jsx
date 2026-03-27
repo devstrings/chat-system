@@ -4,6 +4,8 @@ import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axiosInstance from "@/utils/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
+import { getFriendStatus } from "@/store/apiActions";
+
 const UserItem = memo(function UserItem({
   user,
   selected,
@@ -80,11 +82,12 @@ const UserItem = memo(function UserItem({
   // Fetch relationship status
   useEffect(() => {
     const fetchStatus = async () => {
+
       try {
-        const res = await axiosInstance.get(`/api/friends/status/${user._id}`);
-        setRelationshipStatus(res.data.status);
-        if (res.data.requestId) {
-          setRequestId(res.data.requestId);
+        const resData = await getFriendStatus(user._id);
+        setRelationshipStatus(resData.status);
+        if (resData.requestId) {
+          setRequestId(resData.requestId);
         }
       } catch (err) {
         console.error("Fetch status error:", err);
