@@ -4,7 +4,7 @@ import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
 import axiosInstance from "@/utils/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
-import { getFriendStatus } from "@/store/apiActions";
+import {default as apiActions} from "@/store/apiActions";
 
 const UserItem = memo(function UserItem({
   user,
@@ -84,7 +84,7 @@ const UserItem = memo(function UserItem({
     const fetchStatus = async () => {
 
       try {
-        const resData = await getFriendStatus(user._id);
+        const resData = await apiActions.getFriendStatus(user._id);
         setRelationshipStatus(resData.status);
         if (resData.requestId) {
           setRequestId(resData.requestId);
