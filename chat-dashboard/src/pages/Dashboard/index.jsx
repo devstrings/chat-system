@@ -7,9 +7,8 @@ import { useWebRTC } from "../../hooks/useWebRTC";
 import VideoCall from "../../components/Call/VideoCall";
 import IncomingCall from "../../components/Call/IncomingCall";
 import MessageInput from "../../components/MessageInput";
-import ConfirmationDialog, {
-  AlertDialog,
-} from "../../components/ConfirmationDialog";
+import ConfirmationDialog  from "@/components/base/ConfirmationDialog";
+import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "../../hooks/useAuthImage";
 import ProfileSetting from "../../components/ProfileSetting";
 import GroupChatWindow from "../../components/Group/GroupChatWindow";

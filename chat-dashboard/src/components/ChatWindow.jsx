@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import Message from "./Message";
-import ConfirmationDialog from "./ConfirmationDialog";
+import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import {
   fetchMessages,
   updateMessageStatus,
@@ -426,8 +426,8 @@ export default function ChatWindow({
                     >
                       <div
                         className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${isMissed || isRejected
-                            ? "bg-red-50 border-red-200"
-                            : "bg-green-50 border-green-200"
+                          ? "bg-red-50 border-red-200"
+                          : "bg-green-50 border-green-200"
                           }`}
                       >
                         <span>{getCallIcon()}</span>

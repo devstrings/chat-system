@@ -1,7 +1,7 @@
 //(Upload + Privacy + My Status)
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
-import ConfirmationDialog from "../ConfirmationDialog";
+import ConfirmationDialog from "../base/ConfirmationDialog";
 import axiosInstance from "@/lib/axiosInstance";
 import AlertDialog from "@/components/base/AlertDialog";
 

@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import ConfirmationDialog, { AlertDialog } from "../ConfirmationDialog";
+import ConfirmationDialog from "@/components/base/ConfirmationDialog";
+import AlertDialog from "@/components/base/AlertDialog";
 import axiosInstance from "@/lib/axiosInstance";
 import GroupProfile from "./GroupProfile";
 import API_BASE_URL from "@/config/api";
+
 export default function GroupItem({
   group,
   selected,
@@ -212,8 +214,8 @@ export default function GroupItem({
     <>
       <div
         className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${selected
-            ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
-            : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
+          ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
+          : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
           }`}
         onClick={(e) => {
           if (showMenu || showProfile) {
@@ -269,10 +271,10 @@ export default function GroupItem({
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
                 className={`font-semibold truncate ${selected
-                    ? "text-white"
-                    : unreadCount > 0
-                      ? "text-gray-900"
-                      : "text-gray-900"
+                  ? "text-white"
+                  : unreadCount > 0
+                    ? "text-gray-900"
+                    : "text-gray-900"
                   }`}
               >
                 {group.name}
@@ -293,10 +295,10 @@ export default function GroupItem({
             {lastMessageTime && (
               <span
                 className={`text-xs flex-shrink-0 ml-2 ${selected
-                    ? "text-white text-opacity-90"
-                    : unreadCount > 0
-                      ? "text-blue-600 font-bold"
-                      : "text-gray-700"
+                  ? "text-white text-opacity-90"
+                  : unreadCount > 0
+                    ? "text-blue-600 font-bold"
+                    : "text-gray-700"
                   }`}
               >
                 {formatTime(lastMessageTime)}
@@ -309,10 +311,10 @@ export default function GroupItem({
               {getMessageStatusIcon()}
               <p
                 className={`text-xs truncate ${selected
-                    ? "text-white text-opacity-90"
-                    : unreadCount > 0
-                      ? "text-gray-900 font-semibold"
-                      : "text-gray-600"
+                  ? "text-white text-opacity-90"
+                  : unreadCount > 0
+                    ? "text-gray-900 font-semibold"
+                    : "text-gray-600"
                   }`}
               >
                 {displayMessage}

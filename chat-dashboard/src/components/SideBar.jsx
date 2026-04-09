@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import UserItem from "./UserItem";
 import GroupItem from "./Group/GroupItem";
 import axiosInstance from "@/lib/axiosInstance";
-import { AlertDialog } from "./ConfirmationDialog";
+import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
@@ -13,13 +13,12 @@ import {
   rejectFriendRequest,
   unblockUser,
 } from "@/store/slices/userSlice";
-import {
-  CreateGroupDialog,
-  BlockedUsersModal,
-  FriendRequestsModal,
-  NotificationModal,
-  AddFriendModal,
-} from "./ConfirmationDialog";
+
+import CreateGroupModal from "@/components/CreateGroupModal";
+import NotificationModal from "@/components/NotificationModal";
+import BlockedUsersModal from "@/components/BlockedUsersModal";
+import FriendRequestModal from "@/components/FriendRequestModal";
+import AddFriendModal from "@/components/AddFriendModal";
 
 import StatusRingsList from "./Status/StatusRingsList";
 export default function Sidebar({
@@ -484,8 +483,8 @@ export default function Sidebar({
     <>
       <div
         className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${isMobileSidebarOpen
-            ? "translate-x-0"
-            : "-translate-x-full md:translate-x-0"
+          ? "translate-x-0"
+          : "-translate-x-full md:translate-x-0"
           }`}
       >
         <button
@@ -810,8 +809,8 @@ export default function Sidebar({
             <button
               onClick={() => setActiveTab("chats")}
               className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${activeTab === "chats"
-                  ? "bg-white text-blue-600 shadow-md"
-                  : "bg-white/10 text-white hover:bg-white/20"
+                ? "bg-white text-blue-600 shadow-md"
+                : "bg-white/10 text-white hover:bg-white/20"
                 }`}
             >
               Chats
@@ -819,8 +818,8 @@ export default function Sidebar({
             <button
               onClick={() => setActiveTab("status")}
               className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${activeTab === "status"
-                  ? "bg-white text-purple-600 shadow-md"
-                  : "bg-white/10 text-white hover:bg-white/20"
+                ? "bg-white text-purple-600 shadow-md"
+                : "bg-white/10 text-white hover:bg-white/20"
                 }`}
             >
               Status
@@ -1033,7 +1032,7 @@ export default function Sidebar({
       </div>
 
       {showCreateGroup && (
-        <CreateGroupDialog
+        <CreateGroupModal
           friends={users}
           currentUserId={currentUserId}
           onClose={() => setShowCreateGroup(false)}
@@ -1058,7 +1057,7 @@ export default function Sidebar({
         onUnblock={handleUnblockUser}
       />
 
-      <FriendRequestsModal
+      <FriendRequestModal
         isOpen={showRequestsModal}
         onClose={() => setShowRequestsModal(false)}
         pendingRequests={pendingRequests}
