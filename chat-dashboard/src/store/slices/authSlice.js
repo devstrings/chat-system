@@ -76,8 +76,8 @@ export const logout = createAsyncThunk(
 );
 
 // Fetch Current User
-export const fetchCurrentUser = createAsyncThunk(
-  "auth/fetchCurrentUser",
+export const checkAuth = createAsyncThunk(
+  "auth/checkAuth",
   async (_, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.get(
@@ -85,7 +85,7 @@ export const fetchCurrentUser = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      console.error(" fetchCurrentUser failed:", error.response?.status);
+      console.error(" checkAuth failed:", error.response?.status);
       return rejectWithValue(
         error.response?.data?.message || "Failed to fetch user",
       );
@@ -220,10 +220,10 @@ const authSlice = createSlice({
       })
 
       // Fetch Current User
-      .addCase(fetchCurrentUser.pending, (state) => {
+      .addCase(checkAuth.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+      .addCase(checkAuth.fulfilled, (state, action) => {
         state.loading = false;
         state.currentUser = action.payload;
         state.currentUserId = action.payload._id;
@@ -231,7 +231,7 @@ const authSlice = createSlice({
         state.error = null;
         state.userFetched = true;
       })
-      .addCase(fetchCurrentUser.rejected, (state) => {
+      .addCase(checkAuth.rejected, (state) => {
         state.loading = false;
         state.isAuthenticated = false;
       })

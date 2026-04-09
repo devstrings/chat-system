@@ -20,6 +20,40 @@ const facebookLogin = async (accessToken) => {
     }
 };
 
+const getConversation = async (participantId, skipCreate = true) => { 
+    try {
+        const response = await axiosInstance.post(`/api/messages/conversation`, {
+            otherUserId: participantId,
+            skipCreate,
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching conversation:", error);
+        throw error;
+    }
+}
+
+const getPaginatedConversationMessagesById = async (conversationId, page = 1, limit = 20) => {
+    try {
+        const response = await axiosInstance.get(`/api/messages/${conversationId}`, {
+            // params: { page, limit },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching paginated messages:", error);
+        throw error;
+    }
+}
+
+const getConversationById = async (conversationId) => {
+    try {
+        const response = await axiosInstance.get(`/api/conversations/${conversationId}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching conversation by ID:", error);
+        throw error;
+    }
+};
 
 const fetchUser = async () => {
     try {
@@ -83,4 +117,7 @@ export default {
     getFriendStatus,
     sendFriendRequest,
     unblockFriend,
+    getConversation,
+    getConversationById,
+    getPaginatedConversationMessagesById
 };

@@ -3,7 +3,7 @@
 import { useTheme } from 'next-themes';
 import React from 'react';
 
-import Loader from '@/components/base/loader/Loader';
+import Loader from '@/components/base/Loader';
 
 const Loading = ({
   title = 'Just a moment!',

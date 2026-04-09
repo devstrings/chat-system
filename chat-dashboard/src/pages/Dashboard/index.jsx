@@ -7,7 +7,7 @@ import { useWebRTC } from "../../hooks/useWebRTC";
 import VideoCall from "../../components/Call/VideoCall";
 import IncomingCall from "../../components/Call/IncomingCall";
 import MessageInput from "../../components/MessageInput";
-import ConfirmationDialog  from "@/components/base/ConfirmationDialog";
+import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "../../hooks/useAuthImage";
 import ProfileSetting from "../../components/ProfileSetting";
@@ -16,18 +16,18 @@ import StatusManager from "../../components/Status/StatusManager";
 import StatusViewer from "../../components/Status/StatusViewer";
 import StatusRingsList from "../../components/Status/StatusRingsList";
 import axiosInstance from "../../lib/axiosInstance";
-import NotificationToast from "../../components/NotificationToast";
+import NotificationToast from "@/components/NotificationToast";
 import { setUser } from "../../store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
-import { logout, fetchCurrentUser } from "../../store/slices/authSlice";
+import { logout } from "@/store/slices/authSlice";
 import {
   fetchFriendsList,
   fetchPendingRequests,
-} from "../../store/slices/userSlice";
-import { fetchGroups } from "../../store/slices/groupSlice";
+} from "@/store/slices/userSlice";
+import { fetchGroups } from "@/store/slices/groupSlice";
 import {
   fetchConversation,
-  fetchMessages,
+
   clearUnreadCount,
   addMessage,
   incrementUnreadCount,
@@ -35,13 +35,14 @@ import {
   updateMessageStatus,
   updateMessage,
   updateGroupMessageInSidebar,
-  updateLastMessage,
-} from "../../store/slices/chatSlice";
+} from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
   updateGroup,
   updateGroupMessage,
-} from "../../store/slices/groupSlice";
+} from "@/store/slices/groupSlice";
+import apiActions from "@/store/apiActions";
+
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(
@@ -50,10 +51,10 @@ export default function Dashboard() {
   const [conversationId, setConversationId] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const socket = useSelector((state) => state.socket.socket);
-  const connected = useSelector((state) => state.socket.connected);
+
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [toastNotifications, setToastNotifications] = useState([]);
-  const toastNotificationsRef = useRef([]);
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [replyTo, setReplyTo] = useState(null);
@@ -107,7 +108,7 @@ export default function Dashboard() {
   const [isGroupChat, setIsGroupChat] = useState(() => {
     return localStorage.getItem("isGroupChat") === "true";
   });
-  const [currentUserCoverPhoto, setCurrentUserCoverPhoto] = useState(null);
+
   const [profileSettingsView, setProfileSettingsView] = useState("all");
 
   const [showStatusManager, setShowStatusManager] = useState(false);
@@ -378,11 +379,9 @@ export default function Dashboard() {
 
       if (!convId) {
         try {
-          const res = await axiosInstance.post(
-            `${API_BASE_URL}/api/messages/conversation`,
-            { otherUserId, skipCreate: true },
-          );
-          convId = res.data?._id;
+          apiActions.getConversation(otherUserId, true).then((data) => {
+            convId = data._id;
+          });
         } catch (err) {
           console.log(" API fetch failed:", err);
           return;
@@ -421,9 +420,7 @@ export default function Dashboard() {
   useEffect(() => {
     const loadAllStatuses = async () => {
       try {
-        const token =
-          localStorage.getItem("accessToken") ||
-          localStorage.getItem("accessToken");
+
         const response = await axiosInstance.get(
           `${API_BASE_URL}/api/status`,
           {},
@@ -893,30 +890,31 @@ export default function Dashboard() {
         // Load messages for all friends
         for (const user of users) {
           try {
-            const convRes = await axiosInstance.post(
-              `${API_BASE_URL}/api/messages/conversation`,
-              {
-                otherUserId: user._id,
-                skipCreate: true,
-              },
-            );
+            const convRes = await apiActions.getConversation(user._id, true);
+
+            if (!convRes) {
+              console.log(` Conversation with ${user._id} not found, skipping`);
+              continue;
+            }
 
             // Skip if conversation was deleted
             if (
-              convRes.data?.deletedBy?.some((d) => d.userId === currentUserId)
+              convRes?.deletedBy?.some((d) => d.userId === currentUserId)
             ) {
               console.log(` Conversation with ${user._id} deleted, skipping`);
               continue;
             }
 
-            const conversationId = convRes.data?._id;
+            const conversationId = convRes?._id;
             if (!conversationId) continue;
 
-            const msgRes = await axiosInstance.get(
-              `${API_BASE_URL}/api/messages/${conversationId}`,
+            const msgRes = await apiActions.getPaginatedConversationMessagesById(
+              conversationId,
+              1,
+              20,
             );
 
-            const messages = msgRes.data;
+            const messages = msgRes;
             const visibleMessages = messages.filter(
               (msg) => !msg.deletedFor?.includes(currentUserId),
             );
@@ -1094,6 +1092,7 @@ export default function Dashboard() {
 
     getConversation();
   }, [selectedUser?._id, socket]);
+
   useEffect(() => {
     if (!socket) return;
 

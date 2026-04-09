@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import FriendListItem from "@/components/FriendListItem";
+import Button from "@/components/base/Button";
 
 export default function AddFriendModal({
     isOpen,

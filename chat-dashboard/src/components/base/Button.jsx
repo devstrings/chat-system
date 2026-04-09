@@ -23,21 +23,21 @@ const Button = ({
       type={type}
       disabled={isDisabled}
       className={cn(
-        // base layout
-        'flex items-center justify-center gap-2 text-sm font-bold',
-        // default size (can be overridden)
-        'h-12 w-full',
-        // variants
-        variant === 'primary' &&
-        'bg-[var(--light-blue-1)] text-[var(--light-1)] dark:bg-[var(--dark-blue-1)] dark:text-[var(--light-1)]',
-        variant === 'secondary' &&
-        'theme-light-gradient-bg theme-dark-gradient-bg border dark:border-[var(--black-4)]',
-        variant === 'ghost' &&
-        'bg-transparent text-[var(--text-color-light)] dark:bg-transparent dark:text-[var(--text-color)]',
-        // shape
-        rounded ? 'rounded-full' : 'rounded-2xl',
-        // state
-        isDisabled && 'cursor-not-allowed opacity-50',
+        // // base layout
+        // 'flex items-center justify-center gap-2 text-sm font-bold',
+        // // default size (can be overridden)
+        // 'h-12 w-full',
+        // // variants
+        // variant === 'primary' &&
+        // 'bg-[var(--light-blue-1)] text-[var(--light-1)] dark:bg-[var(--dark-blue-1)] dark:text-[var(--light-1)]',
+        // variant === 'secondary' &&
+        // 'theme-light-gradient-bg theme-dark-gradient-bg border dark:border-[var(--black-4)]',
+        // variant === 'ghost' &&
+        // 'bg-transparent text-[var(--text-color-light)] dark:bg-transparent dark:text-[var(--text-color)]',
+        // // shape
+        // rounded ? 'rounded-full' : 'rounded-2xl',
+        // // state
+        // isDisabled && 'cursor-not-allowed opacity-50',
         className,
       )}
       {...rest}
