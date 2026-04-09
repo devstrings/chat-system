@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -258,11 +258,10 @@ export default function StatusRingsList({
                   }}
                 >
                   <div
-                    className={`p-0.5 rounded-full ${
-                      isUnseen
+                    className={`p-0.5 rounded-full ${isUnseen
                         ? "bg-gradient-to-tr from-yellow-400 via-red-500 to-pink-500"
                         : "bg-gray-300"
-                    }`}
+                      }`}
                   >
                     <ProfileImageWithAuth
                       user={userStatus.user}

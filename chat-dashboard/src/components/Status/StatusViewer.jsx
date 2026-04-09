@@ -1,7 +1,7 @@
 // StatusViewer.jsx - VIEWER ONLY
 import React, { useState, useEffect, useRef } from "react";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -262,13 +262,12 @@ export default function StatusViewer({
             className="flex-1 h-1 sm:h-0.5 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm"
           >
             <div
-              className={`h-full transition-all duration-100 ${
-                idx < currentStatusIndex
+              className={`h-full transition-all duration-100 ${idx < currentStatusIndex
                   ? "bg-white"
                   : idx === currentStatusIndex
                     ? "bg-white"
                     : "bg-white/0"
-              }`}
+                }`}
               style={{
                 width:
                   idx < currentStatusIndex

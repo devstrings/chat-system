@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from "react";
 import UserItem from "./UserItem";
 import GroupItem from "./Group/GroupItem";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import { AlertDialog } from "./ConfirmationDialog";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
@@ -30,20 +30,20 @@ export default function Sidebar({
   onLogout,
   isMobileSidebarOpen = false,
   profileImageUrl,
-  onCloseMobileSidebar = () => {},
-  onOpenProfileSettings = (view = "all") => {},
+  onCloseMobileSidebar = () => { },
+  onOpenProfileSettings = (view = "all") => { },
   pinnedConversations = new Set(),
-  onPinConversation = () => {},
+  onPinConversation = () => { },
   archivedConversations = new Set(),
-  onArchiveConversation = () => {},
+  onArchiveConversation = () => { },
   showArchived = false,
-  onToggleArchived = () => {},
-  onGroupUpdate = () => {},
-  onConversationDeleted = () => {},
-  onOpenStatusManager = () => {},
+  onToggleArchived = () => { },
+  onGroupUpdate = () => { },
+  onConversationDeleted = () => { },
+  onOpenStatusManager = () => { },
   allStatuses = [],
-  onOpenStatusViewer = () => {},
-  onViewMyStatus = () => {},
+  onOpenStatusViewer = () => { },
+  onViewMyStatus = () => { },
   currentUserForStatus = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -483,11 +483,10 @@ export default function Sidebar({
   return (
     <>
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${
-          isMobileSidebarOpen
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${isMobileSidebarOpen
             ? "translate-x-0"
             : "-translate-x-full md:translate-x-0"
-        }`}
+          }`}
       >
         <button
           onClick={onCloseMobileSidebar}
@@ -810,21 +809,19 @@ export default function Sidebar({
           <div className="flex gap-1 mb-2">
             <button
               onClick={() => setActiveTab("chats")}
-              className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${
-                activeTab === "chats"
+              className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${activeTab === "chats"
                   ? "bg-white text-blue-600 shadow-md"
                   : "bg-white/10 text-white hover:bg-white/20"
-              }`}
+                }`}
             >
               Chats
             </button>
             <button
               onClick={() => setActiveTab("status")}
-              className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${
-                activeTab === "status"
+              className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${activeTab === "status"
                   ? "bg-white text-purple-600 shadow-md"
                   : "bg-white/10 text-white hover:bg-white/20"
-              }`}
+                }`}
             >
               Status
             </button>

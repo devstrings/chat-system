@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import ConfirmationDialog, { AlertDialog } from "../ConfirmationDialog";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import GroupProfile from "./GroupProfile";
 import API_BASE_URL from "@/config/api";
 export default function GroupItem({
@@ -19,13 +19,13 @@ export default function GroupItem({
   lastMessageTime = null,
   lastMessageSender = null,
   lastMessageStatus = "sent",
-  onGroupUpdate = () => {},
-  onGroupDeleted = () => {},
+  onGroupUpdate = () => { },
+  onGroupDeleted = () => { },
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
-  React.useEffect(() => {}, [showMenu, showProfile]);
+  React.useEffect(() => { }, [showMenu, showProfile]);
 
   const { imageSrc: groupImage } = useAuthImage(group.groupImage, "group");
 
@@ -211,11 +211,10 @@ export default function GroupItem({
   return (
     <>
       <div
-        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${
-          selected
+        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${selected
             ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
             : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
-        }`}
+          }`}
         onClick={(e) => {
           if (showMenu || showProfile) {
             e.stopPropagation();
@@ -228,9 +227,8 @@ export default function GroupItem({
         {/* Group Avatar */}
         <div className="relative">
           <div
-            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${
-              selected ? "ring-2 ring-white ring-opacity-40" : ""
-            }`}
+            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${selected ? "ring-2 ring-white ring-opacity-40" : ""
+              }`}
             onClick={(e) => {
               e.stopPropagation();
               setShowProfile(true);
@@ -270,13 +268,12 @@ export default function GroupItem({
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
-                className={`font-semibold truncate ${
-                  selected
+                className={`font-semibold truncate ${selected
                     ? "text-white"
                     : unreadCount > 0
                       ? "text-gray-900"
                       : "text-gray-900"
-                }`}
+                  }`}
               >
                 {group.name}
               </h3>
@@ -295,13 +292,12 @@ export default function GroupItem({
 
             {lastMessageTime && (
               <span
-                className={`text-xs flex-shrink-0 ml-2 ${
-                  selected
+                className={`text-xs flex-shrink-0 ml-2 ${selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
                       ? "text-blue-600 font-bold"
                       : "text-gray-700"
-                }`}
+                  }`}
               >
                 {formatTime(lastMessageTime)}
               </span>
@@ -312,22 +308,20 @@ export default function GroupItem({
             <div className="flex items-center">
               {getMessageStatusIcon()}
               <p
-                className={`text-xs truncate ${
-                  selected
+                className={`text-xs truncate ${selected
                     ? "text-white text-opacity-90"
                     : unreadCount > 0
                       ? "text-gray-900 font-semibold"
                       : "text-gray-600"
-                }`}
+                  }`}
               >
                 {displayMessage}
               </p>
             </div>
           ) : (
             <p
-              className={`text-xs truncate ${
-                selected ? "text-white text-opacity-90" : "text-gray-600"
-              }`}
+              className={`text-xs truncate ${selected ? "text-white text-opacity-90" : "text-gray-600"
+                }`}
             >
               {group.members?.length || 0} members
             </p>

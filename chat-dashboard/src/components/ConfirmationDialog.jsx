@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
+import Button from "@/components/base/Button";
+import AlertDialog from "@/components/base/AlertDialog";
+
 const DIALOG_THEME = {
   // Overlay (background blur)
   overlay: "bg-black bg-opacity-50 backdrop-blur-sm",
@@ -200,155 +203,29 @@ export default function ConfirmationDialog({
 
         {/* Buttons */}
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={onClose}
             className={`flex-1 px-6 py-3 ${DIALOG_THEME.cancelBtn} rounded-lg font-medium ${DIALOG_THEME.animation}`}
           >
             {cancelText}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={async () => {
               await onConfirm();
               onClose();
             }}
-            className={`flex-1 px-6 py-3 ${getConfirmButtonClass()} rounded-lg font-medium ${
-              DIALOG_THEME.animation
-            }`}
+            className={`flex-1 px-6 py-3 ${getConfirmButtonClass()} rounded-lg font-medium ${DIALOG_THEME.animation
+              }`}
           >
             {confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-export function AlertDialog({
-  isOpen,
-  onClose,
-  title = "Success",
-  message = "Operation completed successfully!",
-  buttonText = "OK",
-  icon = "success",
-  type = "success",
-}) {
-  if (!isOpen) return null;
 
-  const renderIcon = () => {
-    if (icon === "success") {
-      return (
-        <svg
-          className="w-12 h-12"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      );
-    } else if (icon === "error") {
-      return (
-        <svg
-          className="w-12 h-12"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      );
-    } else {
-      return (
-        <svg
-          className="w-12 h-12"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      );
-    }
-  };
-
-  const getIconBgClass = () => {
-    if (type === "error") return "bg-red-50";
-    if (type === "info") return "bg-blue-50";
-    return "bg-green-50";
-  };
-
-  const getIconColorClass = () => {
-    if (type === "error") return "text-red-500";
-    if (type === "info") return "text-blue-500";
-    return "text-green-500";
-  };
-
-  const getButtonClass = () => {
-    if (type === "error") return "bg-red-600 hover:bg-red-700";
-    if (type === "info") return "bg-blue-600 hover:bg-blue-700";
-    return "bg-green-600 hover:bg-green-700";
-  };
-
-  return (
-    <div
-      className={`fixed inset-0 ${DIALOG_THEME.overlay} flex items-center justify-center z-50`}
-      onClick={onClose}
-    >
-      <div
-        className={`${DIALOG_THEME.dialogBg} ${DIALOG_THEME.border} rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-fadeIn`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Icon */}
-        <div className="flex justify-center mb-6">
-          <div
-            className={`${getIconBgClass()} ${getIconColorClass()} rounded-full p-4`}
-          >
-            {renderIcon()}
-          </div>
-        </div>
-
-        {/* Title */}
-        <h2
-          className={`text-2xl font-bold ${DIALOG_THEME.titleColor} text-center mb-3`}
-        >
-          {title}
-        </h2>
-
-        {/* Message */}
-        <p
-          className={`${DIALOG_THEME.messageColor} text-center mb-8 leading-relaxed`}
-        >
-          {message}
-        </p>
-
-        {/* Single Button */}
-        <button
-          onClick={onClose}
-          className={`w-full px-6 py-3 ${getButtonClass()} text-white rounded-lg font-medium ${
-            DIALOG_THEME.animation
-          }`}
-        >
-          {buttonText}
-        </button>
-      </div>
-    </div>
-  );
-}
 function FriendListItem({ friend, isSelected, onToggle }) {
   const shouldLoadImage = !!friend.profileImage;
   const { imageSrc, loading } = useAuthImage(
@@ -450,7 +327,6 @@ export function CreateGroupDialog({
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("accessToken");
 
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/groups/create`,
@@ -513,7 +389,7 @@ export function CreateGroupDialog({
               </svg>
               <h2 className="text-xl font-bold text-white">Create New Group</h2>
             </div>
-            <button
+            <Button
               onClick={onClose}
               className="p-1 hover:bg-white/20 rounded-full transition-colors"
             >
@@ -530,7 +406,7 @@ export function CreateGroupDialog({
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
 
           {/* Body */}
@@ -577,14 +453,14 @@ export function CreateGroupDialog({
                 <label className="block text-sm font-medium text-gray-700">
                   Select Members <span className="text-red-500">*</span>
                 </label>
-                <button
+                <Button
                   onClick={handleSelectAll}
                   className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                 >
                   {selectedMembers.length === friends.length
                     ? "Deselect All"
                     : "Select All"}
-                </button>
+                </Button>
               </div>
 
               {friends.length === 0 ? (
@@ -1053,17 +929,23 @@ export function AddFriendModal({
   onSearch,
   onSendRequest,
 }) {
-  if (!isOpen) return null;
-const debounceRef = useRef(null);
+  const debounceRef = useRef(null);
 
-useEffect(() => {
-  if (!searchUsers.trim()) return;
-  clearTimeout(debounceRef.current);
-  debounceRef.current = setTimeout(() => {
-    onSearch();
-  }, 500);
-  return () => clearTimeout(debounceRef.current);
-}, [searchUsers]);
+  // useEffect(() => {
+
+  // }, []);
+
+  useEffect(() => {
+    if (!searchUsers.trim()) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearch();
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
+  }, [searchUsers]);
+
+  if (!isOpen) return null;
+
   return (
     <>
       <div

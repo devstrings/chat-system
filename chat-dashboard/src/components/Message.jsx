@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
+
 export default function Message({
   message,
   isOwn,
@@ -22,45 +23,45 @@ export default function Message({
   const [editedText, setEditedText] = useState(message.text || "");
   const audioRefs = React.useRef({});
   const longPressTimer = useRef(null);
-const [swipeOffset, setSwipeOffset] = useState(0);
-const isDragging = useRef(false);
-const startX = useRef(0);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
 
-const handleDragStart = (clientX) => {
-  startX.current = clientX;
-  isDragging.current = true;
-};
+  const handleDragStart = (clientX) => {
+    startX.current = clientX;
+    isDragging.current = true;
+  };
 
-const handleDragMove = (clientX) => {
-  if (!isDragging.current) return;
-  const diff = clientX - startX.current;
-  if (isOwn && diff < 0) setSwipeOffset(Math.max(diff, -70));
-  if (!isOwn && diff > 0) setSwipeOffset(Math.min(diff, 70));
-};
+  const handleDragMove = (clientX) => {
+    if (!isDragging.current) return;
+    const diff = clientX - startX.current;
+    if (isOwn && diff < 0) setSwipeOffset(Math.max(diff, -70));
+    if (!isOwn && diff > 0) setSwipeOffset(Math.min(diff, 70));
+  };
 
-const handleDragEnd = () => {
-  if (Math.abs(swipeOffset) > 50) {
-    onReply?.(message);
-  }
-  setSwipeOffset(0);
-  isDragging.current = false;
-};
+  const handleDragEnd = () => {
+    if (Math.abs(swipeOffset) > 50) {
+      onReply?.(message);
+    }
+    setSwipeOffset(0);
+    isDragging.current = false;
+  };
 
-const handleTouchStart = () => {
-  longPressTimer.current = setTimeout(() => {
-    onEnterSelectionMode?.();
+  const handleTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      onEnterSelectionMode?.();
+      onToggleSelect?.(message._id);
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    clearTimeout(longPressTimer.current);
+  };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
     onToggleSelect?.(message._id);
-  }, 500);
-};
-
-const handleTouchEnd = () => {
-  clearTimeout(longPressTimer.current);
-};
-
-const handleContextMenu = (e) => {
-  e.preventDefault();
-  onToggleSelect?.(message._id);
-};
+  };
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
@@ -158,7 +159,6 @@ const handleContextMenu = (e) => {
         });
       } else {
         // HTTP endpoint for regular messages
-        const token = localStorage.getItem("accessToken");
         await axiosInstance.delete(
           `${API_BASE_URL}/api/messages/message/${message._id}/for-me`,
         );
@@ -430,8 +430,8 @@ const handleContextMenu = (e) => {
       const response = await fetch(downloadUrl, {
         headers: needsAuth
           ? {
-              Authorization: `Bearer ${token}`,
-            }
+            Authorization: `Bearer ${token}`,
+          }
           : {},
       });
 
@@ -495,16 +495,14 @@ const handleContextMenu = (e) => {
   if (isDeletedForEveryone) {
     return (
       <div
-        className={`flex mb-3 md:mb-4 ${
-          isOwn ? "justify-end" : "justify-start"
-        } px-2 md:px-0`}
+        className={`flex mb-3 md:mb-4 ${isOwn ? "justify-end" : "justify-start"
+          } px-2 md:px-0`}
       >
         <div
-          className={`flex items-end gap-2 ${
-            isOwn
+          className={`flex items-end gap-2 ${isOwn
               ? "flex-row-reverse max-w-[85%] sm:max-w-md"
               : "flex-row max-w-[85%] sm:max-w-md"
-          }`}
+            }`}
         >
           {!isOwn && (
             <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md">
@@ -513,9 +511,8 @@ const handleContextMenu = (e) => {
           )}
 
           <div
-            className={`relative px-3 md:px-4 py-2 rounded-2xl shadow-lg bg-gray-800 bg-opacity-50 border border-gray-700 ${
-              isOwn ? "rounded-br-sm" : "rounded-bl-sm"
-            }`}
+            className={`relative px-3 md:px-4 py-2 rounded-2xl shadow-lg bg-gray-800 bg-opacity-50 border border-gray-700 ${isOwn ? "rounded-br-sm" : "rounded-bl-sm"
+              }`}
             style={{ minWidth: "180px" }}
           >
             <p className="text-xs md:text-sm text-gray-500 italic flex items-center gap-2">
@@ -545,23 +542,21 @@ const handleContextMenu = (e) => {
 
   return (
     <div
-      className={`flex mb-3 md:mb-4 ${
-        isOwn ? "justify-end" : "justify-start"
-      } px-2 md:px-0`}
+      className={`flex mb-3 md:mb-4 ${isOwn ? "justify-end" : "justify-start"
+        } px-2 md:px-0`}
     >
-<div
-  className={`flex items-end gap-2 max-w-[85%] sm:max-w-md ${
-    isOwn ? "flex-row-reverse" : "flex-row"
-  }`}
-  style={{ 
-    transform: `translateX(${swipeOffset}px)`, 
-    transition: isDragging.current ? 'none' : 'transform 0.3s ease' 
-  }}
-  onTouchStart={(e) => { handleTouchStart(); handleDragStart(e.touches[0].clientX); }}
-  onTouchMove={(e) => handleDragMove(e.touches[0].clientX)}
-  onTouchEnd={() => { handleTouchEnd(); handleDragEnd(); }}
-  onContextMenu={handleContextMenu}
->
+      <div
+        className={`flex items-end gap-2 max-w-[85%] sm:max-w-md ${isOwn ? "flex-row-reverse" : "flex-row"
+          }`}
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: isDragging.current ? 'none' : 'transform 0.3s ease'
+        }}
+        onTouchStart={(e) => { handleTouchStart(); handleDragStart(e.touches[0].clientX); }}
+        onTouchMove={(e) => handleDragMove(e.touches[0].clientX)}
+        onTouchEnd={() => { handleTouchEnd(); handleDragEnd(); }}
+        onContextMenu={handleContextMenu}
+      >
         {isSelectionMode && (
           <div className="flex items-center">
             <input
@@ -578,27 +573,25 @@ const handleContextMenu = (e) => {
             {getSenderInitial()}
           </div>
         )}
-{Math.abs(swipeOffset) > 20 && (
-  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
-    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-    </svg>
-  </div>
-)}
+        {Math.abs(swipeOffset) > 20 && (
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </div>
+        )}
         <div
-          className={`relative px-3 md:px-4 py-2 rounded-2xl shadow-lg transition-all hover:shadow-xl group ${
-            isOwn
+          className={`relative px-3 md:px-4 py-2 rounded-2xl shadow-lg transition-all hover:shadow-xl group ${isOwn
               ? "bg-gradient-to-r from-[#2563EB] to-[#4F46E5] text-white rounded-br-sm"
               : "bg-white border border-gray-200 text-gray-900 shadow-md rounded-bl-sm"
-          }`}
+            }`}
         >
           {!isSelectionMode && (
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => setShowOptions(!showOptions)}
-                className={`p-1 rounded-lg hover:bg-opacity-20 ${
-                  isOwn ? "hover:bg-white" : "hover:bg-gray-600"
-                }`}
+                className={`p-1 rounded-lg hover:bg-opacity-20 ${isOwn ? "hover:bg-white" : "hover:bg-gray-600"
+                  }`}
               >
                 <svg
                   className="w-3.5 h-3.5 md:w-4 md:h-4"
@@ -616,17 +609,17 @@ const handleContextMenu = (e) => {
                     onClick={() => setShowOptions(false)}
                   ></div>
 
-<div className={`absolute mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden ${isOwn ? 'right-0' : 'left-0'}`}> 
-  <button
-  onClick={() => { onReply?.(message); setShowOptions(false); }}
-  className="w-full px-3 md:px-4 py-2 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
->
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-  </svg>
-  Reply
-</button>           
-          {isOwn && canEdit() && !isEditing && (
+                  <div className={`absolute mt-1 w-44 md:w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-20 overflow-hidden ${isOwn ? 'right-0' : 'left-0'}`}>
+                    <button
+                      onClick={() => { onReply?.(message); setShowOptions(false); }}
+                      className="w-full px-3 md:px-4 py-2 text-left text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                      Reply
+                    </button>
+                    {isOwn && canEdit() && !isEditing && (
                       <button
                         onClick={handleEditMessage}
                         className="w-full px-3 md:px-4 py-2 text-left text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs md:text-sm"
@@ -674,33 +667,32 @@ const handleContextMenu = (e) => {
               )}
             </div>
           )}
-{!isOwn && (
-  <p className="text-xs font-semibold text-blue-400 mb-1">
-    {getSenderName()}
-  </p>
-)}
+          {!isOwn && (
+            <p className="text-xs font-semibold text-blue-400 mb-1">
+              {getSenderName()}
+            </p>
+          )}
 
-{message.replyTo && message.replyTo._id && (
-    <div className={`flex items-start gap-1 mb-2 p-2 rounded-lg border-l-4 ${
-    isOwn 
-      ? "bg-white/10 border-white/40" 
-      : "bg-gray-100 border-blue-400"
-  }`}>
-    <svg className={`w-3 h-3 mt-0.5 flex-shrink-0 ${isOwn ? "text-white/70" : "text-blue-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-    </svg>
-    <div className="min-w-0 flex-1">
-      <p className={`text-xs font-semibold truncate ${isOwn ? "text-white/80" : "text-blue-500"}`}>
-        {message.replyTo.sender?.username || "Unknown"}
-      </p>
-      <p className={`text-xs truncate ${isOwn ? "text-white/60" : "text-gray-500"}`}>
-        {message.replyTo.text || "📎 Attachment"}
-      </p>
-    </div>
-  </div>
-)}
+          {message.replyTo && message.replyTo._id && (
+            <div className={`flex items-start gap-1 mb-2 p-2 rounded-lg border-l-4 ${isOwn
+                ? "bg-white/10 border-white/40"
+                : "bg-gray-100 border-blue-400"
+              }`}>
+              <svg className={`w-3 h-3 mt-0.5 flex-shrink-0 ${isOwn ? "text-white/70" : "text-blue-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-semibold truncate ${isOwn ? "text-white/80" : "text-blue-500"}`}>
+                  {message.replyTo.sender?.username || "Unknown"}
+                </p>
+                <p className={`text-xs truncate ${isOwn ? "text-white/60" : "text-gray-500"}`}>
+                  {message.replyTo.text || "📎 Attachment"}
+                </p>
+              </div>
+            </div>
+          )}
 
-{message.attachments && message.attachments.length > 0 && (
+          {message.attachments && message.attachments.length > 0 && (
             <div className="mb-2">
               {message.attachments.map((file, index) => {
                 const fileName = getFileName(file);
@@ -714,19 +706,17 @@ const handleContextMenu = (e) => {
                   return (
                     <div
                       key={index}
-                      className={`flex items-center gap-1.5 md:gap-2 p-2 rounded-lg ${
-                        isOwn
+                      className={`flex items-center gap-1.5 md:gap-2 p-2 rounded-lg ${isOwn
                           ? "bg-white bg-opacity-20"
                           : "bg-blue-50 border border-blue-100"
-                      }`}
+                        }`}
                     >
                       <button
                         onClick={() => toggleAudio(index, file.url)}
-                        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${
-                          isOwn
+                        className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 transition ${isOwn
                             ? "bg-white bg-opacity-30 hover:bg-opacity-40"
                             : "bg-blue-500 hover:bg-blue-600"
-                        }`}
+                          }`}
                       >
                         {isPlaying ? (
                           <svg
@@ -752,9 +742,8 @@ const handleContextMenu = (e) => {
                           {[...Array(20)].map((_, i) => (
                             <div
                               key={i}
-                              className={`w-0.5 rounded-full transition-all ${
-                                isOwn ? "bg-white" : "bg-blue-400"
-                              }`}
+                              className={`w-0.5 rounded-full transition-all ${isOwn ? "bg-white" : "bg-blue-400"
+                                }`}
                               style={{
                                 height: `${Math.random() * 80 + 20}%`,
                                 opacity: progress > (i / 20) * 100 ? 1 : 0.3,
@@ -764,9 +753,8 @@ const handleContextMenu = (e) => {
                         </div>
 
                         <div
-                          className={`flex items-center justify-between text-xs ${
-                            isOwn ? "text-white opacity-70" : "text-gray-600"
-                          }`}
+                          className={`flex items-center justify-between text-xs ${isOwn ? "text-white opacity-70" : "text-gray-600"
+                            }`}
                         >
                           <span className="flex items-center gap-1">
                             <svg
@@ -783,8 +771,8 @@ const handleContextMenu = (e) => {
                           <span className="font-mono">
                             {isPlaying && audioDuration[index]
                               ? `${formatAudioTime(
-                                  (progress / 100) * audioDuration[index],
-                                )} / ${formatAudioTime(duration)}`
+                                (progress / 100) * audioDuration[index],
+                              )} / ${formatAudioTime(duration)}`
                               : formatAudioTime(duration || 0)}
                           </span>
                         </div>
@@ -841,27 +829,24 @@ const handleContextMenu = (e) => {
                   <button
                     key={index}
                     onClick={() => handleFileDownload(file)}
-                    className={`flex items-center gap-2 p-2 rounded-lg transition w-full ${
-                      isOwn
+                    className={`flex items-center gap-2 p-2 rounded-lg transition w-full ${isOwn
                         ? "bg-white bg-opacity-20 hover:bg-opacity-30"
                         : "bg-blue-50 hover:bg-blue-100 border border-blue-100"
-                    }`}
+                      }`}
                   >
                     <div className="text-xl md:text-2xl flex-shrink-0">
                       {fileIcon}
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       <p
-                        className={`text-xs md:text-sm font-medium truncate ${
-                          isOwn ? "text-white" : "text-gray-900"
-                        }`}
+                        className={`text-xs md:text-sm font-medium truncate ${isOwn ? "text-white" : "text-gray-900"
+                          }`}
                       >
                         {fileName}
                       </p>
                       <p
-                        className={`text-xs ${
-                          isOwn ? "opacity-70" : "text-gray-600"
-                        }`}
+                        className={`text-xs ${isOwn ? "opacity-70" : "text-gray-600"
+                          }`}
                       >
                         {file.fileSize
                           ? `${(file.fileSize / 1024).toFixed(1)} KB`
@@ -895,11 +880,10 @@ const handleContextMenu = (e) => {
                 <textarea
                   value={editedText}
                   onChange={(e) => setEditedText(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${
-                    isOwn
+                  className={`w-full px-3 py-2 rounded-lg text-sm resize-none ${isOwn
                       ? "bg-white/10 border border-white/20 text-white"
                       : "bg-gray-100 border border-gray-300 text-gray-900"
-                  }`}
+                    }`}
                   rows={3}
                   autoFocus
                 />
@@ -931,14 +915,12 @@ const handleContextMenu = (e) => {
             ))}
 
           <div
-            className={`flex items-center gap-1 mt-1 ${
-              isOwn ? "justify-end" : "justify-start"
-            }`}
+            className={`flex items-center gap-1 mt-1 ${isOwn ? "justify-end" : "justify-start"
+              }`}
           >
             <p
-              className={`text-xs ${
-                isOwn ? "text-blue-100 text-opacity-70" : "text-gray-400"
-              }`}
+              className={`text-xs ${isOwn ? "text-blue-100 text-opacity-70" : "text-gray-400"
+                }`}
             >
               {formatTime(message.createdAt)}
             </p>
@@ -950,11 +932,10 @@ const handleContextMenu = (e) => {
             className={`absolute bottom-0 ${isOwn ? "-right-1" : "-left-1"}`}
           >
             <div
-              className={`w-0 h-0 ${
-                isOwn
+              className={`w-0 h-0 ${isOwn
                   ? "border-l-8 border-l-[#4F46E5] border-t-8 border-t-transparent"
                   : "border-r-8 border-r-white border-t-8 border-t-transparent"
-              }`}
+                }`}
             ></div>
           </div>
         </div>

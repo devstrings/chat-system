@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance from "../lib/axiosInstance";
 
 export default function VerifyOTP() {
   const navigate = useNavigate();

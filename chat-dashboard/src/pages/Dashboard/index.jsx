@@ -1,31 +1,31 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import API_BASE_URL from "../config/api";
+import API_BASE_URL from "../../config/api";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../components/SideBar";
-import ChatWindow from "../components/ChatWindow";
-import { useWebRTC } from "../hooks/useWebRTC";
-import VideoCall from "../components/Call/VideoCall";
-import IncomingCall from "../components/Call/IncomingCall";
-import MessageInput from "../components/MessageInput";
+import Sidebar from "../../components/SideBar";
+import ChatWindow from "../../components/ChatWindow";
+import { useWebRTC } from "../../hooks/useWebRTC";
+import VideoCall from "../../components/Call/VideoCall";
+import IncomingCall from "../../components/Call/IncomingCall";
+import MessageInput from "../../components/MessageInput";
 import ConfirmationDialog, {
   AlertDialog,
-} from "../components/ConfirmationDialog";
-import { useAuthImage } from "../hooks/useAuthImage";
-import ProfileSetting from "../components/ProfileSetting";
-import GroupChatWindow from "../components/Group/GroupChatWindow";
-import StatusManager from "../components/Status/StatusManager";
-import StatusViewer from "../components/Status/StatusViewer";
-import StatusRingsList from "../components/Status/StatusRingsList";
-import axiosInstance from "../utils/axiosInstance";
-import NotificationToast from "../components/NotificationToast";
-import { setUser } from "../store/slices/authSlice";
+} from "../../components/ConfirmationDialog";
+import { useAuthImage } from "../../hooks/useAuthImage";
+import ProfileSetting from "../../components/ProfileSetting";
+import GroupChatWindow from "../../components/Group/GroupChatWindow";
+import StatusManager from "../../components/Status/StatusManager";
+import StatusViewer from "../../components/Status/StatusViewer";
+import StatusRingsList from "../../components/Status/StatusRingsList";
+import axiosInstance from "../../lib/axiosInstance";
+import NotificationToast from "../../components/NotificationToast";
+import { setUser } from "../../store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
-import { logout, fetchCurrentUser } from "../store/slices/authSlice";
+import { logout, fetchCurrentUser } from "../../store/slices/authSlice";
 import {
   fetchFriendsList,
   fetchPendingRequests,
-} from "../store/slices/userSlice";
-import { fetchGroups } from "../store/slices/groupSlice";
+} from "../../store/slices/userSlice";
+import { fetchGroups } from "../../store/slices/groupSlice";
 import {
   fetchConversation,
   fetchMessages,
@@ -37,12 +37,12 @@ import {
   updateMessage,
   updateGroupMessageInSidebar,
   updateLastMessage,
-} from "../store/slices/chatSlice";
+} from "../../store/slices/chatSlice";
 import {
   addGroupMessage,
   updateGroup,
   updateGroupMessage,
-} from "../store/slices/groupSlice";
+} from "../../store/slices/groupSlice";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(
@@ -132,7 +132,7 @@ export default function Dashboard() {
   const playNotificationSound = () => {
     const audio = new Audio("/sounds/notification.mp3");
     audio.volume = 0.5;
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
   };
 
   // Show notification
@@ -240,7 +240,7 @@ export default function Dashboard() {
 
       // Notification
       if (msg.sender?._id !== currentUserId) {
-        
+
         playNotificationSound();
         const senderIdStr =
           msg.sender?._id?.toString() || msg.sender?.toString();
@@ -861,6 +861,7 @@ export default function Dashboard() {
 
     loadInitialData();
   }, [dispatch, navigate]);
+
   useEffect(() => {
 
     if (loading) return;
@@ -1685,7 +1686,7 @@ export default function Dashboard() {
                     currentUserId={currentUserId}
                     searchQuery={searchInChat}
                     selectedUser={selectedUser}
-                    onUpdateLastMessageStatus={(updateData) => {}}
+                    onUpdateLastMessageStatus={(updateData) => { }}
                     isSelectionMode={isSelectionMode}
                     setIsSelectionMode={setIsSelectionMode}
                     selectedMessages={selectedMessages}
@@ -1881,9 +1882,9 @@ export default function Dashboard() {
                 <p className="text-gray-900 text-sm">
                   {selectedUser?.createdAt
                     ? new Date(selectedUser.createdAt).toLocaleDateString(
-                        "en-US",
-                        { year: "numeric", month: "long", day: "numeric" },
-                      )
+                      "en-US",
+                      { year: "numeric", month: "long", day: "numeric" },
+                    )
                     : "N/A"}
                 </p>
               </div>

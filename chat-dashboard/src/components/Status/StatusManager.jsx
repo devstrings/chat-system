@@ -2,7 +2,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
 import ConfirmationDialog from "../ConfirmationDialog";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
+import AlertDialog from "@/components/base/AlertDialog";
+
 export default function StatusManager({
   currentUser,
   onClose,
@@ -811,7 +813,6 @@ export default function StatusManager({
               </button>
             </div>
 
-            {/* Alert Dialog */}
             <AlertDialog
               isOpen={alertDialog.isOpen}
               onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
@@ -832,44 +833,5 @@ export default function StatusManager({
         />
       </>
     );
-
-    function AlertDialog({ isOpen, onClose, title, message, type }) {
-      if (!isOpen) return null;
-
-      return (
-        <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
-          <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl relative z-10">
-            <div className="flex items-start gap-3">
-              <div className="text-green-600">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 mb-1">{title}</h3>
-                <p className="text-gray-700 text-sm">{message}</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="mt-4 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
-            >
-              Got it!
-            </button>
-          </div>
-        </div>
-      );
-    }
   }
 }

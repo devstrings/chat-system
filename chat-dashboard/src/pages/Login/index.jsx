@@ -1,27 +1,37 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from "@/utils/axiosInstance";
+import { useDispatch, useSelector } from "react-redux";
+import { login, clearError } from "../store/slices/authSlice";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
-import { register, clearError } from "@/store/slices/authSlice";
 import { useGoogleLogin } from "@react-oauth/google";
 import FacebookLogin from "@greatsumini/react-facebook-login";
+import { default as apiActions} from '@/store/apiActions'
 
-export default function Register() {
+
+export default function Login() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-  });
+  const hasNavigated = useRef(false);
+  const hasCheckedAuth = useRef(false);
+
   const dispatch = useDispatch();
-  const { loading, error } = useSelector((state) => state.auth);
+  const { loading, error } = useSelector(
+    (state) => state.auth,
+  );
+  const [formData, setFormData] = useState({ email: "", password: "" });
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      navigate("/dashboard", { replace: true });
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
+    const accessToken = localStorage.getItem("accessToken");
+    const refreshToken = localStorage.getItem("refreshToken");
+
+    if (accessToken || refreshToken) {
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        navigate("/dashboard", { replace: true });
+      }
     }
   }, [navigate]);
 
@@ -29,58 +39,58 @@ export default function Register() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     dispatch(clearError());
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     dispatch(clearError());
 
-    const result = await dispatch(register(formData));
+    const result = await dispatch(login(formData));
 
- if (register.fulfilled.match(result)) {
-  navigate("/verify-otp", { 
-    state: { email: formData.email } 
-  });
-}
+    if (login.fulfilled.match(result)) {
+      hasNavigated.current = true;
+      navigate("/dashboard", { replace: true });
+    }
   };
-  //  GOOGLE SIGNUP
-  const handleGoogleSignup = useGoogleLogin({
+
+  const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (response) => {
       try {
-        const result = await axiosInstance.post("/api/auth/google", {
-          code: response.code,
-        });
-        localStorage.setItem("accessToken", result.data.accessToken);
-        localStorage.setItem("refreshToken", result.data.refreshToken);
-        localStorage.setItem("username", result.data.username);
-        if (result.data.profileImage) {
-          localStorage.setItem("profileImage", result.data.profileImage);
+        
+        const result = await apiActions.googleLogin(response.code);
+
+        
+        localStorage.setItem("accessToken", result.accessToken);
+        localStorage.setItem("refreshToken", result.refreshToken);
+        localStorage.setItem("username", result.username);
+        if (result.profileImage) {
+          localStorage.setItem("profileImage", result.profileImage);
         }
         navigate("/dashboard", { replace: true });
       } catch (err) {
-        console.error("Google signup error:", err);
+        console.error("Google login error:", err);
       }
     },
     onError: (err) => console.error("Google error:", err),
     flow: "auth-code",
   });
 
-  //  FACEBOOK SIGNUP
-
-  const handleFacebookSignup = async (response) => {
+  const handleFacebookLogin = async (response) => {
     try {
-      const result = await axiosInstance.post("/api/auth/facebook", {
-        accessToken: response.accessToken,
-      });
-      localStorage.setItem("accessToken", result.data.accessToken);
-      localStorage.setItem("refreshToken", result.data.refreshToken);
-      localStorage.setItem("username", result.data.username);
-      if (result.data.profileImage) {
-        localStorage.setItem("profileImage", result.data.profileImage);
+      const result = await apiActions.facebookLogin(response.accessToken);
+
+      
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      localStorage.setItem("username", result.username);
+      if (result.profileImage) {
+        localStorage.setItem("profileImage", result.profileImage);
       }
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error("Facebook signup error:", err);
+      console.error("Facebook login error:", err);
     }
   };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white px-4">
       <div className="bg-gray-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
@@ -88,7 +98,7 @@ export default function Register() {
           Chat-System
         </h1>
         <p className="text-center text-gray-400 mb-6 text-sm">
-          Create your account to get started
+          Welcome back! Please login to continue
         </p>
 
         {error && (
@@ -97,19 +107,19 @@ export default function Register() {
           </div>
         )}
 
-        {/*  SOCIAL SIGNUP BUTTONS */}
         <div className="space-y-3 mb-6">
           <button
-            onClick={() => handleGoogleSignup()}
+            type="button"
+            onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 py-3 rounded-lg font-medium hover:bg-gray-100 transition-all shadow-md hover:shadow-lg"
           >
             <FcGoogle className="text-2xl" />
-            Sign up with Google
+            Continue with Google
           </button>
 
           <FacebookLogin
             appId="1280660247415742"
-            onSuccess={handleFacebookSignup}
+            onSuccess={handleFacebookLogin}
             onFail={(err) => console.error("Facebook error:", err)}
             render={({ onClick }) => (
               <button
@@ -117,37 +127,19 @@ export default function Register() {
                 className="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-lg font-medium hover:bg-[#1565C0] transition-all shadow-md hover:shadow-lg"
               >
                 <FaFacebook className="text-2xl" />
-                Sign up with Facebook
+                Continue with Facebook
               </button>
             )}
           />
         </div>
 
-        {/* DIVIDER */}
         <div className="flex items-center gap-3 mb-6">
           <div className="flex-1 h-px bg-gray-700"></div>
           <span className="text-gray-500 text-sm">OR</span>
           <div className="flex-1 h-px bg-gray-700"></div>
         </div>
 
-        {/*  EMAIL/PASSWORD SIGNUP */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Username
-            </label>
-            <input
-              type="text"
-              name="username"
-              placeholder="Choose a username"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              autoComplete="username"
-              className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">
               Email Address
@@ -171,13 +163,22 @@ export default function Register() {
             <input
               type="password"
               name="password"
-              placeholder="Create a password"
+              placeholder="Enter your password"
               value={formData.password}
               onChange={handleChange}
               required
-              autoComplete="new-password"
+              autoComplete="current-password"
               className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
+
+            <div className="text-right mt-2">
+              <span
+                onClick={() => navigate("/forgot-password")}
+                className="text-sm text-blue-400 cursor-pointer hover:underline transition-colors"
+              >
+                Forgot Password?
+              </span>
+            </div>
           </div>
 
           <button
@@ -188,21 +189,21 @@ export default function Register() {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white"></div>
-                Creating Account...
+                Logging in...
               </span>
             ) : (
-              "Create Account"
+              "Login with Email"
             )}
           </button>
         </form>
 
         <p className="text-center mt-6 text-gray-400 text-sm">
-          Already have an account?{" "}
+          Don't have an account?{" "}
           <span
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/register")}
             className="text-blue-400 cursor-pointer hover:underline font-medium"
           >
-            Login
+            Create Account
           </span>
         </p>
       </div>

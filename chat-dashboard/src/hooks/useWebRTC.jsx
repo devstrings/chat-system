@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSelector } from "react-redux";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance from "../lib/axiosInstance";
 
 const defaultIceServers = {
   iceServers: [

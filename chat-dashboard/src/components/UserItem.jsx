@@ -1,7 +1,7 @@
 import React, { useState, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import ConfirmationDialog, { AlertDialog } from "./ConfirmationDialog";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
 import { default as apiActions } from "@/store/apiActions";
@@ -526,8 +526,8 @@ const UserItem = memo(function UserItem({
     <>
       <div
         className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${selected
-            ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
-            : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
+          ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
+          : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
           }`}
         onClick={(e) => {
           if (relationshipStatus === "friends") {
@@ -601,10 +601,10 @@ const UserItem = memo(function UserItem({
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
                 className={`font-semibold truncate ${selected
+                  ? "text-white"
+                  : unreadCount > 0
                     ? "text-white"
-                    : unreadCount > 0
-                      ? "text-white"
-                      : "text-gray-900"
+                    : "text-gray-900"
                   }`}
               >
                 {user.username}
@@ -627,10 +627,10 @@ const UserItem = memo(function UserItem({
             {lastMessageTime && relationshipStatus === "friends" && (
               <span
                 className={`text-xs flex-shrink-0 ml-2 ${selected
-                    ? "text-white text-opacity-90"
-                    : unreadCount > 0
-                      ? "text-blue-600 font-bold"
-                      : "text-gray-700"
+                  ? "text-white text-opacity-90"
+                  : unreadCount > 0
+                    ? "text-blue-600 font-bold"
+                    : "text-gray-700"
                   }`}
               >
                 {formatTime(lastMessageTime)}
@@ -644,10 +644,10 @@ const UserItem = memo(function UserItem({
               {getMessageStatusIcon()}
               <p
                 className={`text-xs truncate ${selected
-                    ? "text-white text-opacity-90"
-                    : unreadCount > 0
-                      ? "text-gray-900 font-semibold"
-                      : "text-gray-600"
+                  ? "text-white text-opacity-90"
+                  : unreadCount > 0
+                    ? "text-gray-900 font-semibold"
+                    : "text-gray-600"
                   }`}
               >
                 {displayMessage}
@@ -666,8 +666,8 @@ const UserItem = memo(function UserItem({
               setShowOptionsModal(true);
             }}
             className={`p-2 rounded-lg transition-colors ${selected
-                ? "hover:bg-white/20 text-white"
-                : "hover:bg-gray-200 text-gray-700"
+              ? "hover:bg-white/20 text-white"
+              : "hover:bg-gray-200 text-gray-700"
               }`}
             title="Options"
           >

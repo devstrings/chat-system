@@ -9,16 +9,18 @@ import {
 } from "@/store/slices/chatSlice";
 
 import { useDispatch, useSelector } from "react-redux";
+import Button from "@/components/base/Button";
+
 export default function ChatWindow({
   conversationId,
   currentUserId,
   searchQuery = "",
   selectedUser = null,
   isSelectionMode = false,
-  setIsSelectionMode = () => {},
+  setIsSelectionMode = () => { },
   selectedMessages = new Set(),
-  setSelectedMessages = () => {},
-  onReply = () => {},
+  setSelectedMessages = () => { },
+  onReply = () => { },
 }) {
   const dispatch = useDispatch();
   const messages = useSelector(
@@ -32,11 +34,8 @@ export default function ChatWindow({
   const conversationIdRef = useRef(null);
   const messagesRef = useRef(messages);
   const socket = useSelector((state) => state.socket.socket);
-  const connected = useSelector((state) => state.socket.connected);
-  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
 
   const [typingUsers, setTypingUsers] = useState(new Set());
-  const [replyTo, setReplyTo] = useState(null);
 
   const [deleteDialog, setDeleteDialog] = useState({
     isOpen: false,
@@ -192,8 +191,8 @@ export default function ChatWindow({
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
-        msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
+      msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
+    )
     : messages;
 
   if (loading) {
@@ -288,7 +287,7 @@ export default function ChatWindow({
         {isSelectionMode && (
           <div className="bg-white border-b border-gray-300 shadow-sm px-2 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
-              <button
+              <Button
                 onClick={toggleSelectionMode}
                 className="text-gray-400 hover:text-white transition-colors"
               >
@@ -305,7 +304,7 @@ export default function ChatWindow({
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-              </button>
+              </Button>
               <span className="text-gray-900 font-medium text-sm md:text-base">
                 {selectedMessages.size} selected
               </span>
@@ -313,22 +312,22 @@ export default function ChatWindow({
 
             <div className="flex items-center gap-2">
               {selectedMessages.size < filteredMessages.length ? (
-                <button
+                <Button
                   onClick={selectAllMessages}
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   All
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   onClick={deselectAllMessages}
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   None
-                </button>
+                </Button>
               )}
 
-              <button
+              <Button
                 onClick={handleBulkDelete}
                 disabled={selectedMessages.size === 0}
                 className="px-3 md:px-4 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-xs md:text-sm"
@@ -347,7 +346,7 @@ export default function ChatWindow({
                   />
                 </svg>
                 <span className="hidden sm:inline">Delete</span>
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -358,7 +357,7 @@ export default function ChatWindow({
         >
           {/* {!isSelectionMode && messages.length > 0 && (
             <div className="flex justify-center mb-4 sticky top-0 z-10">
-              <button
+              <Button
                 onClick={toggleSelectionMode}
                 className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-1.5 text-[11px] md:text-sm"
               >
@@ -426,11 +425,10 @@ export default function ChatWindow({
                       className={`flex items-center justify-center my-2`}
                     >
                       <div
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${
-                          isMissed || isRejected
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${isMissed || isRejected
                             ? "bg-red-50 border-red-200"
                             : "bg-green-50 border-green-200"
-                        }`}
+                          }`}
                       >
                         <span>{getCallIcon()}</span>
                         <span className={`font-medium ${getCallColor()}`}>

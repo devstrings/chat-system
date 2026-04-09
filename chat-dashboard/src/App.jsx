@@ -78,7 +78,7 @@ export default function App() {
         {/* <Route path="/auth/callback" element={<AuthCallback />} /> */}
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/verify-otp" element={<VerifyOTP />} />  
+        <Route path="/verify-otp" element={<VerifyOTP />} />
 
         {/* Protected Routes */}
         <Route

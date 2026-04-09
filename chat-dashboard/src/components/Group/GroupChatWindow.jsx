@@ -9,16 +9,16 @@ import {
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 export default function GroupChatWindow({
   group,
   currentUserId,
   searchQuery = "",
   isSelectionMode = false,
-  setIsSelectionMode = () => {},
+  setIsSelectionMode = () => { },
   selectedMessages = new Set(),
-  setSelectedMessages = () => {},
-    onReply = () => {},
+  setSelectedMessages = () => { },
+  onReply = () => { },
 }) {
   //  Redux setup
   const dispatch = useDispatch();
@@ -160,8 +160,8 @@ export default function GroupChatWindow({
   // Filter messages
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
-        msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
+      msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
+    )
     : messages;
 
   // Group messages by date
@@ -342,7 +342,7 @@ export default function GroupChatWindow({
                   isSelected={selectedMessages.has(msg._id)}
                   onToggleSelect={toggleMessageSelection}
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
-                   onReply={onReply}
+                  onReply={onReply}
                 />
               </div>
             ))}
@@ -368,7 +368,7 @@ export default function GroupChatWindow({
                     style={{ animationDelay: "300ms" }}
                   />
                 </div>
-              
+
               </div>
             </div>
           </div>

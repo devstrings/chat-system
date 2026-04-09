@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axiosInstance from '@/utils/axiosInstance';
+import axiosInstance from '@/lib/axiosInstance';
 import API_BASE_URL from '@/config/api';
 
 // ASYNC THUNKS 
@@ -127,21 +127,21 @@ const userSlice = createSlice({
     setOnlineUsers: (state, action) => {
       state.onlineUsers = new Set(action.payload);
     },
-    
+
     addOnlineUser: (state, action) => {
       state.onlineUsers = new Set([...state.onlineUsers, action.payload]);
     },
-    
+
     removeOnlineUser: (state, action) => {
       const newSet = new Set(state.onlineUsers);
       newSet.delete(action.payload);
       state.onlineUsers = newSet;
     },
-    
+
     addFriendRequest: (state, action) => {
       state.pendingRequests.push(action.payload);
     },
-    
+
     removeFriendRequest: (state, action) => {
       state.pendingRequests = state.pendingRequests.filter(
         (req) => req._id !== action.payload
@@ -162,7 +162,7 @@ const userSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Send friend request
       .addCase(sendFriendRequest.fulfilled, (state) => {
         state.error = null;
@@ -170,43 +170,43 @@ const userSlice = createSlice({
       .addCase(sendFriendRequest.rejected, (state, action) => {
         state.error = action.payload;
       })
-      
+
       // Accept request
       .addCase(acceptFriendRequest.fulfilled, (state, action) => {
         state.pendingRequests = state.pendingRequests.filter(
           (req) => req._id !== action.payload._id
         );
       })
-      
+
       // Reject request
       .addCase(rejectFriendRequest.fulfilled, (state, action) => {
         state.pendingRequests = state.pendingRequests.filter(
           (req) => req._id !== action.payload
         );
       })
-      
+
       // Fetch pending requests
       .addCase(fetchPendingRequests.fulfilled, (state, action) => {
         state.pendingRequests = action.payload;
       })
-      
+
       // Fetch blocked users
       .addCase(fetchBlockedUsers.fulfilled, (state, action) => {
         state.blockedUsers = action.payload;
       })
-      
+
       // Block user
       .addCase(blockUser.fulfilled, (state, action) => {
         state.blockedUsers.push(action.payload);
       })
-      
+
       // Unblock user
       .addCase(unblockUser.fulfilled, (state, action) => {
         state.blockedUsers = state.blockedUsers.filter(
           (block) => block.blocked._id !== action.payload
         );
       })
-      
+
       // Reset on logout
       .addCase('RESET_APP', () => {
         return {

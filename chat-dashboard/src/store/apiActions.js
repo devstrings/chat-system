@@ -1,4 +1,25 @@
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
+
+const googleLogin = async (code) => {
+    try {
+        const response = await axiosInstance.post("/api/auth/google", { code });
+        return response.data;
+    } catch (err) {
+        console.error("Google login error:", err);
+        throw err;
+    }
+}
+
+const facebookLogin = async (accessToken) => {
+    try {
+        const response = await axiosInstance.post("/api/auth/facebook", { accessToken });
+        return response.data;
+    } catch (err) {
+        console.error("Facebook login error:", err);
+        throw err;
+    }
+};
+
 
 const fetchUser = async () => {
     try {
@@ -55,6 +76,8 @@ const unblockFriend = async (friendId) => {
 
 
 export default {
+    googleLogin,
+    facebookLogin,
     fetchUser,
     updateProfile,
     getFriendStatus,

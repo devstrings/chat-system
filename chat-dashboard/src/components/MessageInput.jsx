@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 export default function MessageInput({
@@ -8,7 +8,7 @@ export default function MessageInput({
   isGroup = false,
   selectedUser = null,
   replyTo = null,
-  onCancelReply = () => {},
+  onCancelReply = () => { },
 }) {
   const dispatch = useDispatch();
   const currentUserId = useSelector((state) => state.auth.currentUserId);
@@ -183,13 +183,13 @@ export default function MessageInput({
         attachments,
         replyTo: replyTo
           ? {
-              _id: replyTo._id,
-              text: replyTo.text,
-              sender: {
-                _id: replyTo.sender?._id || replyTo.sender,
-                username: replyTo.sender?.username || "Unknown",
-              },
-            }
+            _id: replyTo._id,
+            text: replyTo.text,
+            sender: {
+              _id: replyTo.sender?._id || replyTo.sender,
+              username: replyTo.sender?.username || "Unknown",
+            },
+          }
           : null,
       });
     }
@@ -201,13 +201,13 @@ export default function MessageInput({
         attachments,
         replyTo: replyTo
           ? {
-              _id: replyTo._id,
-              text: replyTo.text,
-              sender: {
-                _id: replyTo.sender?._id || replyTo.sender,
-                username: replyTo.sender?.username || "Unknown",
-              },
-            }
+            _id: replyTo._id,
+            text: replyTo.text,
+            sender: {
+              _id: replyTo.sender?._id || replyTo.sender,
+              username: replyTo.sender?.username || "Unknown",
+            },
+          }
           : null,
       });
     }
@@ -397,8 +397,7 @@ export default function MessageInput({
     } catch (error) {
       console.error("Voice upload error:", error);
       alert(
-        `Voice upload failed!\n\n${
-          error.response?.data?.message || error.message
+        `Voice upload failed!\n\n${error.response?.data?.message || error.message
         }`,
       );
     } finally {
@@ -537,11 +536,10 @@ export default function MessageInput({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className={`p-2 md:p-3 hover:bg-gray-100 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${
-                  uploading
+                className={`p-2 md:p-3 hover:bg-gray-100 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${uploading
                     ? "text-blue-400 cursor-wait"
                     : "text-gray-400 hover:text-blue-400"
-                }`}
+                  }`}
                 title={uploading ? "Uploading..." : "Attach file"}
               >
                 {uploading ? (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance from "../lib/axiosInstance";
 import API_BASE_URL from "../config/api";
 
 export const useAuthImage = (imageUrl, type = "profile") => {
