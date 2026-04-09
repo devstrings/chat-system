@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { FiLock, FiEye, FiEyeOff } from "react-icons/fi";
-import API_BASE_URL from "../config/api";
+import API_BASE_URL from "@/config/api";
+
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { token } = useParams();
