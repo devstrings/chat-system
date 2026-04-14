@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
-
 export default function VideoCall({
   remoteUser,
   callType,
   onClose,
   localStream,
   remoteStream,
-  
   isVideoOff,
   onEndCall,
   onToggleVideo,
   receiverOnline,
+  onCallRejected,
 }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -44,13 +43,14 @@ export default function VideoCall({
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("call:rejected", () => {
-      setCallRejected(true);
-      setTimeout(() => {
-        onEndCall?.();
-        onClose?.();
-      }, 2000);
-    });
+ socket.on("call:rejected", () => {
+  setCallRejected(true);
+  setTimeout(() => {
+    onEndCall?.();
+    onClose?.();
+    onCallRejected?.();
+  }, 2000);
+});
 
     socket.on("call:ended", () => {
       onEndCall?.();

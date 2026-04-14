@@ -72,10 +72,18 @@ const socketMiddleware = (store) => {
         store.dispatch(setConnected(true));
       });
 
-      socket.on("disconnect", (reason) => {
-        console.warn(" Socket disconnected:", reason);
-        store.dispatch(setConnected(false));
-      });
+    socket.on("disconnect", (reason) => {
+  console.warn(" Socket disconnected:", reason);
+  store.dispatch(setConnected(false));
+
+  if (reason === "io server disconnect") {
+    const freshToken = localStorage.getItem("accessToken");
+    if (freshToken && socket) {
+      socket.auth = { token: freshToken };
+      socket.connect();
+    }
+  }
+});
 
       socket.on("connect_error", (err) => {
         console.error(" Socket connection error:", err.message);

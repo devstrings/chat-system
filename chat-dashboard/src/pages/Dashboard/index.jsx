@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import API_BASE_URL from "../../config/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../../components/SideBar";
 import ChatWindow from "../../components/ChatWindow";
 import { useWebRTC } from "../../hooks/useWebRTC";
@@ -57,6 +57,7 @@ export default function Dashboard() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { conversationId: urlConversationId } = useParams();
   const [replyTo, setReplyTo] = useState(null);
   // Redux state
   const { currentUser, currentUserId, isAuthenticated } = useSelector(
@@ -94,6 +95,7 @@ export default function Dashboard() {
   const hasInitialized = useRef(false);
   const lastMessagesRef = useRef({});
   const hasRestored = useRef(false);
+  const hasLoadedMessages = useRef(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [pinnedConversations, setPinnedConversations] = useState(new Set());
   const [archivedConversations, setArchivedConversations] = useState(new Set());
@@ -881,9 +883,36 @@ export default function Dashboard() {
       }
     }
   }, [users, groups, loading]);
-
   useEffect(() => {
+  if (loading) return;
+  if (users.length === 0 && groups.length === 0) return;
+  if (!urlConversationId) return;
+
+  const group = groups.find((g) => g._id === urlConversationId);
+  if (group) {
+    setSelectedGroup(group);
+    setIsGroupChat(true);
+    setSelectedUser(null);
+    return;
+  }
+
+  const userId = Object.keys(lastMessages).find(
+    (uid) => lastMessages[uid]?.conversationId === urlConversationId
+  );
+  if (userId) {
+    const user = users.find((u) => u._id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setIsGroupChat(false);
+      setSelectedGroup(null);
+    }
+  }
+}, [urlConversationId, users, groups, loading, lastMessages]);
+
+useEffect(() => {
     if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
+    if (hasLoadedMessages.current) return;
+    hasLoadedMessages.current = true;
 
     const loadLastMessages = async () => {
       try {
@@ -988,7 +1017,6 @@ export default function Dashboard() {
             }
           } catch (userErr) {
             if (userErr.response?.status === 404) {
-              console.log(` No conversation for ${user._id}`);
               continue;
             }
             console.error(
@@ -1278,19 +1306,21 @@ export default function Dashboard() {
 
         <Sidebar
           selectedUserId={selectedUser?._id}
-          onSelectUser={(user) => {
-            if (user.isGroup) {
-              setSelectedGroup(user);
-              setSelectedUser(null);
-              setIsGroupChat(true);
-              setConversationId(null);
-            } else {
-              setSelectedUser(user);
-              setSelectedGroup(null);
-              setIsGroupChat(false);
-            }
-            setIsMobileSidebarOpen(false);
-          }}
+      onSelectUser={(user) => {
+  if (user.isGroup) {
+    setSelectedGroup(user);
+    setSelectedUser(null);
+    setIsGroupChat(true);
+    setConversationId(null);
+    navigate(`/conversation/${user._id}`);
+  } else {
+    setSelectedUser(user);
+    setSelectedGroup(null);
+    setIsGroupChat(false);
+    navigate(`/conversation/${user._id}`);
+  }
+  setIsMobileSidebarOpen(false);
+}}
           currentUsername={currentUser?.username || ""}
           currentUserId={currentUserId}
           onLogout={handleLogout}
@@ -1757,6 +1787,10 @@ export default function Dashboard() {
             setShowVideoCall(false);
             setActiveCall(null);
           }}
+          onCallRejected={() => {
+  setShowVideoCall(false);
+  setActiveCall(null);
+}}
         />
       )}
       {/* Incoming Call */}
@@ -1962,30 +1996,32 @@ export default function Dashboard() {
         onClose={(id) => {
           setToastNotifications((prev) => prev.filter((n) => n.id !== id));
         }}
-        onSelect={(notif) => {
-          console.log("=== NOTIFICATION CLICKED ===", notif);
-          if (notif.isGroup) {
-            const group = groups.find((g) => g._id === notif.groupId);
-            if (group) {
-              setSelectedGroup(group);
-              setSelectedUser(null);
-              setIsGroupChat(true);
-              setConversationId(null);
-              setIsMobileSidebarOpen(false);
-            }
-          } else {
-            const senderId = notif.senderId?._id || notif.senderId;
-            const user =
-              users.find((u) => u._id === senderId) || notif.senderObj;
-            console.log("User found:", user, "senderId:", senderId);
-            if (user) {
-              setSelectedUser(user);
-              setSelectedGroup(null);
-              setIsGroupChat(false);
-              setIsMobileSidebarOpen(false);
-            }
-          }
-        }}
+    onSelect={(notif) => {
+  console.log("=== NOTIFICATION CLICKED ===", notif);
+  if (notif.isGroup) {
+    const group = groups.find((g) => g._id === notif.groupId);
+    if (group) {
+      setSelectedGroup(group);
+      setSelectedUser(null);
+      setIsGroupChat(true);
+      setConversationId(null);
+      setIsMobileSidebarOpen(false);
+      navigate(`/conversation/${group._id}`);
+    }
+  } else {
+    const senderId = notif.senderId?._id || notif.senderId;
+    const user =
+      users.find((u) => u._id === senderId) || notif.senderObj;
+    console.log("User found:", user, "senderId:", senderId);
+    if (user) {
+      setSelectedUser(user);
+      setSelectedGroup(null);
+      setIsGroupChat(false);
+      setIsMobileSidebarOpen(false);
+      navigate(`/conversation/${user._id}`);
+    }
+  }
+}}
       />
     </>
   );
