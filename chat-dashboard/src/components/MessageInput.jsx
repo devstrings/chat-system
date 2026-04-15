@@ -2,6 +2,19 @@ import React, { useState, useRef, useEffect } from "react";
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
+import {
+  uploadFile,
+  uploadVoiceMessage,
+  sendIndividualMessage,
+  sendGroupMessage,
+  emitTyping,
+  emitGroupTyping,
+  stopAllTyping,
+  isValidFileSize,
+  getEmojisList,
+  formatRecordingTime,
+  setupMediaRecorder
+} from "../actions/messageInput.actions";
 export default function MessageInput({
   conversationId,
   groupId,
@@ -28,129 +41,42 @@ export default function MessageInput({
   const recordingIntervalRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  const emojis = [
-    "😀",
-    "😂",
-    "🤣",
-    "😊",
-    "😍",
-    "🥰",
-    "😎",
-    "🤔",
-    "🤗",
-    "🤩",
-    "😭",
-    "😅",
-    "😇",
-    "🙂",
-    "😉",
-    "😋",
-    "😘",
-    "🥳",
-    "😏",
-    "😌",
-    "👍",
-    "👎",
-    "👏",
-    "🙏",
-    "💪",
-    "✌️",
-    "🤝",
-    "👋",
-    "🤙",
-    "🤞",
-    "❤️",
-    "💙",
-    "💚",
-    "💛",
-    "🧡",
-    "💜",
-    "🖤",
-    "🤍",
-    "💔",
-    "💕",
-    "🔥",
-    "✨",
-    "⭐",
-    "🌟",
-    "💫",
-    "🎉",
-    "🎊",
-    "🎈",
-    "🎁",
-    "🏆",
-    "🎯",
-    "💯",
-    "✅",
-    "❌",
-    "⚡",
-    "💥",
-    "🌈",
-    "☀️",
-    "🌙",
-    "⛅",
-  ];
-
+ const emojis = getEmojisList();
   //  Handle typing for both group and individual
-  const handleTyping = (value) => {
-    setText(value);
-
-    if (!socket) return;
-
-    //  Group typing
-    if (isGroup && groupId) {
-      console.log(" Group typing:", { groupId, isTyping: true });
-      socket.emit("groupTyping", { groupId, isTyping: true });
-
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("groupTyping", { groupId, isTyping: false });
-      }, 2000);
-    }
-    //  Individual chat typing
-    else if (conversationId) {
-      console.log(" Individual typing:", { conversationId, isTyping: true });
-      socket.emit("typing", { conversationId, isTyping: true });
-
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("typing", { conversationId, isTyping: false });
-      }, 2000);
-    }
-  };
-
+const handleTyping = (value) => {
+  setText(value);
+  if (!socket) return;
+  
+  if (isGroup && groupId) {
+    emitGroupTyping(socket, groupId, true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      emitGroupTyping(socket, groupId, false);
+    }, 2000);
+  } else if (conversationId) {
+    emitTyping(socket, conversationId, true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      emitTyping(socket, conversationId, false);
+    }, 2000);
+  }
+};
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+useEffect(() => {
+  return () => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+      if (mediaRecorder.stream) {
+        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
       }
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-      if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-        if (mediaRecorder.stream) {
-          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-        }
-      }
-
-      //  Stop typing indicator on unmount
-      if (socket) {
-        if (isGroup && groupId) {
-          socket.emit("groupTyping", { groupId, isTyping: false });
-        } else if (conversationId) {
-          socket.emit("typing", { conversationId, isTyping: false });
-        }
-      }
-    };
-  }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
+    }
+    
+    //  Using action
+    stopAllTyping(socket, isGroup, groupId, conversationId);
+  };
+}, [socket, conversationId, groupId, isGroup, mediaRecorder]);
   useEffect(() => {
     if (!isRecording) return;
 
@@ -164,177 +90,88 @@ export default function MessageInput({
 
     return () => clearInterval(interval);
   }, [isRecording]);
-  const handleSendMessage = async (attachments = []) => {
-    if (!socket || (!text.trim() && attachments.length === 0) || sending)
-      return;
-
-    setSending(true);
-
-    // Stop typing indicator
-    if (isGroup && groupId) {
-      socket.emit("groupTyping", { groupId, isTyping: false });
-    } else if (conversationId) {
-      socket.emit("typing", { conversationId, isTyping: false });
-    }
-    if (!isGroup && conversationId) {
-      socket.emit("sendMessage", {
-        conversationId,
-        text: text.trim(),
-        attachments,
-        replyTo: replyTo
-          ? {
-            _id: replyTo._id,
-            text: replyTo.text,
-            sender: {
-              _id: replyTo.sender?._id || replyTo.sender,
-              username: replyTo.sender?.username || "Unknown",
-            },
-          }
-          : null,
-      });
-    }
-
-    if (isGroup && groupId) {
-      socket.emit("sendGroupMessage", {
-        groupId,
-        text: text.trim(),
-        attachments,
-        replyTo: replyTo
-          ? {
-            _id: replyTo._id,
-            text: replyTo.text,
-            sender: {
-              _id: replyTo.sender?._id || replyTo.sender,
-              username: replyTo.sender?.username || "Unknown",
-            },
-          }
-          : null,
-      });
-    }
-
-    setText("");
-    onCancelReply();
-    setTimeout(() => setSending(false), 100);
-  };
+ const handleSendMessage = async (attachments = []) => {
+  if (!socket || (!text.trim() && attachments.length === 0) || sending) return;
+  setSending(true);
+  
+  //  Using action to stop typing
+  stopAllTyping(socket, isGroup, groupId, conversationId);
+  
+  if (!isGroup && conversationId) {
+    sendIndividualMessage(socket, conversationId, text, attachments, replyTo);
+  }
+  
+  if (isGroup && groupId) {
+    sendGroupMessage(socket, groupId, text, attachments, replyTo);
+  }
+  
+  setText("");
+  onCancelReply();
+  setTimeout(() => setSending(false), 100);
+};
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);
     setShowEmojiPicker(false);
   };
 
   //  File upload with group support
-  const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+ const handleFileSelect = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  
+  //  Using action for validation
+  if (!isValidFileSize(file, 10)) {
+    alert("File too large! Maximum size is 10MB");
+    e.target.value = "";
+    return;
+  }
+  
+  if (!conversationId && !groupId) {
+    alert(isGroup ? "Please select a group first" : "Please select a conversation first");
+    e.target.value = "";
+    return;
+  }
+  
+  setUploading(true);
+  
+  try {
+    //  Using action for upload
+    const uploadId = isGroup ? groupId : conversationId;
+    const uploadedFile = await uploadFile(file, uploadId, isGroup);
+    handleSendMessage([uploadedFile]);
+  } catch (error) {
+    console.error("Upload error:", error);
+    alert(`Upload failed!\n\n${error.response?.data?.message || error.message}`);
+  } finally {
+    setUploading(false);
+    e.target.value = "";
+  }
+};
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("File too large! Maximum size is 10MB");
-      e.target.value = "";
-      return;
-    }
-
-    //  Check if conversation or group exists
-    if (!conversationId && !groupId) {
-      alert(
-        isGroup
-          ? "Please select a group first"
-          : "Please select a conversation first",
-      );
-      e.target.value = "";
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      //  Use groupId or conversationId
-      const uploadConversationId = isGroup ? groupId : conversationId;
-
-      if (!uploadConversationId) {
-        alert("Please select a chat first");
-        e.target.value = "";
-        setUploading(false);
-        return;
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    const { recorder } = setupMediaRecorder(
+      stream,
+      (chunks) => { audioChunksRef.current = chunks; },
+      async (audioBlob) => {
+        await handleVoiceUpload(audioBlob, recordingTimeRef.current);
       }
-
-      formData.append("conversationId", uploadConversationId);
-      console.log(
-        "Uploading file:",
-        uploadConversationId,
-        isGroup ? "(group)" : "(DM)",
-      );
-
-      const token = localStorage.getItem("accessToken");
-
-      const response = await axiosInstance.post(
-        `${API_BASE_URL}/api/file/upload`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      console.log(" File uploaded:", response.data);
-      handleSendMessage([response.data]);
-    } catch (error) {
-      console.error(" Upload error:", error);
-      alert(
-        `Upload failed!\n\n${error.response?.data?.message || error.message}`,
-      );
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
-        await uploadVoiceMessage(audioBlob, recordingTimeRef.current);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-      setRecordingTime(0);
-      recordingTimeRef.current = 0;
-
-      //  Stop typing indicator when recording
-      if (socket) {
-        if (isGroup && groupId) {
-          socket.emit("groupTyping", { groupId, isTyping: false });
-        } else if (conversationId) {
-          socket.emit("typing", { conversationId, isTyping: false });
-        }
-      }
-
-      recordingTimeRef.current = 0;
-    } catch (err) {
-      console.error("Microphone error:", err);
-      alert("Please allow microphone access to record voice messages");
-    }
-  };
-
+    );
+    
+    recorder.start();
+    setMediaRecorder(recorder);
+    setIsRecording(true);
+    setRecordingTime(0);
+    recordingTimeRef.current = 0;
+    
+    stopAllTyping(socket, isGroup, groupId, conversationId);
+  } catch (err) {
+    console.error("Microphone error:", err);
+    alert("Please allow microphone access to record voice messages");
+  }
+};
   const stopRecording = () => {
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
@@ -361,57 +198,24 @@ export default function MessageInput({
   };
 
   //  Voice message upload with group support
-  const uploadVoiceMessage = async (audioBlob, duration) => {
-    setUploading(true);
+ const handleVoiceUpload = async (audioBlob, duration) => {
+  setUploading(true);
+  try {
+    //  Using action for voice upload
+    const uploadId = isGroup ? groupId : conversationId;
+    const voiceMessage = await uploadVoiceMessage(audioBlob, duration, uploadId, isGroup);
+    handleSendMessage([voiceMessage]);
+  } catch (error) {
+    console.error("Voice upload error:", error);
+    alert(`Voice upload failed!\n\n${error.response?.data?.message || error.message}`);
+  } finally {
+    setUploading(false);
+    setRecordingTime(0);
+    setMediaRecorder(null);
+  }
+};
 
-    try {
-      const formData = new FormData();
-      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, {
-        type: "audio/webm",
-      });
-
-      formData.append("file", audioFile);
-
-      // Add groupId or conversationId
-
-      const uploadConversationId = isGroup ? groupId : conversationId;
-      formData.append("conversationId", uploadConversationId);
-
-      formData.append("isVoiceMessage", "true");
-      formData.append("duration", duration.toString());
-
-      const token = localStorage.getItem("accessToken");
-
-      const response = await axiosInstance.post(
-        `${API_BASE_URL}/api/file/upload`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      handleSendMessage([{ ...response.data, duration }]);
-    } catch (error) {
-      console.error("Voice upload error:", error);
-      alert(
-        `Voice upload failed!\n\n${error.response?.data?.message || error.message
-        }`,
-      );
-    } finally {
-      setUploading(false);
-      setRecordingTime(0);
-      setMediaRecorder(null);
-    }
-  };
-
-  const formatRecordingTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+ 
 
   return (
     <div className="bg-white border-t border-gray-200 p-3 md:p-4">

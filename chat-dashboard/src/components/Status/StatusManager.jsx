@@ -2,9 +2,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
 import ConfirmationDialog from "../base/ConfirmationDialog";
-import axiosInstance from "@/lib/axiosInstance";
 import AlertDialog from "@/components/base/AlertDialog";
-
+import {
+  loadMyStatuses,
+  handleCreateStatus,
+  handleDeleteStatus,
+  handleViewStatusViewers,
+} from "../actions/statusManager.actions";
 export default function StatusManager({
   currentUser,
   onClose,
@@ -67,33 +71,22 @@ export default function StatusManager({
     { name: "Monospace", value: "monospace" },
     { name: "Cursive", value: "cursive" },
   ];
+  
+const onLoadMyStatuses = async () => {
+  const result = await loadMyStatuses(currentUser._id);
+  setMyStatuses(result.data);
+};
 
-  useEffect(() => {
-    if (mode === "myStatus" && currentUser?._id) {
-      loadMyStatuses();
-    }
-  }, [mode, currentUser?._id]);
+useEffect(() => {
+  if (mode === "myStatus" && currentUser?._id) {
+    onLoadMyStatuses();
+  }
+}, [mode, currentUser?._id]);
   useEffect(() => {
     setCurrentMode(mode);
   }, [mode]);
 
-  const loadMyStatuses = async () => {
-    console.log(" Loading my statuses for user:", currentUser._id);
 
-    try {
-      const response = await axiosInstance.get(
-        `/api/status/user/${currentUser._id}`,
-      );
-      const data = response.data;
-      console.log(" My statuses loaded:", data);
-      console.log(" Total statuses:", data.length);
-
-      setMyStatuses(data);
-    } catch (err) {
-      console.error(" Load my statuses error:", err);
-      setMyStatuses([]);
-    }
-  };
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -121,134 +114,17 @@ export default function StatusManager({
     reader.readAsDataURL(file);
   };
 
-  const handleCreateStatus = async () => {
-    if (statusType === "text" && !textContent.trim()) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Required",
-        message: "Please enter some text",
-        type: "error",
-      });
-      return;
-    }
-    if ((statusType === "image" || statusType === "video") && !selectedFile) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Required",
-        message: "Please select a file",
-        type: "error",
-      });
-      return;
-    }
-    setLoading(true);
-
-    try {
-      const token = localStorage.getItem("accessToken");
-      const formData = new FormData();
-
-      formData.append("type", statusType);
-
-      if (statusType === "text") {
-        formData.append("content", textContent);
-        formData.append("backgroundColor", bgColor);
-        formData.append("textColor", textColor);
-        formData.append("font", font);
-      } else {
-        formData.append("file", selectedFile);
-      }
-
-      if (caption) {
-        formData.append("caption", caption);
-      }
-
-      formData.append("privacy", privacy);
-      formData.append("hiddenFrom", JSON.stringify(hiddenFrom));
-      formData.append("sharedWith", JSON.stringify(sharedWith));
-
-      const response = await axiosInstance.post(`/api/status`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const result = response.data;
-
-      if (onStatusCreated) {
-        onStatusCreated(result.status);
-      }
-
-      //  Reset form
-      setTextContent("");
-      setCaption("");
-      setSelectedFile(null);
-      setFilePreview(null);
-      setStatusType("text");
-
-      //  Show success message (don't close modal)
-      setAlertDialog({
-        isOpen: true,
-        title: " Status Added!",
-        message:
-          "Your status has been posted successfully. Add another or close when done.",
-        type: "success",
-      });
-
-      if (onStatusCreated) {
-        onStatusCreated(result.status);
-      }
-    } catch (err) {
-      console.error("Create status error:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to create status",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteStatus = (statusId) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Status?",
-      message: "Are you sure you want to delete this status?",
-      type: "danger",
-
-      onConfirm: async () => {
-        try {
-          await axiosInstance.delete(`/api/status/${statusId}`);
-          setMyStatuses((prev) => prev.filter((s) => s._id !== statusId));
-          await loadMyStatuses();
-          setAlertDialog({
-            isOpen: true,
-            title: "Deleted!",
-            message: "Status deleted successfully",
-            type: "success",
-          });
-        } catch (err) {
-          console.error("Delete status error:", err);
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: "Failed to delete status",
-            type: "error",
-          });
-        }
-      },
-    });
-  };
-
-  const handleViewStatusViewers = async (statusId) => {
-    try {
-      const response = await axiosInstance.get(
-        `/api/status/${statusId}/viewers`,
-      );
-      const data = response.data;
-      setStatusViewers(data.viewers);
-      setShowViewers(true);
-    } catch (err) {
-      console.error("Load viewers error:", err);
-    }
-  };
+const onCreateStatus = () =>
+  handleCreateStatus(
+    statusType, textContent, selectedFile, caption,
+    bgColor, textColor, font, privacy, hiddenFrom, sharedWith,
+    onStatusCreated, setLoading, setAlertDialog,
+    setTextContent, setCaption, setSelectedFile, setFilePreview, setStatusType
+  );
+const onDeleteStatus = (statusId) =>
+  handleDeleteStatus(statusId, currentUser._id, setMyStatuses, setConfirmDialog, setAlertDialog);
+const onViewStatusViewers = (statusId) =>
+  handleViewStatusViewers(statusId, setStatusViewers, setShowViewers);
 
   const formatTime = (date) => {
     if (!date) return "";
@@ -368,10 +244,10 @@ export default function StatusManager({
                         <div className="flex items-center justify-between mb-2">
                           {/*  CLICKABLE VIEW BUTTON */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewStatusViewers(status._id);
-                            }}
+                          onClick={(e) => {
+  e.stopPropagation();
+  onViewStatusViewers(status._id);
+}}
                             className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
                           >
                             <svg
@@ -410,10 +286,10 @@ export default function StatusManager({
                         )}
 
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStatus(status._id);
-                          }}
+                        onClick={(e) => {
+  e.stopPropagation();
+  onDeleteStatus(status._id);
+}}
                           className="w-full py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
                         >
                           <svg
@@ -798,7 +674,7 @@ export default function StatusManager({
                 Close
               </button>
               <button
-                onClick={handleCreateStatus}
+onClick={onCreateStatus}
                 disabled={loading}
                 className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >

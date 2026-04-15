@@ -10,6 +10,7 @@ import {
 } from "@/store/slices/groupSlice";
 import API_BASE_URL from "@/config/api";
 import axiosInstance from "@/lib/axiosInstance";
+import { toggleMessageSelection, selectAllMessages, deselectAllMessages, handleBulkDelete } from "../actions/groupChat.actions";
 export default function GroupChatWindow({
   group,
   currentUserId,
@@ -30,38 +31,7 @@ export default function GroupChatWindow({
 
   const messagesEndRef = useRef(null);
   const [typingUsers, setTypingUsers] = useState(new Set());
-  const toggleMessageSelection = (messageId) => {
-    setSelectedMessages((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId);
-      } else {
-        newSet.add(messageId);
-      }
-      return newSet;
-    });
-  };
 
-  const selectAllMessages = () => {
-    setSelectedMessages(new Set(messages.map((msg) => msg._id)));
-  };
-
-  const deselectAllMessages = () => {
-    setSelectedMessages(new Set());
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedMessages.size === 0) return;
-    const messageIds = Array.from(selectedMessages);
-    messageIds.forEach((messageId) => {
-      socket?.emit("deleteGroupMessageForMe", {
-        messageId,
-        groupId: group._id,
-      });
-    });
-    setIsSelectionMode(false);
-    setSelectedMessages(new Set());
-  };
 
   //  Fetch messages
   useEffect(() => {
@@ -275,21 +245,21 @@ export default function GroupChatWindow({
           <div className="flex items-center gap-2">
             {selectedMessages.size < filteredMessages.length ? (
               <button
-                onClick={selectAllMessages}
+onClick={() => selectAllMessages(setSelectedMessages, messages)}
                 className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
               >
                 All
               </button>
             ) : (
               <button
-                onClick={deselectAllMessages}
+onClick={() => deselectAllMessages(setSelectedMessages)}
                 className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
               >
                 None
               </button>
             )}
             <button
-              onClick={handleBulkDelete}
+onClick={() => handleBulkDelete(socket, selectedMessages, group._id, setIsSelectionMode, setSelectedMessages)}
               disabled={selectedMessages.size === 0}
               className="px-3 md:px-4 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs md:text-sm"
             >
@@ -340,7 +310,7 @@ export default function GroupChatWindow({
                   isGroupMessage={true}
                   isSelectionMode={isSelectionMode}
                   isSelected={selectedMessages.has(msg._id)}
-                  onToggleSelect={toggleMessageSelection}
+onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messageId)}
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
                   onReply={onReply}
                 />

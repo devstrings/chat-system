@@ -2,7 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
-
+import {
+  handleDeleteForMe,
+  handleDeleteForEveryone,
+  handleFileDownload,
+  fetchSecureImages,
+} from "../actions/message.actions";
 export default function Message({
   message,
   isOwn,
@@ -148,72 +153,11 @@ export default function Message({
     message.deletedForEveryone || message.isDeletedForEveryone;
   const isDeletedForMe =
     message.deletedFor?.includes(message.sender._id) || message.isDeletedForMe;
-  const handleDeleteForMe = async () => {
-    try {
-      // Check if it's a group message
-      if (message.isGroupMessage && message.groupId) {
-        // Use socket for group messages
-        socket?.emit("deleteGroupMessageForMe", {
-          messageId: message._id,
-          groupId: message.groupId,
-        });
-      } else {
-        // HTTP endpoint for regular messages
-        await axiosInstance.delete(
-          `${API_BASE_URL}/api/messages/message/${message._id}/for-me`,
-        );
+const onDeleteForMe = () =>
+  handleDeleteForMe(message, socket, setShowDeleteModal, setShowOptions);
 
-        if (socket) {
-          socket.emit("deleteMessageForMe", {
-            messageId: message._id,
-            conversationId: message.conversationId,
-          });
-        }
-      }
-
-      setShowDeleteModal(false);
-      setShowOptions(false);
-    } catch (err) {
-      console.error("Delete for me error:", err);
-      alert("Failed to delete message");
-    }
-  };
-
-  const handleDeleteForEveryone = async () => {
-    try {
-      // Check if it's a group message
-      if (message.isGroupMessage && message.groupId) {
-        // Use socket for group messages
-        socket?.emit("deleteGroupMessageForEveryone", {
-          messageId: message._id,
-          groupId: message.groupId,
-        });
-      } else {
-        // HTTP endpoint for regular messages
-        const token = localStorage.getItem("accessToken");
-        await axiosInstance.delete(
-          `${API_BASE_URL}/api/messages/message/${message._id}/for-everyone`,
-        );
-
-        if (socket) {
-          socket.emit("deleteMessageForEveryone", {
-            messageId: message._id,
-            conversationId: message.conversationId,
-          });
-        }
-      }
-
-      setShowDeleteModal(false);
-      setShowOptions(false);
-    } catch (err) {
-      console.error("Delete for everyone error:", err);
-      if (err.response?.status === 400) {
-        alert("Cannot delete for everyone after 5 minutes");
-      } else {
-        alert("Failed to delete message");
-      }
-    }
-  };
+const onDeleteForEveryone = () =>
+  handleDeleteForEveryone(message, socket, setShowDeleteModal, setShowOptions);
 
   const canDeleteForEveryone = () => {
     if (!isOwn) return false;
@@ -327,134 +271,18 @@ export default function Message({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  useEffect(() => {
-    const fetchSecureImages = async () => {
-      if (!message.attachments || message.attachments.length === 0) return;
-
-      const token = localStorage.getItem("accessToken");
-      if (!token) return;
-
-      for (const [index, file] of message.attachments.entries()) {
-        if (file.fileType?.startsWith("image/")) {
-          setImageLoading((prev) => ({ ...prev, [index]: true }));
-
-          try {
-            let imageUrl;
-
-            // Check if URL is external (Google, Facebook, etc.)
-            if (
-              file.url.startsWith("http://") ||
-              file.url.startsWith("https://")
-            ) {
-              console.log(" External image URL:", file.url);
-              imageUrl = file.url;
-              setImageUrls((prev) => ({ ...prev, [index]: imageUrl }));
-              setImageLoading((prev) => ({ ...prev, [index]: false }));
-              continue;
-            }
-
-            // Local file - extract filename correctly
-            let filename = file.url;
-            if (filename.includes("/")) {
-              filename = filename.split("/").pop();
-            }
-
-            //  Use correct endpoint matching your backend route
-            const fullUrl = `${API_BASE_URL}/api/file/get/${filename}`;
-
-            console.log("Fetching local image:", fullUrl);
-
-            const response = await fetch(fullUrl, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-
-            if (!response.ok) {
-              throw new Error(`Failed to load image: ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            imageUrl = URL.createObjectURL(blob);
-
-            setImageUrls((prev) => ({ ...prev, [index]: imageUrl }));
-            console.log(" Image loaded successfully");
-          } catch (error) {
-            console.error(" Error loading image:", error.message);
-            setImageUrls((prev) => ({ ...prev, [index]: null }));
-          } finally {
-            setImageLoading((prev) => ({ ...prev, [index]: false }));
-          }
-        }
-      }
-    };
-
-    fetchSecureImages();
-
-    return () => {
-      Object.values(imageUrls).forEach((url) => {
-        if (url && url.startsWith("blob:")) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, [message.attachments]);
+useEffect(() => {
+  fetchSecureImages(message.attachments, setImageUrls, setImageLoading);
+  return () => {
+    Object.values(imageUrls).forEach((url) => {
+      if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
+    });
+  };
+}, [message.attachments]);
 
   // handleFileDownload function
-  const handleFileDownload = async (file) => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) {
-        alert("Please login to download files");
-        return;
-      }
-
-      let downloadUrl;
-      let needsAuth = true;
-
-      //  Check if URL is external
-      if (file.url.startsWith("http://") || file.url.startsWith("https://")) {
-        downloadUrl = file.url;
-        needsAuth = false;
-      } else {
-        //  Local file - extract filename
-        let filename = file.url;
-        if (filename.includes("/")) {
-          filename = filename.split("/").pop();
-        }
-        downloadUrl = `${API_BASE_URL}/api/file/get/${filename}`;
-      }
-
-      console.log(" Downloading:", downloadUrl);
-
-      const response = await fetch(downloadUrl, {
-        headers: needsAuth
-          ? {
-            Authorization: `Bearer ${token}`,
-          }
-          : {},
-      });
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = getFileName(file);
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      console.log("Download successful");
-    } catch (error) {
-      console.error(" Download error:", error);
-      alert("Failed to download file");
-    }
-  };
+ const onFileDownload = (file) =>
+  handleFileDownload(file, getFileName);
 
   const getStatusIcon = () => {
     const status = message.status || "sent";
@@ -828,7 +656,7 @@ export default function Message({
                 return (
                   <button
                     key={index}
-                    onClick={() => handleFileDownload(file)}
+                   onClick={() => onFileDownload(file)}
                     className={`flex items-center gap-2 p-2 rounded-lg transition w-full ${isOwn
                         ? "bg-white bg-opacity-20 hover:bg-opacity-30"
                         : "bg-blue-50 hover:bg-blue-100 border border-blue-100"
@@ -958,7 +786,7 @@ export default function Message({
               <div className="space-y-2">
                 {/* DELETE FOR ME BUTTON  */}
                 <button
-                  onClick={handleDeleteForMe}
+                onClick={onDeleteForMe}
                   className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
                 >
                   <svg
@@ -987,7 +815,7 @@ export default function Message({
                 {/* DELETE FOR EVERYONE BUTTON  */}
                 {isOwn && canDeleteForEveryone() && (
                   <button
-                    onClick={handleDeleteForEveryone}
+onClick={onDeleteForEveryone}
                     className="w-full px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-left flex items-center gap-2 md:gap-3"
                   >
                     <svg

@@ -6,7 +6,20 @@ import axiosInstance from "@/lib/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
 import { default as apiActions } from "@/store/apiActions";
-
+import {
+  getFriendStatus,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  unfriendUser,
+  blockUser,
+  unblockUser,
+  clearChat,
+  deleteConversation,
+  getOrCreateConversation,
+  formatTime,
+  truncateMessage,
+} from "../actions/userItem.actions";
 const UserItem = memo(function UserItem({
   user,
   selected,
@@ -81,50 +94,26 @@ const UserItem = memo(function UserItem({
   };
 
   // Fetch relationship status
-  useEffect(() => {
-    const fetchStatus = async () => {
-
-      try {
-        const resData = await apiActions.getFriendStatus(user._id);
-        setRelationshipStatus(resData.status);
-        if (resData.requestId) {
-          setRequestId(resData.requestId);
-        }
-      } catch (err) {
-        console.error("Fetch status error:", err);
+ useEffect(() => {
+  const fetchStatus = async () => {
+    try {
+      const data = await getFriendStatus(user._id);
+      setRelationshipStatus(data.status);
+      if (data.requestId) {
+        setRequestId(data.requestId);
       }
-    };
-
-    if (user._id) {
-      fetchStatus();
+    } catch (err) {
+      console.error("Fetch status error:", err);
     }
-  }, [user._id]);
-
-  const formatTime = (date) => {
-    if (!date) return "";
-    const now = new Date();
-    const msgDate = new Date(date);
-    const diff = now - msgDate;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "now";
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d`;
-    return msgDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
   };
 
-  const truncateMessage = (msg, length = 30) => {
-    if (!msg || msg.trim() === "") return "";
-    if (msg.length <= length) return msg;
-    return msg.substring(0, length) + "...";
-  };
+  if (user._id) {
+    fetchStatus();
+  }
+}, [user._id]);
+
+  
+
 
   const displayMessage = truncateMessage(lastMessage);
   const isOwnMessage =
@@ -166,342 +155,277 @@ const UserItem = memo(function UserItem({
     }
   };
 
-  const handleSendRequest = async () => {
-    try {
-      await apiActions.sendFriendRequest(user._id);
-
-
-      setRelationshipStatus("request_sent");
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Friend Request Sent!",
-        message: `Friend request sent to ${user.username}`,
-        type: "success",
-      });
-
-      if (onRelationshipChange) onRelationshipChange();
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.message || "Failed to send request",
-        type: "error",
-      });
-    }
-    setShowMenu(false);
-  };
-
-  const handleAcceptRequest = async () => {
-    try {
-      await axiosInstance.post(`/api/friends/request/${requestId}/accept`);
-
-      setRelationshipStatus("friends");
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Friend Request Accepted!",
-        message: `You are now friends with ${user.username}`,
-        type: "success",
-      });
-
-      if (onRelationshipChange) onRelationshipChange();
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.message || "Failed to accept request",
-        type: "error",
-      });
-    }
-    setShowMenu(false);
-  };
-
-  const handleRejectRequest = async () => {
-    try {
-      await axiosInstance.delete(`/api/friends/request/${requestId}/reject`);
-
-      setRelationshipStatus("none");
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Request Rejected",
-        message: "Friend request rejected",
-        type: "info",
-      });
-
-      if (onRelationshipChange) onRelationshipChange();
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.message || "Failed to reject request",
-        type: "error",
-      });
-    }
-    setShowMenu(false);
-  };
-
-  const handleUnfriend = () => {
-    setConfirmDialog({
+const handleSendRequest = async () => {
+  try {
+    await sendFriendRequest(user._id);
+    setRelationshipStatus("request_sent");
+    setAlertDialog({
       isOpen: true,
-      title: "Unfriend User?",
-      message: `Are you sure you want to unfriend ${user.username}?`,
-      confirmText: "Unfriend",
-      cancelText: "Cancel",
-      icon: "unfriend",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          await axiosInstance.delete(`/api/friends/unfriend/${user._id}`);
-
-          setRelationshipStatus("none");
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Unfriended",
-            message: `You are no longer friends with ${user.username}`,
-            type: "info",
-          });
-
-          if (onRelationshipChange) onRelationshipChange();
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.message || "Failed to unfriend",
-            type: "error",
-          });
-        }
-      },
+      title: "Friend Request Sent!",
+      message: `Friend request sent to ${user.username}`,
+      type: "success",
     });
-    setShowMenu(false);
-  };
+    if (onRelationshipChange) onRelationshipChange();
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: err.message || "Failed to send request",
+      type: "error",
+    });
+  }
+  setShowMenu(false);
+};
+
+ const handleAcceptRequest = async () => {
+  try {
+    await acceptFriendRequest(requestId);
+    setRelationshipStatus("friends");
+    setAlertDialog({
+      isOpen: true,
+      title: "Friend Request Accepted!",
+      message: `You are now friends with ${user.username}`,
+      type: "success",
+    });
+    if (onRelationshipChange) onRelationshipChange();
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: err.message || "Failed to accept request",
+      type: "error",
+    });
+  }
+  setShowMenu(false);
+};
+
+ const handleRejectRequest = async () => {
+  try {
+    await rejectFriendRequest(requestId);
+    setRelationshipStatus("none");
+    setAlertDialog({
+      isOpen: true,
+      title: "Request Rejected",
+      message: "Friend request rejected",
+      type: "info",
+    });
+    if (onRelationshipChange) onRelationshipChange();
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: err.message || "Failed to reject request",
+      type: "error",
+    });
+  }
+  setShowMenu(false);
+};
+
+ const handleUnfriend = () => {
+  setConfirmDialog({
+    isOpen: true,
+    title: "Unfriend User?",
+    message: `Are you sure you want to unfriend ${user.username}?`,
+    confirmText: "Unfriend",
+    cancelText: "Cancel",
+    icon: "unfriend",
+    type: "danger",
+    onConfirm: async () => {
+      try {
+        await unfriendUser(user._id);
+        setRelationshipStatus("none");
+        setAlertDialog({
+          isOpen: true,
+          title: "Unfriended",
+          message: `You are no longer friends with ${user.username}`,
+          type: "info",
+        });
+        if (onRelationshipChange) onRelationshipChange();
+      } catch (err) {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: err.message || "Failed to unfriend",
+          type: "error",
+        });
+      }
+    },
+  });
+  setShowMenu(false);
+};
 
   const handleBlock = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Block User?",
-      message: `Block ${user.username}? They won't be able to message you.`,
-      confirmText: "Block",
-      cancelText: "Cancel",
-      highlightText: user.username,
-      icon: "block",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          await axiosInstance.post(`/api/friends/block`, { userId: user._id });
-          setRelationshipStatus("blocked");
+  setConfirmDialog({
+    isOpen: true,
+    title: "Block User?",
+    message: `Block ${user.username}? They won't be able to message you.`,
+    confirmText: "Block",
+    cancelText: "Cancel",
+    highlightText: user.username,
+    icon: "block",
+    type: "danger",
+    onConfirm: async () => {
+      try {
+        await blockUser(user._id);
+        setRelationshipStatus("blocked");
+        setAlertDialog({
+          isOpen: true,
+          title: "User Blocked",
+          message: `${user.username} has been blocked successfully`,
+          type: "success",
+        });
+        if (onRelationshipChange) onRelationshipChange();
+      } catch (err) {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: err.message || "Failed to block user",
+          type: "error",
+        });
+      }
+    },
+  });
+  setShowMenu(false);
+};
 
-          setAlertDialog({
-            isOpen: true,
-            title: "User Blocked",
-            message: `${user.username} has been blocked successfully`,
-            type: "success",
-          });
-
-          if (onRelationshipChange) onRelationshipChange();
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.message || "Failed to block user",
-            type: "error",
-          });
-        }
-      },
-    });
-    setShowMenu(false);
-  };
-
-  const handleUnblock = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Unblock User?",
-      message: `Unblock ${user.username}? They will be able to message you again.`,
-      confirmText: "Unblock",
-      cancelText: "Cancel",
-      highlightText: user.username,
-      icon: "success",
-      type: "success",
-      onConfirm: async () => {
-        try {
-          await apiActions.unblockFriend(user._id);
-          // await axiosInstance.delete(`/api/friends/unblock/${user._id}`);
-
-          setRelationshipStatus("none");
-
-          setAlertDialog({
-            isOpen: true,
-            title: "User Unblocked",
-            message: `${user.username} has been unblocked`,
-            type: "success",
-          });
-
-          if (onRelationshipChange) onRelationshipChange();
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.message || "Failed to unblock user",
-            type: "error",
-          });
-        }
-      },
-    });
-    setShowMenu(false);
-  };
+ const handleUnblock = () => {
+  setConfirmDialog({
+    isOpen: true,
+    title: "Unblock User?",
+    message: `Unblock ${user.username}? They will be able to message you again.`,
+    confirmText: "Unblock",
+    cancelText: "Cancel",
+    highlightText: user.username,
+    icon: "success",
+    type: "success",
+    onConfirm: async () => {
+      try {
+        await unblockUser(user._id);
+        setRelationshipStatus("none");
+        setAlertDialog({
+          isOpen: true,
+          title: "User Unblocked",
+          message: `${user.username} has been unblocked`,
+          type: "success",
+        });
+        if (onRelationshipChange) onRelationshipChange();
+      } catch (err) {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: err.message || "Failed to unblock user",
+          type: "error",
+        });
+      }
+    },
+  });
+  setShowMenu(false);
+};
 
   const handleClearChat = async () => {
-    let convId = conversationId;
+  let convId = conversationId;
 
-    if (!convId) {
+  if (!convId) {
+    try {
+      const conversation = await getOrCreateConversation(user._id);
+      convId = conversation._id;
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "No conversation found.",
+        type: "error",
+      });
+      return;
+    }
+  }
+
+  setConfirmDialog({
+    isOpen: true,
+    title: "Clear Chat?",
+    message: `Delete all messages with ${user.username}? Chat stays in list.`,
+    confirmText: "Clear Messages",
+    cancelText: "Cancel",
+    highlightText: user.username,
+    icon: "delete",
+    type: "danger",
+    onConfirm: async () => {
       try {
-        const response = await axiosInstance.post(
-          `${API_BASE_URL}/api/messages/conversation`,
-          { otherUserId: user._id },
-        );
-        convId = response.data._id;
+        await clearChat(convId);
+        setAlertDialog({
+          isOpen: true,
+          title: "Chat Cleared!",
+          message: "All messages have been cleared.",
+          type: "success",
+        });
+        setShowMenu(false);
       } catch (err) {
+        console.error("Clear chat error:", err);
         setAlertDialog({
           isOpen: true,
           title: "Error",
-          message: "No conversation found.",
+          message: err.response?.data?.message || "Could not clear messages.",
           type: "error",
         });
-        return;
       }
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Clear Chat?",
-      message: `Delete all messages with ${user.username}? Chat stays in list.`,
-      confirmText: "Clear Messages",
-      cancelText: "Cancel",
-      highlightText: user.username,
-      icon: "delete",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          console.log(" Clearing chat:", convId);
-
-          await axiosInstance.patch(
-            `${API_BASE_URL}/api/messages/conversation/${convId}/clear`,
-            {},
-          );
-
-          console.log(" Chat cleared successfully");
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Chat Cleared!",
-            message: "All messages have been cleared.",
-            type: "success",
-          });
-
-          //  Close menu
-          setShowMenu(false);
-
-          // Socket will handle UI update automatically
-        } catch (err) {
-          console.error(" Clear chat error:", err);
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.response?.data?.message || "Could not clear messages.",
-            type: "error",
-          });
-        }
-      },
-    });
-    setShowMenu(false);
-  };
+    },
+  });
+  setShowMenu(false);
+};
   const handleDeleteConversation = async () => {
-    let convId = conversationId;
+  let convId = conversationId;
 
-    // If no conversationId, fetch it first
-    if (!convId) {
+  if (!convId) {
+    try {
+      const conversation = await getOrCreateConversation(user._id);
+      convId = conversation._id;
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "No conversation found to delete.",
+        type: "error",
+      });
+      return;
+    }
+  }
+
+  setConfirmDialog({
+    isOpen: true,
+    title: "Delete Conversation?",
+    message: `Permanently delete this conversation with ${user.username}? It will be removed from your chat list.`,
+    confirmText: "Delete Conversation",
+    cancelText: "Cancel",
+    highlightText: user.username,
+    icon: "delete",
+    type: "danger",
+    onConfirm: async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.post(
-          `${API_BASE_URL}/api/messages/conversation`,
-          { otherUserId: user._id },
-        );
-        convId = response.data._id;
-        console.log(" Fetched conversation ID:", convId);
-      } catch (err) {
+        await deleteConversation(convId, user._id);
         setAlertDialog({
           isOpen: true,
-          title: "Error",
-          message: "No conversation found to delete.",
+          title: "Conversation Deleted!",
+          message: "Conversation permanently removed from database.",
+          type: "success",
+        });
+        if (onConversationDeleted) {
+          onConversationDeleted(user._id);
+        }
+        setShowMenu(false);
+        setShowOptionsModal(false);
+      } catch (err) {
+        console.error("Delete conversation error:", err);
+        setAlertDialog({
+          isOpen: true,
+          title: "Delete Failed",
+          message: err.response?.data?.message || "Could not delete conversation. Please try again.",
           type: "error",
         });
-        return;
       }
-    }
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Conversation?",
-      message: `Permanently delete this conversation with ${user.username}? It will be removed from your chat list.`,
-      confirmText: "Delete Conversation",
-      cancelText: "Cancel",
-      highlightText: user.username,
-      icon: "delete",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          console.log(" [UserItem] Deleting conversation:", convId);
-          console.log(" User ID:", user._id);
-
-          // Send DELETE request with otherUserId in body
-          const response = await axiosInstance.delete(
-            `${API_BASE_URL}/api/messages/conversation/${convId}/delete`,
-            {
-              data: { otherUserId: user._id },
-            },
-          );
-
-          console.log(" Delete response:", response.data);
-
-          //  Show success alert
-          setAlertDialog({
-            isOpen: true,
-            title: "Conversation Deleted!",
-            message: "Conversation permanently removed from database.",
-            type: "success",
-          });
-
-          //  Call parent's delete handler IMMEDIATELY
-          if (onConversationDeleted) {
-            console.log("Calling onConversationDeleted for user:", user._id);
-            onConversationDeleted(user._id);
-          }
-
-          //  Close menu
-          setShowMenu(false);
-          setShowOptionsModal(false);
-
-          console.log(" Delete completed successfully");
-        } catch (err) {
-          console.error(" Delete conversation error:", err);
-          console.error("Response:", err.response?.data);
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Delete Failed",
-            message:
-              err.response?.data?.message ||
-              "Could not delete conversation. Please try again.",
-            type: "error",
-          });
-        }
-      },
-    });
-
-    setShowMenu(false);
-  };
+    },
+  });
+  setShowMenu(false);
+};
 
   const handleShowProfile = () => {
     setShowProfileDialog(true);

@@ -42,7 +42,25 @@ import {
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
 import apiActions from "@/store/apiActions";
-
+import {
+  loadAllStatuses,
+  loadPinnedConversations,
+  loadArchivedConversations,
+  archiveConversation,
+  unarchiveConversation,
+  pinConversation,
+  unpinConversation,
+  clearChatMessages,
+  removeProfilePicture,
+  loadUserLastMessages,
+  loadGroupLastMessages,
+  formatAttachmentText,
+  playNotificationSound,
+  shouldShowBrowserNotification,
+  requestNotificationPermission,
+  registerServiceWorker,
+  processCallRecordMessage,
+} from "../actions/dashboard.actions";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(
@@ -130,12 +148,6 @@ export default function Dashboard() {
     username: "",
   });
 
-  // Notification sound
-  const playNotificationSound = () => {
-    const audio = new Audio("/sounds/notification.mp3");
-    audio.volume = 0.5;
-    audio.play().catch(() => { });
-  };
 
   // Show notification
   const showNotification = useCallback(
@@ -419,25 +431,20 @@ export default function Dashboard() {
       socket.off("friendRequestReceived", handleFriendRequest);
     };
   }, [socket, currentUserId, dispatch, lastMessages]); // Load all statuses
-  useEffect(() => {
-    const loadAllStatuses = async () => {
-      try {
-
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/status`,
-          {},
-        );
-        setAllStatuses(response.data);
-      } catch (err) {
-        console.error("Load statuses error:", err);
-      }
-    };
-
-    if (currentUserId) {
-      loadAllStatuses();
+useEffect(() => {
+  const loadAllStatusesHandler = async () => {
+    try {
+      const data = await loadAllStatuses();
+      setAllStatuses(data);
+    } catch (err) {
+      console.error("Load statuses error:", err);
     }
-  }, [currentUserId]);
+  };
 
+  if (currentUserId) {
+    loadAllStatusesHandler();
+  }
+}, [currentUserId]);
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
@@ -454,64 +461,49 @@ export default function Dashboard() {
       console.log(" Saved selectedGroupId:", selectedGroup._id);
     }
   }, [selectedGroup]);
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-    // Service Worker register karo
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js");
-    }
-  }, []);
+ useEffect(() => {
+  requestNotificationPermission();
+  registerServiceWorker();
+}, []);
   useEffect(() => {
     lastMessagesRef.current = lastMessages;
   }, [lastMessages]);
 
   // Load pinned conversations
-  useEffect(() => {
-    const loadPinnedConversations = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/messages/pinned`,
-        );
-
-        const pinnedIds = new Set(response.data.map((conv) => conv._id));
-        setPinnedConversations(pinnedIds);
-      } catch (err) {
-        console.error("Failed to load pinned conversations:", err);
-      }
-    };
-
-    if (currentUserId) {
-      loadPinnedConversations();
+useEffect(() => {
+  const loadPinnedConversationsHandler = async () => {
+    try {
+      const pinnedIdsArray = await loadPinnedConversations();
+      setPinnedConversations(new Set(pinnedIdsArray));
+    } catch (err) {
+      console.error("Failed to load pinned conversations:", err);
     }
-  }, [currentUserId]);
+  };
+
+  if (currentUserId) {
+    loadPinnedConversationsHandler();
+  }
+}, [currentUserId]);
 
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage,
   );
 
   // Load archived conversations
-  useEffect(() => {
-    const loadArchivedConversations = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/messages/archived`,
-        );
-
-        const archivedIds = new Set(response.data.map((conv) => conv._id));
-        setArchivedConversations(archivedIds);
-      } catch (err) {
-        console.error("Failed to load archived conversations:", err);
-      }
-    };
-
-    if (currentUserId) {
-      loadArchivedConversations();
+ useEffect(() => {
+  const loadArchivedConversationsHandler = async () => {
+    try {
+      const archivedIdsArray = await loadArchivedConversations();
+      setArchivedConversations(new Set(archivedIdsArray));
+    } catch (err) {
+      console.error("Failed to load archived conversations:", err);
     }
-  }, [currentUserId]);
+  };
+
+  if (currentUserId) {
+    loadArchivedConversationsHandler();
+  }
+}, [currentUserId]);
 
   //  - LOAD ARCHIVED GROUPS
   useEffect(() => {
@@ -547,11 +539,7 @@ export default function Dashboard() {
   //   handleRemoveProfileImage function
   const handleRemoveProfileImage = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-      await axiosInstance.delete(
-        `${API_BASE_URL}/api/users/profile/remove-image`,
-        {},
-      );
+  await removeProfilePicture();
 
       // UPDATE SHARED STATE
       setSharedProfileImage(null);
@@ -577,195 +565,175 @@ export default function Dashboard() {
 
   //Archeived
 
-  const handleArchiveConversation = async (conversationId, isArchived) => {
-    try {
-      const token = localStorage.getItem("accessToken");
+ const handleArchiveConversation = async (conversationId, isArchived) => {
+  try {
+    // CHECK IF IT'S A GROUP
+    const isGroup = groups.some((g) => g._id === conversationId);
 
-      // CHECK IF IT'S A GROUP
-      const isGroup = groups.some((g) => g._id === conversationId);
+    if (isArchived) {
+      // Unarchive
+      await unarchiveConversation(conversationId, isGroup);
 
-      if (isArchived) {
-        // Unarchive
-        const endpoint = isGroup
-          ? `${API_BASE_URL}/api/groups/${conversationId}/unarchive`
-          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unarchive`;
+      setArchivedConversations((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(conversationId);
+        return newSet;
+      });
 
-        await axiosInstance.delete(endpoint, {});
+      //  UPDATE REDUX STATE
+      if (isGroup) {
+        const updatedGroup = groups.find((g) => g._id === conversationId);
+        if (updatedGroup) {
+          const newArchivedBy =
+            updatedGroup.archivedBy?.filter(
+              (a) => a.userId !== currentUserId,
+            ) || [];
 
-        setArchivedConversations((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(conversationId);
-          return newSet;
-        });
-
-        //  UPDATE REDUX STATE
-        if (isGroup) {
-          const updatedGroup = groups.find((g) => g._id === conversationId);
-          if (updatedGroup) {
-            const newArchivedBy =
-              updatedGroup.archivedBy?.filter(
-                (a) => a.userId !== currentUserId,
-              ) || [];
-
-            dispatch(
-              updateGroup({
-                ...updatedGroup,
-                archivedBy: newArchivedBy,
-              }),
-            );
-          }
+          dispatch(
+            updateGroup({
+              ...updatedGroup,
+              archivedBy: newArchivedBy,
+            }),
+          );
         }
-
-        setAlertDialog({
-          isOpen: true,
-          title: isGroup ? "Group Unarchived" : "Chat Unarchived",
-          message: isGroup
-            ? "Group has been restored to main list."
-            : "Chat has been restored to main list.",
-          type: "success",
-        });
-      } else {
-        // Archive
-        const endpoint = isGroup
-          ? `${API_BASE_URL}/api/groups/${conversationId}/archive`
-          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/archive`;
-
-        await axiosInstance.post(endpoint, {});
-
-        setArchivedConversations((prev) => new Set([...prev, conversationId]));
-
-        //  UPDATE REDUX STATE
-        if (isGroup) {
-          const updatedGroup = groups.find((g) => g._id === conversationId);
-          if (updatedGroup) {
-            const newArchivedBy = [
-              ...(updatedGroup.archivedBy || []),
-              { userId: currentUserId, archivedAt: new Date() },
-            ];
-
-            dispatch(
-              updateGroup({
-                ...updatedGroup,
-                archivedBy: newArchivedBy,
-              }),
-            );
-          }
-        }
-
-        setAlertDialog({
-          isOpen: true,
-          title: isGroup ? "Group Archived" : "Chat Archived",
-          message: isGroup
-            ? "Group has been moved to archive."
-            : "Chat has been moved to archive.",
-          type: "success",
-        });
       }
-    } catch (err) {
+
       setAlertDialog({
         isOpen: true,
-        title: "Error",
-        message:
-          err.response?.data?.message || "Failed to update archive status",
-        type: "error",
+        title: isGroup ? "Group Unarchived" : "Chat Unarchived",
+        message: isGroup
+          ? "Group has been restored to main list."
+          : "Chat has been restored to main list.",
+        type: "success",
+      });
+    } else {
+      // Archive
+      await archiveConversation(conversationId, isGroup);
+
+      setArchivedConversations((prev) => new Set([...prev, conversationId]));
+
+      //  UPDATE REDUX STATE
+      if (isGroup) {
+        const updatedGroup = groups.find((g) => g._id === conversationId);
+        if (updatedGroup) {
+          const newArchivedBy = [
+            ...(updatedGroup.archivedBy || []),
+            { userId: currentUserId, archivedAt: new Date() },
+          ];
+
+          dispatch(
+            updateGroup({
+              ...updatedGroup,
+              archivedBy: newArchivedBy,
+            }),
+          );
+        }
+      }
+
+      setAlertDialog({
+        isOpen: true,
+        title: isGroup ? "Group Archived" : "Chat Archived",
+        message: isGroup
+          ? "Group has been moved to archive."
+          : "Chat has been moved to archive.",
+        type: "success",
       });
     }
-  };
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message:
+        err.response?.data?.message || "Failed to update archive status",
+      type: "error",
+    });
+  }
+};
 
   // Pin/Unpin conversation handler
-  const handlePinConversation = async (conversationId, isPinned) => {
-    try {
-      const token = localStorage.getItem("accessToken");
+ const handlePinConversation = async (conversationId, isPinned) => {
+  try {
+    // CHECK IF IT'S A GROUP
+    const isGroup = groups.some((g) => g._id === conversationId);
 
-      // CHECK IF IT'S A GROUP
-      const isGroup = groups.some((g) => g._id === conversationId);
+    if (isPinned) {
+      // Unpin
+      await unpinConversation(conversationId, isGroup);
 
-      if (isPinned) {
-        // Unpin
-        const endpoint = isGroup
-          ? `${API_BASE_URL}/api/groups/${conversationId}/unpin`
-          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unpin`;
+      setPinnedConversations((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(conversationId);
+        return newSet;
+      });
 
-        await axiosInstance.delete(endpoint, {});
+      //  UPDATE REDUX STATE
+      if (isGroup) {
+        const updatedGroup = groups.find((g) => g._id === conversationId);
+        if (updatedGroup) {
+          const newPinnedBy =
+            updatedGroup.pinnedBy?.filter(
+              (p) => p.userId !== currentUserId,
+            ) || [];
 
-        setPinnedConversations((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(conversationId);
-          return newSet;
-        });
-
-        //  UPDATE REDUX STATE
-        if (isGroup) {
-          const updatedGroup = groups.find((g) => g._id === conversationId);
-          if (updatedGroup) {
-            const newPinnedBy =
-              updatedGroup.pinnedBy?.filter(
-                (p) => p.userId !== currentUserId,
-              ) || [];
-
-            dispatch(
-              updateGroup({
-                ...updatedGroup,
-                pinnedBy: newPinnedBy,
-              }),
-            );
-          }
+          dispatch(
+            updateGroup({
+              ...updatedGroup,
+              pinnedBy: newPinnedBy,
+            }),
+          );
         }
-
-        setAlertDialog({
-          isOpen: true,
-          title: isGroup ? "Group Unpinned" : "Chat Unpinned",
-          message: isGroup
-            ? "Group has been unpinned successfully."
-            : "Chat has been unpinned successfully.",
-          type: "success",
-        });
-      } else {
-        // Pin
-        const endpoint = isGroup
-          ? `${API_BASE_URL}/api/groups/${conversationId}/pin`
-          : `${API_BASE_URL}/api/messages/conversation/${conversationId}/pin`;
-
-        await axiosInstance.post(endpoint, {});
-
-        setPinnedConversations((prev) => new Set([...prev, conversationId]));
-
-        //  UPDATE REDUX STATE
-        if (isGroup) {
-          const updatedGroup = groups.find((g) => g._id === conversationId);
-          if (updatedGroup) {
-            const newPinnedBy = [
-              ...(updatedGroup.pinnedBy || []),
-              { userId: currentUserId, pinnedAt: new Date() },
-            ];
-
-            dispatch(
-              updateGroup({
-                ...updatedGroup,
-                pinnedBy: newPinnedBy,
-              }),
-            );
-          }
-        }
-
-        setAlertDialog({
-          isOpen: true,
-          title: isGroup ? "Group Pinned" : "Chat Pinned",
-          message: isGroup
-            ? "Group has been pinned to the top."
-            : "Chat has been pinned to the top.",
-          type: "success",
-        });
       }
-    } catch (err) {
+
       setAlertDialog({
         isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to update pin status",
-        type: "error",
+        title: isGroup ? "Group Unpinned" : "Chat Unpinned",
+        message: isGroup
+          ? "Group has been unpinned successfully."
+          : "Chat has been unpinned successfully.",
+        type: "success",
+      });
+    } else {
+      // Pin
+      await pinConversation(conversationId, isGroup);
+
+      setPinnedConversations((prev) => new Set([...prev, conversationId]));
+
+      //  UPDATE REDUX STATE
+      if (isGroup) {
+        const updatedGroup = groups.find((g) => g._id === conversationId);
+        if (updatedGroup) {
+          const newPinnedBy = [
+            ...(updatedGroup.pinnedBy || []),
+            { userId: currentUserId, pinnedAt: new Date() },
+          ];
+
+          dispatch(
+            updateGroup({
+              ...updatedGroup,
+              pinnedBy: newPinnedBy,
+            }),
+          );
+        }
+      }
+
+      setAlertDialog({
+        isOpen: true,
+        title: isGroup ? "Group Pinned" : "Chat Pinned",
+        message: isGroup
+          ? "Group has been pinned to the top."
+          : "Chat has been pinned to the top.",
+        type: "success",
       });
     }
-  };
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: err.response?.data?.message || "Failed to update pin status",
+      type: "error",
+    });
+  }
+};
   const handleConversationDeleted = (userId) => {
     console.log(
       " [DASHBOARD] Handling conversation deletion for user:",
@@ -811,35 +779,7 @@ export default function Dashboard() {
 
     console.log(" Conversation fully deleted from all states");
   };
-  const formatAttachmentText = (attachments) => {
-    if (!attachments || attachments.length === 0) return "";
-
-    const file = attachments[0];
-
-    //  Check isVoiceMessage flag (most reliable)
-    if (file.isVoiceMessage) {
-      const duration = file.duration || 0;
-      if (duration > 0) {
-        const mins = Math.floor(duration / 60);
-        const secs = Math.floor(duration % 60);
-        return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
-      }
-      return "🎤 Voice message";
-    }
-
-    // Priority 2: Check fileType
-    const fileType = file.fileType || file.type || "";
-
-    if (fileType.startsWith("image/")) return "📷 Photo";
-    if (fileType.startsWith("video/")) return "🎥 Video";
-    if (fileType === "application/pdf") return "📕 PDF";
-    if (fileType.startsWith("audio/")) return "🎵 Audio";
-    if (fileType.includes("word")) return "📄 Document";
-    if (fileType === "text/plain") return "📝 Text file";
-
-    // Default fallback
-    return "📎 File";
-  };
+ 
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -1026,20 +966,14 @@ useEffect(() => {
           }
         }
 
-        //  Load messages for all groups
+             //  Load messages for all groups
         for (const group of groups) {
           try {
-            const msgRes = await axiosInstance.get(
-              `${API_BASE_URL}/api/messages/group/${group._id}`,
-            );
+            const result = await loadGroupLastMessages(group._id, currentUserId);
+            const messages = result.messages;
 
-            const messages = msgRes.data;
-            const visibleMessages = messages.filter(
-              (msg) => !msg.deletedFor?.includes(currentUserId),
-            );
-
-            if (visibleMessages.length > 0) {
-              const lastMsg = visibleMessages[visibleMessages.length - 1];
+            if (messages.length > 0) {
+              const lastMsg = messages[messages.length - 1];
               console.log(" lastMsg:", {
                 id: lastMsg._id,
                 text: lastMsg.text,
@@ -1163,10 +1097,7 @@ useEffect(() => {
 
       console.log(" Clearing chat for conversation:", conversationId);
 
-      await axiosInstance.patch(
-        `${API_BASE_URL}/api/messages/conversation/${conversationId}/clear`,
-        {},
-      );
+  await clearChatMessages(conversationId);
 
       console.log(" Backend cleared successfully");
 
@@ -1272,22 +1203,14 @@ useEffect(() => {
     setShowStatusRings(false);
   };
 
-  const handleStatusCreated = (newStatus) => {
-    // Reload statuses
-    const loadStatuses = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        const response = await axiosInstance.get(
-          `${API_BASE_URL}/api/status`,
-          {},
-        );
-        setAllStatuses(response.data);
-      } catch (err) {
-        console.error("Reload statuses error:", err);
-      }
-    };
-    loadStatuses();
-  };
+ const handleStatusCreated = async (newStatus) => {
+  try {
+    const data = await loadAllStatuses();
+    setAllStatuses(data);
+  } catch (err) {
+    console.error("Reload statuses error:", err);
+  }
+};
 
   return (
     <>

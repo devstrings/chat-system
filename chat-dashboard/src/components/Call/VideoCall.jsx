@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
+import { endCall } from "../actions/videoCall.actions";
 export default function VideoCall({
   remoteUser,
   callType,
@@ -64,9 +65,7 @@ export default function VideoCall({
   }, [socket]);
 
 const handleEndCall = () => {
-  if (socket && remoteUser?._id) {
-    socket.emit("call:cancel", { to: remoteUser._id });
-  }
+  endCall(socket, remoteUser?._id);
   onEndCall?.();
   onClose?.();
 };

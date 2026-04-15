@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/lib/axiosInstance";
+import { loadStatuses } from "../actions/statusRingsList.actions";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -102,45 +102,18 @@ export default function StatusRingsList({
   const [statusUpdates, setStatusUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadStatuses();
-  }, []);
+const onLoadStatuses = async () => {
+  setLoading(true);
+  const result = await loadStatuses(currentUserId);
+  setStatusUpdates(result.data);
+  setLoading(false);
+};
+    
+useEffect(() => {
+  onLoadStatuses();
+}, []);
 
-  const loadStatuses = async () => {
-    try {
-      const response = await axiosInstance.get(`/api/status`);
-      const data = response.data;
 
-      // Filter expired statuses
-      const now = new Date();
-      const filtered = data
-        .map((userStatus) => ({
-          ...userStatus,
-          statuses: userStatus.statuses.filter(
-            (s) => new Date(s.expiresAt) > now,
-          ),
-        }))
-        .filter((u) => u.statuses.length > 0);
-
-      const uniqueUsers = Object.values(
-        filtered.reduce((acc, item) => {
-          const userId = item.user._id;
-          if (!acc[userId]) {
-            acc[userId] = { user: item.user, statuses: [] };
-          }
-          acc[userId].statuses.push(...item.statuses);
-          return acc;
-        }, {}),
-      );
-
-      setStatusUpdates(uniqueUsers);
-    } catch (err) {
-      console.error(" Load statuses error:", err);
-      setStatusUpdates([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const hasUnseenStatus = (userStatuses) => {
     if (!userStatuses?.statuses) return false;

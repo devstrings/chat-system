@@ -1,9 +1,18 @@
 import React, { useState, useRef } from "react";
-import axios from "axios";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import API_BASE_URL from "@/config/api";
 import { useDispatch } from "react-redux";
-import { updateGroup } from "@/store/slices/groupSlice";
+import {
+  handleImageUpload,
+  handleRemoveImage,
+  handleUpdateGroupName,
+  handleSearchUsers,
+  handleAddMember,
+  handleRemoveMember,
+  handleMakeAdmin,
+  handleRemoveAdmin,
+  handleExitGroup,
+  handleDeleteGroup,
+} from "../actions/groupProfile.actions";
 
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {
@@ -401,468 +410,39 @@ export default function GroupProfile({
   };
 
   // Upload group image
-  const handleImageUpload = async () => {
-    if (!selectedImage) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("groupImage", selectedImage);
-
-      const token = localStorage.getItem("accessToken");
-
-      const response = await axios.put(
-        `${API_BASE_URL}/api/groups/${group._id}/image`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        },
-      );
-
-      const updatedGroup = {
-        ...response.data,
-        groupImage: response.data.groupImage
-          ? `${response.data.groupImage}?t=${Date.now()}`
-          : null,
-      };
-
-      onGroupUpdate(updatedGroup);
-      setSelectedImage(null);
-      setImagePreview(null);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Group picture updated successfully",
-        type: "success",
-      });
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to upload image",
-        type: "error",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
+const onImageUpload = () =>
+    handleImageUpload(selectedImage, group, onGroupUpdate, setSelectedImage, setImagePreview, setAlertDialog, setUploading);
 
   // Remove group image
-  const handleRemoveImage = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Remove Group Image?",
-      message: "Are you sure you want to remove the group profile picture?",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          const token = localStorage.getItem("accessToken");
-          const response = await axios.delete(
-            `${API_BASE_URL}/api/groups/${group._id}/image`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          onGroupUpdate(response.data);
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Image Removed",
-            message: "Group image has been removed successfully",
-            type: "success",
-          });
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.response?.data?.message || "Failed to remove image",
-            type: "error",
-          });
-        }
-      },
-    });
-  };
+ const onRemoveImage = () =>
+    handleRemoveImage(group, onGroupUpdate, setConfirmDialog, setAlertDialog);
 
   // Update group name
-  const handleUpdateGroupName = async () => {
-    if (!groupName.trim()) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Invalid Name",
-        message: "Group name cannot be empty",
-        type: "error",
-      });
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      const response = await axios.put(
-        `${API_BASE_URL}/api/groups/${group._id}`,
-        { name: groupName },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      onGroupUpdate(response.data);
-      setIsEditingName(false);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Group name updated successfully",
-        type: "success",
-      });
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to update group name",
-        type: "error",
-      });
-    }
-  };
+const onUpdateGroupName = () =>
+    handleUpdateGroupName(groupName, group, onGroupUpdate, setIsEditingName, setAlertDialog);
 
   // Search users
-  const handleSearchUsers = async () => {
-    if (!searchUsers.trim()) return;
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axios.get(
-        `${API_BASE_URL}/api/users/search?q=${searchUsers}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      const filtered = res.data.filter(
-        (u) => !group.members.some((m) => m._id === u._id),
-      );
-      setSearchResults(filtered);
-    } catch (err) {
-      console.error("Search error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+ const onSearchUsers = () =>
+    handleSearchUsers(searchUsers, group, setSearchResults, setLoading);
 
   //  Add member
-  const handleAddMember = async (userId) => {
-    const token = localStorage.getItem("accessToken");
-
-    const isAlreadyMember = group.members.some((m) => m._id === userId);
-
-    if (isAlreadyMember) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Already a Member",
-        message: "This user is already a member of the group",
-        type: "info",
-      });
-      return;
-    }
-
-    let res;
-
-    try {
-      res = await axios.post(
-        `${API_BASE_URL}/api/groups/${group._id}/add-members`,
-        { memberIds: [userId] },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      console.log(" MEMBER ADDED - Response:", res.data);
-
-      //  UPDATE STATE
-      dispatch(updateGroup(res.data));
-      onGroupUpdate(res.data);
-
-      setSearchResults([]);
-      setSearchUsers("");
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Member Added!",
-        message: "Member added to group successfully",
-        type: "success",
-      });
-    } catch (err) {
-      console.error(" ADD MEMBER ERROR:", err.response?.data);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to add member",
-        type: "error",
-      });
-    }
-  };
+  const onAddMember = (userId) =>
+    handleAddMember(userId, group, dispatch, onGroupUpdate, setSearchResults, setSearchUsers, setAlertDialog);
   // Remove member
-  const handleRemoveMember = (memberId) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Remove Member?",
-      message: "Are you sure you want to remove this member from the group?",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          const token = localStorage.getItem("accessToken");
-
-          const res = await axios.delete(
-            `${API_BASE_URL}/api/groups/${group._id}/remove/${memberId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          console.log(" MEMBER REMOVED - Response:", res.data);
-
-          //  UPDATE STATE
-          dispatch(updateGroup(res.data));
-          onMemberRemoved(memberId);
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Member Removed",
-            message: "Member removed from group successfully",
-            type: "success",
-          });
-        } catch (err) {
-          console.error(" REMOVE MEMBER ERROR:", err.response?.data);
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.response?.data?.message || "Failed to remove member",
-            type: "error",
-          });
-        }
-      },
-    });
-  };
+const onRemoveMember = (memberId) =>
+    handleRemoveMember(memberId, group, dispatch, onMemberRemoved, setConfirmDialog, setAlertDialog);
   //  make ADMIN FUNCTION
-  const handleMakeAdmin = async (memberId) => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axios.post(
-        `${API_BASE_URL}/api/groups/${group._id}/make-admin/${memberId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      console.log(" ADMIN ADDED - Response:", res.data);
-
-      //  UPDATE STATE
-      dispatch(updateGroup(res.data));
-      onGroupUpdate(res.data);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Admin Added!",
-        message: "Member has been promoted to admin successfully.",
-        type: "success",
-      });
-    } catch (err) {
-      console.error(" MAKE ADMIN ERROR:", err.response?.data);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: err.response?.data?.message || "Failed to make admin",
-        type: "error",
-      });
-    }
-  };
+const onMakeAdmin = (memberId) =>
+    handleMakeAdmin(memberId, group, dispatch, onGroupUpdate, setAlertDialog);
   // Remove Admin Function
-  const handleRemoveAdmin = async (memberId) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Remove Admin Status?",
-      message:
-        "Are you sure you want to demote this admin to a regular member?",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          const token = localStorage.getItem("accessToken");
-
-          const res = await axios.delete(
-            `${API_BASE_URL}/api/groups/${group._id}/remove-admin/${memberId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          console.log("ADMIN REMOVED - Response:", res.data);
-
-          //  UPDATE STATE
-          dispatch(updateGroup(res.data));
-          onGroupUpdate(res.data);
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Admin Removed!",
-            message: "Member has been demoted to regular member successfully.",
-            type: "success",
-          });
-        } catch (err) {
-          console.error(" REMOVE ADMIN ERROR:", err.response?.data);
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.response?.data?.message || "Failed to remove admin",
-            type: "error",
-          });
-        }
-      },
-    });
-  };
+ const onRemoveAdmin = (memberId) =>
+    handleRemoveAdmin(memberId, group, dispatch, onGroupUpdate, setConfirmDialog, setAlertDialog);
   // Exit group
-  const handleExitGroup = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Leave Group?",
-      message: `Are you sure you want to leave ${group.name}?`,
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          const token = localStorage.getItem("accessToken");
-          await axios.post(
-            `${API_BASE_URL}/api/groups/${group._id}/leave`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-
-          setAlertDialog({
-            isOpen: true,
-            title: "Left Group",
-            message: "You have left the group successfully",
-            type: "info",
-          });
-
-          setTimeout(() => {
-            onGroupDeleted();
-            onClose();
-          }, 1500);
-        } catch (err) {
-          setAlertDialog({
-            isOpen: true,
-            title: "Error",
-            message: err.response?.data?.message || "Failed to exit group",
-            type: "error",
-          });
-        }
-      },
-    });
-  };
-
+ const onExitGroup = () =>
+    handleExitGroup(group, onGroupDeleted, onClose, setConfirmDialog, setAlertDialog);
   // Delete group
-  const handleDeleteGroup = () => {
-    // CHECK: Is user the ONLY admin?
-    const isOnlyAdmin =
-      group.admins.length === 1 &&
-      group.admins.some((a) => (a._id || a) === currentUserId);
-
-    if (isOnlyAdmin && group.members.length > 1) {
-      //  SHOW WARNING WITH OPTIONS
-      setConfirmDialog({
-        isOpen: true,
-        title: " You're the Only Admin!",
-        message: `You are the only admin of "${group.name}". Choose an option:
-      
-- Make another member admin first (recommended)
-- Delete group for everyone`,
-        confirmText: "Show Members",
-        cancelText: "Delete Anyway",
-        type: "warning",
-        onConfirm: () => {
-          // OPTION 1: Show member list to make admin
-          setShowAddMember(false);
-          setAlertDialog({
-            isOpen: true,
-            title: "Make Someone Admin First",
-            message:
-              "Select a member from the list below to make them admin, then you can delete the group.",
-            type: "info",
-          });
-          //
-        },
-        onCancel: () => {
-          // OPTION 2: Delete anyway
-          setConfirmDialog({
-            isOpen: true,
-            title: "Delete Group for Everyone?",
-            message: `Are you sure you want to delete "${group.name}"? This will remove the group for ALL members. This action cannot be undone.`,
-            confirmText: "Delete Group",
-            cancelText: "Cancel",
-            type: "danger",
-            onConfirm: async () => {
-              try {
-                const token = localStorage.getItem("accessToken");
-                await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-
-                setAlertDialog({
-                  isOpen: true,
-                  title: "Group Deleted",
-                  message: "Group has been deleted successfully",
-                  type: "success",
-                });
-
-                setTimeout(() => {
-                  onGroupDeleted();
-                  onClose();
-                }, 1500);
-              } catch (err) {
-                setAlertDialog({
-                  isOpen: true,
-                  title: "Error",
-                  message:
-                    err.response?.data?.message || "Failed to delete group",
-                  type: "error",
-                });
-              }
-            },
-          });
-        },
-      });
-    } else {
-      //  NORMAL DELETE
-      setConfirmDialog({
-        isOpen: true,
-        title: "Delete Group?",
-        message: `Are you sure you want to delete "${group.name}"? This action cannot be undone.`,
-        confirmText: "Delete Group",
-        cancelText: "Cancel",
-        type: "danger",
-        onConfirm: async () => {
-          try {
-            const token = localStorage.getItem("accessToken");
-            await axios.delete(`${API_BASE_URL}/api/groups/${group._id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-
-            setAlertDialog({
-              isOpen: true,
-              title: "Group Deleted",
-              message: "Group has been deleted successfully",
-              type: "success",
-            });
-
-            setTimeout(() => {
-              onGroupDeleted();
-              onClose();
-            }, 1500);
-          } catch (err) {
-            setAlertDialog({
-              isOpen: true,
-              title: "Error",
-              message: err.response?.data?.message || "Failed to delete group",
-              type: "error",
-            });
-          }
-        },
-      });
-    }
-
-    setShowMenu(false);
-  };
+const onDeleteGroup = () =>
+    handleDeleteGroup(group, currentUserId, onGroupDeleted, onClose, setConfirmDialog, setAlertDialog, setShowAddMember);
 
   return (
     <>
@@ -972,7 +552,7 @@ export default function GroupProfile({
 
                   {(groupImage || imagePreview) && (
                     <button
-                      onClick={handleRemoveImage}
+onClick={onRemoveImage}
                       className="absolute bottom-0 left-0 p-2.5 bg-red-500 hover:bg-red-600 rounded-full shadow-lg border-2 border-white transition-all transform hover:scale-110"
                     >
                       <svg
@@ -998,7 +578,7 @@ export default function GroupProfile({
             {selectedImage && isAdmin && (
               <div className="flex gap-2 mb-4">
                 <button
-                  onClick={handleImageUpload}
+onClick={onImageUpload}
                   disabled={uploading}
                   className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
                 >
@@ -1026,7 +606,7 @@ export default function GroupProfile({
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center text-xl font-bold"
                 />
                 <button
-                  onClick={handleUpdateGroupName}
+onClick={onUpdateGroupName}
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-semibold"
                 >
                   Save
@@ -1127,14 +707,12 @@ export default function GroupProfile({
                         placeholder="Search users..."
                         value={searchUsers}
                         onChange={(e) => setSearchUsers(e.target.value)}
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && handleSearchUsers()
-                        }
+                      onKeyPress={(e) => e.key === "Enter" && onSearchUsers()}
                         className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                       <button
-                        onClick={handleSearchUsers}
-                        disabled={loading}
+  onClick={onSearchUsers}
+                          disabled={loading}
                         className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold disabled:opacity-50"
                       >
                         {loading ? "..." : "Search"}
@@ -1150,7 +728,7 @@ export default function GroupProfile({
                           >
                             <span className="font-medium">{user.username}</span>
                             <button
-                              onClick={() => handleAddMember(user._id)}
+onClick={() => onAddMember(user._id)}
                               className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold"
                             >
                               Add
@@ -1195,9 +773,9 @@ export default function GroupProfile({
                       currentUserId={currentUserId}
                       currentUserIsAdmin={isAdmin}
                       currentUserIsCreator={isCreator}
-                      onRemove={() => handleRemoveMember(member._id)}
-                      onMakeAdmin={handleMakeAdmin}
-                      onRemoveAdmin={handleRemoveAdmin}
+                   onRemove={() => onRemoveMember(member._id)}
+onMakeAdmin={onMakeAdmin}
+onRemoveAdmin={onRemoveAdmin}
                     />
                   );
                 })}
@@ -1208,7 +786,7 @@ export default function GroupProfile({
             <div className="space-y-3">
               {isCreator ? (
                 <button
-                  onClick={handleDeleteGroup}
+onClick={onDeleteGroup}
                   className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                   <svg
@@ -1228,8 +806,7 @@ export default function GroupProfile({
                 </button>
               ) : (
                 <button
-                  onClick={handleExitGroup}
-                  className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+onClick={onExitGroup}                  className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                   <svg
                     className="w-5 h-5"

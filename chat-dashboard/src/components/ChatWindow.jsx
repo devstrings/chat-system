@@ -10,7 +10,13 @@ import {
 
 import { useDispatch, useSelector } from "react-redux";
 import Button from "@/components/base/Button";
-
+import {
+  toggleMessageSelection,
+  selectAllMessages,
+  deselectAllMessages,
+  toggleSelectionMode,
+  confirmBulkDelete,
+} from "../actions/chatWindow.actions";
 export default function ChatWindow({
   conversationId,
   currentUserId,
@@ -127,31 +133,10 @@ export default function ChatWindow({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
 
-  const toggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode);
-    setSelectedMessages(new Set());
-  };
 
-  const toggleMessageSelection = (messageId) => {
-    setSelectedMessages((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) {
-        newSet.delete(messageId);
-      } else {
-        newSet.add(messageId);
-      }
-      return newSet;
-    });
-  };
 
-  const selectAllMessages = () => {
-    const allMessageIds = messages.map((msg) => msg._id);
-    setSelectedMessages(new Set(allMessageIds));
-  };
 
-  const deselectAllMessages = () => {
-    setSelectedMessages(new Set());
-  };
+ 
 
   const handleBulkDelete = () => {
     if (selectedMessages.size === 0) {
@@ -164,30 +149,8 @@ export default function ChatWindow({
     });
   };
 
-  const confirmBulkDelete = async () => {
-    try {
-      const messageIds = Array.from(selectedMessages);
-
-      //  Redux async thunk
-      await dispatch(
-        bulkDeleteMessages({
-          messageIds,
-          conversationId,
-          deleteForEveryone: false, // For me only
-        }),
-      ).unwrap();
-
-      // Clear selection
-      setIsSelectionMode(false);
-      setSelectedMessages(new Set());
-      setDeleteDialog({ isOpen: false, count: 0 });
-
-      console.log(` Deleted ${messageIds.length} messages`);
-    } catch (err) {
-      console.error(" Bulk delete error:", err);
-      alert("Failed to delete messages");
-    }
-  };
+ const onConfirmBulkDelete = () =>
+    confirmBulkDelete(selectedMessages, conversationId, dispatch, setIsSelectionMode, setSelectedMessages, setDeleteDialog);
 
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
@@ -288,7 +251,7 @@ export default function ChatWindow({
           <div className="bg-white border-b border-gray-300 shadow-sm px-2 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
               <Button
-                onClick={toggleSelectionMode}
+onClick={() => toggleSelectionMode(isSelectionMode, setIsSelectionMode, setSelectedMessages)}
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 <svg
@@ -313,14 +276,14 @@ export default function ChatWindow({
             <div className="flex items-center gap-2">
               {selectedMessages.size < filteredMessages.length ? (
                 <Button
-                  onClick={selectAllMessages}
+onClick={() => selectAllMessages(setSelectedMessages, messages)}
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   All
                 </Button>
               ) : (
                 <Button
-                  onClick={deselectAllMessages}
+onClick={() => deselectAllMessages(setSelectedMessages)}
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   None
@@ -453,7 +416,7 @@ export default function ChatWindow({
                     }
                     isSelectionMode={isSelectionMode}
                     isSelected={selectedMessages.has(msg._id)}
-                    onToggleSelect={toggleMessageSelection}
+onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messageId)}
                     onEnterSelectionMode={() => setIsSelectionMode(true)}
                     onReply={onReply}
                   />
@@ -496,7 +459,7 @@ export default function ChatWindow({
       <ConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false })}
-        onConfirm={confirmBulkDelete}
+onConfirm={onConfirmBulkDelete}
         title="Delete Messages?"
         message={`Delete ${deleteDialog.count} message(s) for you? This action cannot be undone.`}
         confirmText="Delete"

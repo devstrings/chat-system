@@ -1,7 +1,7 @@
 // StatusViewer.jsx - VIEWER ONLY
 import React, { useState, useEffect, useRef } from "react";
 import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/lib/axiosInstance";
+import { markStatusAsViewed, formatTime } from "../actions/statusViewer.actions";
 //  Profile Image Component
 function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
   const [imageSrc, setImageSrc] = useState(null);
@@ -165,19 +165,11 @@ export default function StatusViewer({
     currentStatus,
     statusDuration,
   ]);
-  useEffect(() => {
+ useEffect(() => {
     if (!currentStatus) return;
 
-    const markAsViewed = async () => {
-      try {
-        await axiosInstance.post(`/api/status/${currentStatus._id}/view`);
-      } catch (err) {
-        console.error("Mark as viewed error:", err);
-      }
-    };
-
     if (currentStatus.userId._id !== currentUserId) {
-      markAsViewed();
+      markStatusAsViewed(currentStatus._id);
     }
   }, [currentStatus?._id]);
   const handleNext = () => {
@@ -225,28 +217,7 @@ export default function StatusViewer({
     setIsPaused(false);
   };
 
-  const formatTime = (date) => {
-    if (!date) return "";
-    const now = new Date();
-    const statusDate = new Date(date);
-    const diff = now - statusDate;
 
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-
-    return statusDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   if (!currentStatus || !currentUserStatuses) {
     return null;

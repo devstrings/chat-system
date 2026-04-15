@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useSelector } from "react-redux";
+import { startRinging, stopRinging, rejectCall } from "../actions/incomingCall.actions";
 
 export default function IncomingCall({
   onCallAccepted,
@@ -10,44 +11,30 @@ export default function IncomingCall({
   const [incomingCall, setIncomingCall] = useState(null);
   const ringAudioRef = useRef(null);
 
-  //  Ringing start
-  const startRinging = () => {
-    const audio = new Audio("/sounds/ringing.mp3");
-    audio.loop = true;
-    audio.play().catch((e) => console.log("Audio error:", e));
-    ringAudioRef.current = audio;
-  };
 
-  //  Ringing stop
-  const stopRinging = () => {
-    if (ringAudioRef.current) {
-      ringAudioRef.current.pause();
-      ringAudioRef.current.currentTime = 0;
-      ringAudioRef.current = null;
-    }
-  };
+
 
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("call:incoming", (data) => {
+   socket.on("call:incoming", (data) => {
       console.log(" Incoming call from:", data.callerUsername);
       setIncomingCall(data);
-      startRinging();
+      startRinging(ringAudioRef);
     });
 
-    socket.on("call:rejected", () => {
-      stopRinging();
+   socket.on("call:rejected", () => {
+      stopRinging(ringAudioRef);
       setIncomingCall(null);
     });
 
     socket.on("call:ended", () => {
-      stopRinging();
+      stopRinging(ringAudioRef);
       setIncomingCall(null);
     });
 
     socket.on("call:cancelled", () => {
-      stopRinging();
+      stopRinging(ringAudioRef);
       setIncomingCall(null);
     });
 
@@ -58,9 +45,8 @@ export default function IncomingCall({
       socket.off("call:cancelled");
     };
   }, [socket]);
-
-  const handleAccept = async () => {
-    stopRinging();
+const handleAccept = async () => {
+    stopRinging(ringAudioRef);
     if (incomingCall) {
       console.log(" Accepting call from:", incomingCall);
       await answerCall(
@@ -80,14 +66,9 @@ export default function IncomingCall({
     }
   };
 
-  const handleReject = () => {
-    stopRinging();
-    if (socket && incomingCall) {
-      socket.emit("call:reject", {
-        to: incomingCall.from,
-        callId: incomingCall.callId,
-      });
-    }
+const handleReject = () => {
+    stopRinging(ringAudioRef);
+    rejectCall(socket, incomingCall);
     setIncomingCall(null);
   };
 

@@ -3,7 +3,21 @@ import { useAuthImage } from "@/hooks/useAuthImage";
 import axiosInstance from "@/lib/axiosInstance";
 import AlertDialog from "@/components/base/AlertDialog";
 import API_BASE_URL from "@/config/api";
-
+import AlertDialog from "@/components/base/AlertDialog";
+import {
+  checkLocalAuth,
+  loadBlockedUsers,
+  loadPendingRequests,
+  uploadProfilePicture,
+  uploadCoverPhoto,
+  removeCoverPhoto,
+  removeProfilePicture,
+  setPassword,
+  changePassword,
+  unblockUser,
+  acceptFriendRequest,
+  rejectFriendRequest,
+} from "../actions/profileSettings.actions";
 function AuthImage({ imageUrl, username, className }) {
   const { imageSrc, loading } = useAuthImage(imageUrl);
   if (loading)
@@ -71,25 +85,24 @@ export default function ProfileSettings({
   const photoMenuRef = useRef(null);
 
   //Check if user has local auth
-  useEffect(() => {
-    checkLocalAuth();
-  }, []);
+ useEffect(() => {
+  checkLocalAuthHandler();  
+}, []);
 
-  const checkLocalAuth = async () => {
-    try {
-      const response = await axiosInstance.get(`${API_BASE_URL}/api/auth/me`);
-
-      setAuthProvider(response.data.primaryProvider);
-      setHasPassword(response.data.hasPassword);
-      setHasLocalAuth(response.data.hasLocalAuth);
-    } catch (err) {
-      console.error("Check auth error:", err);
-    }
-  };
-  useEffect(() => {
-    loadBlockedUsers();
-    loadPendingRequests();
-  }, []);
+ const checkLocalAuthHandler = async () => {
+  try {
+    const data = await checkLocalAuth();
+    setAuthProvider(data.authProvider);
+    setHasPassword(data.hasPassword);
+    setHasLocalAuth(data.hasLocalAuth);
+  } catch (err) {
+    console.error("Check auth error:", err);
+  }
+};
+ useEffect(() => {
+  loadBlockedUsersHandler();   
+  loadPendingRequestsHandler(); 
+}, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -108,317 +121,279 @@ export default function ProfileSettings({
     };
   }, [showPhotoMenu]);
 
-  const loadBlockedUsers = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/friends/blocked`);
-      setBlockedUsers(res.data);
-    } catch (err) { }
-  };
+const loadBlockedUsersHandler = async () => {
+  try {
+    const data = await loadBlockedUsers();
+    setBlockedUsers(data);
+  } catch (err) { }
+};
 
-  const loadPendingRequests = async () => {
-    try {
-      const res = await axiosInstance.get(`/api/friends/requests/pending`);
-      setPendingRequests(res.data);
-    } catch (err) { }
-  };
+const loadPendingRequestsHandler = async () => {
+  try {
+    const data = await loadPendingRequests();
+    setPendingRequests(data);
+  } catch (err) { }
+};
 
   const handleUploadClick = () => {
     fileInputRef.current.click();
     setShowPhotoMenu(false);
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
+const handleFileChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setLoading(true);
+  try {
+    const imageUrl = await uploadProfilePicture(file);
+    onProfileImageUpdate(imageUrl);
+    setAlertDialog({
+      isOpen: true,
+      title: "Success!",
+      message: "Profile picture uploaded successfully!",
+      type: "success",
+    });
+  } catch (err) {
+    console.error("Upload failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to upload profile picture",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
-      const uploadRes = await axiosInstance.post(
-        `/api/users/profile/upload`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
-      const imageUrl = uploadRes.data.imageUrl;
+ const handleCoverPhotoChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-      await axiosInstance.put(`/api/users/profile/update-image`, {
-        profileImage: imageUrl,
-      });
+  setCoverPhotoLoading(true);
+  try {
+    const coverPhotoWithTimestamp = await uploadCoverPhoto(file);
+    onProfileImageUpdate(coverPhotoWithTimestamp, true);
+    setCoverPhotoPreview(coverPhotoWithTimestamp);
 
-      onProfileImageUpdate(imageUrl);
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Profile picture uploaded successfully!",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Upload failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to upload profile picture",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setAlertDialog({
+      isOpen: true,
+      title: "Success!",
+      message: "Cover photo uploaded successfully!",
+      type: "success",
+    });
+  } catch (err) {
+    console.error("Cover upload failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to upload cover photo",
+      type: "error",
+    });
+  } finally {
+    setCoverPhotoLoading(false);
+  }
+};
+ const handleRemoveCoverPhoto = async () => {
+  setCoverPhotoLoading(true);
+  try {
+    await removeCoverPhoto();
+    onProfileImageUpdate(null, true);
+    setCoverPhotoPreview(null);
 
-  const handleCoverPhotoChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    setAlertDialog({
+      isOpen: true,
+      title: "Removed!",
+      message: "Cover photo removed successfully",
+      type: "success",
+    });
+  } catch (err) {
+    console.error("Remove cover failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to remove cover photo",
+      type: "error",
+    });
+  } finally {
+    setCoverPhotoLoading(false);
+  }
+};
 
-    setCoverPhotoLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("coverPhoto", file);
-
-      const uploadRes = await axiosInstance.post(
-        `/api/users/profile/upload-cover`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
-      const uploadData = uploadRes.data;
-      const coverPhotoWithTimestamp = `${uploadData.coverPhotoUrl}?t=${Date.now()}`;
-
-      onProfileImageUpdate(coverPhotoWithTimestamp, true);
-      setCoverPhotoPreview(coverPhotoWithTimestamp);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Cover photo uploaded successfully!",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Cover upload failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to upload cover photo",
-        type: "error",
-      });
-    } finally {
-      setCoverPhotoLoading(false);
-    }
-  };
-
-  const handleRemoveCoverPhoto = async () => {
-    setCoverPhotoLoading(true);
-    try {
-      await axiosInstance.delete(`/api/users/profile/remove-cover`);
-      onProfileImageUpdate(null, true);
-      setCoverPhotoPreview(null);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Removed!",
-        message: "Cover photo removed successfully",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Remove cover failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to remove cover photo",
-        type: "error",
-      });
-    } finally {
-      setCoverPhotoLoading(false);
-    }
-  };
-
-  const handleRemoveImage = async () => {
-    setLoading(true);
-    try {
-      await axiosInstance.delete(`/api/users/profile/remove-image`);
-
-      onProfileImageUpdate(null);
-      setShowPhotoMenu(false);
-      setAlertDialog({
-        isOpen: true,
-        title: "Removed!",
-        message: "Profile picture removed successfully",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Remove failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to remove profile picture",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleRemoveImage = async () => {
+  setLoading(true);
+  try {
+    await removeProfilePicture();
+    onProfileImageUpdate(null);
+    setShowPhotoMenu(false);
+    setAlertDialog({
+      isOpen: true,
+      title: "Removed!",
+      message: "Profile picture removed successfully",
+      type: "success",
+    });
+  } catch (err) {
+    console.error("Remove failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to remove profile picture",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Set Password Handler
-  const handleSetPassword = async (e) => {
-    e.preventDefault();
-    setPasswordError("");
-    setPasswordSuccess("");
+ const handleSetPassword = async (e) => {
+  e.preventDefault();
+  setPasswordError("");
+  setPasswordSuccess("");
 
-    if (newPassword.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
-      return;
-    }
+  if (newPassword.length < 6) {
+    setPasswordError("Password must be at least 6 characters");
+    return;
+  }
 
-    if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match");
-      return;
-    }
+  if (newPassword !== confirmPassword) {
+    setPasswordError("Passwords do not match");
+    return;
+  }
 
-    setPasswordLoading(true);
+  setPasswordLoading(true);
 
-    try {
-      const token = localStorage.getItem("accessToken");
-      const response = await axiosInstance.post(
-        `${API_BASE_URL}/api/auth/set-password`,
-        { newPassword },
-      );
+  try {
+    const response = await setPassword(newPassword);
+    setPasswordSuccess(response.message);
+    setNewPassword("");
+    setConfirmPassword("");
+    setHasPassword(true);
 
-      setPasswordSuccess(response.data.message);
-      setNewPassword("");
-      setConfirmPassword("");
+    await checkLocalAuthHandler();
 
-      setHasPassword(true);
-
-      //  RELOAD USER DATA
-      await checkLocalAuth();
-
-      setTimeout(() => {
-        setPasswordSuccess("Password set successfully! Refreshing...");
-        window.location.reload();
-      }, 1000);
-    } catch (err) {
-      console.error(" Set Password Error:", err.response?.data);
-      setPasswordError(err.response?.data?.message || "Failed to set password");
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
+    setTimeout(() => {
+      setPasswordSuccess("Password set successfully! Refreshing...");
+      window.location.reload();
+    }, 1000);
+  } catch (err) {
+    console.error("Set Password Error:", err.response?.data);
+    setPasswordError(err.response?.data?.message || "Failed to set password");
+  } finally {
+    setPasswordLoading(false);
+  }
+};
   // Add handler
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    setChangePasswordError("");
-    setChangePasswordSuccess("");
+const handleChangePassword = async (e) => {
+  e.preventDefault();
+  setChangePasswordError("");
+  setChangePasswordSuccess("");
 
-    // Validation
-    if (!oldPassword) {
-      setChangePasswordError("Current password is required");
-      return;
-    }
+  if (!oldPassword) {
+    setChangePasswordError("Current password is required");
+    return;
+  }
 
-    if (newPassword.length < 6) {
-      setChangePasswordError("New password must be at least 6 characters");
-      return;
-    }
+  if (newPassword.length < 6) {
+    setChangePasswordError("New password must be at least 6 characters");
+    return;
+  }
 
-    if (newPassword !== confirmPassword) {
-      setChangePasswordError("Passwords do not match");
-      return;
-    }
+  if (newPassword !== confirmPassword) {
+    setChangePasswordError("Passwords do not match");
+    return;
+  }
 
-    if (oldPassword === newPassword) {
-      setChangePasswordError("New password must be different");
-      return;
-    }
+  if (oldPassword === newPassword) {
+    setChangePasswordError("New password must be different");
+    return;
+  }
 
-    setChangePasswordLoading(true);
+  setChangePasswordLoading(true);
 
-    try {
-      const response = await axiosInstance.post(
-        `${API_BASE_URL}/api/auth/change-password`,
-        { oldPassword, newPassword },
-      );
+  try {
+    const response = await changePassword(oldPassword, newPassword);
+    setChangePasswordSuccess(response.message);
+    setOldPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
 
-      setChangePasswordSuccess(response.data.message);
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+    await checkLocalAuthHandler();
 
-      //  RELOAD USER DATA
-      await checkLocalAuth();
+    setTimeout(() => {
+      setChangePasswordSuccess("");
+    }, 5000);
+  } catch (err) {
+    setChangePasswordError(
+      err.response?.data?.message || "Failed to change password",
+    );
+  } finally {
+    setChangePasswordLoading(false);
+  }
+};
+const handleUnblockUser = async (userId) => {
+  try {
+    await unblockUser(userId);
+    setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
+    setAlertDialog({
+      isOpen: true,
+      title: "Success!",
+      message: "User unblocked successfully!",
+      type: "success",
+    });
+  } catch (err) {
+    console.error("Unblock failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to unblock user",
+      type: "error",
+    });
+  }
+};
 
-      setTimeout(() => {
-        setChangePasswordSuccess("");
-      }, 5000);
-    } catch (err) {
-      setChangePasswordError(
-        err.response?.data?.message || "Failed to change password",
-      );
-    } finally {
-      setChangePasswordLoading(false);
-    }
-  };
-  const handleUnblockUser = async (userId) => {
-    try {
-      await axiosInstance.delete(`/api/friends/unblock/${userId}`);
-      setBlockedUsers(blockedUsers.filter((b) => b.blocked._id !== userId));
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "User unblocked successfully!",
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Unblock failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to unblock user",
-        type: "error",
-      });
-    }
-  };
+const handleAcceptRequest = async (requestId) => {
+  try {
+    await acceptFriendRequest(requestId);
+    setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
+    setAlertDialog({
+      isOpen: true,
+      title: "Accepted!",
+      message: "Friend request accepted!",
+      type: "success",
+    });
+    setTimeout(() => window.location.reload(), 1500);
+  } catch (err) {
+    console.error("Accept failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to accept request",
+      type: "error",
+    });
+  }
+};
 
-  const handleAcceptRequest = async (requestId) => {
-    try {
-      await axiosInstance.post(`/api/friends/request/${requestId}/accept`);
-      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
-      setAlertDialog({
-        isOpen: true,
-        title: "Accepted!",
-        message: "Friend request accepted!",
-        type: "success",
-      });
-      setTimeout(() => window.location.reload(), 1500);
-    } catch (err) {
-      console.error("Accept failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to accept request",
-        type: "error",
-      });
-    }
-  };
-
-  const handleRejectRequest = async (requestId) => {
-    try {
-      await axiosInstance.delete(`/api/friends/request/${requestId}/reject`);
-      setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
-      setAlertDialog({
-        isOpen: true,
-        title: "Rejected",
-        message: "Friend request rejected",
-        type: "info",
-      });
-    } catch (err) {
-      console.error("Reject failed:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "Failed to reject request",
-        type: "error",
-      });
-    }
-  };
+const handleRejectRequest = async (requestId) => {
+  try {
+    await rejectFriendRequest(requestId);
+    setPendingRequests(pendingRequests.filter((r) => r._id !== requestId));
+    setAlertDialog({
+      isOpen: true,
+      title: "Rejected",
+      message: "Friend request rejected",
+      type: "info",
+    });
+  } catch (err) {
+    console.error("Reject failed:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Error",
+      message: "Failed to reject request",
+      type: "error",
+    });
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-0 md:p-4">

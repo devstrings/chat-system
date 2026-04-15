@@ -7,6 +7,12 @@ import { useAuthImage } from "@/hooks/useAuthImage";
 import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  searchUsers,
+  sendFriendRequest,
+  formatLastMessageText,
+  formatTime,
+} from "../actions/sidebar.actions";
+import {
   fetchPendingRequests,
   fetchBlockedUsers,
   acceptFriendRequest,
@@ -112,17 +118,7 @@ export default function Sidebar({
     type: "success",
   });
 
-  const formatTime = (date) => {
-    if (!date) return "";
-
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "";
-
-    return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+ 
 
   const memoizedItems = useMemo(() => {
     // If searching, show ALL friends matching search
@@ -274,112 +270,56 @@ export default function Sidebar({
     return convId && archivedConversations.has(convId);
   }).length;
 
-  const formatLastMessageText = (message) => {
-    if (!message) return "";
-    if (message.text === "" && !message.attachments?.length) return "";
-    // Call record
-    if (message.isCallRecord) {
-      const icon = message.callType === "video" ? "📹" : "📞";
-      if (message.callStatus === "missed") return `${icon} Missed Call`;
-      if (message.callStatus === "rejected") return `${icon} Call Declined`;
-      if (message.callStatus === "cancelled") return `${icon} Cancelled`;
-      if (message.callDuration > 0) {
-        const mins = Math.floor(message.callDuration / 60);
-        const secs = message.callDuration % 60;
-        return `${icon} ${mins > 0 ? mins + "m " : ""}${secs}s`;
-      }
-      return `${icon} Call`;
-    }
 
-    if (message.attachments && message.attachments.length > 0) {
-      const attachment = message.attachments[0];
 
-      //  Priority 1: Check isVoiceMessage flag
-      if (attachment.isVoiceMessage) {
-        const duration = attachment.duration || 0;
-        if (duration > 0) {
-          const mins = Math.floor(duration / 60);
-          const secs = Math.floor(duration % 60);
-          return `🎤 Voice (${mins}:${secs.toString().padStart(2, "0")})`;
-        }
-        return "🎤 Voice message";
-      }
+ const handleSearchUsers = async () => {
+  if (!searchUsers.trim()) return;
+  setLoading(true);
+  try {
+    const data = await searchUsers(searchUsers);
+    setAllUsers(data);
+  } catch (err) {
+    console.error("Search error:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Search Failed",
+      message: "Failed to search users. Please try again.",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
-      // Priority 2: Check fileType
-      const fileType = attachment.fileType || attachment.type || "";
+ const handleSendRequest = async (userId) => {
+  try {
+    await sendFriendRequest(userId);
 
-      if (fileType.startsWith("image/")) return "📷 Photo";
-      if (fileType.startsWith("video/")) return "🎥 Video";
-      if (fileType === "application/pdf") return "📕 PDF";
-      if (fileType.startsWith("audio/")) return "🎵 Audio";
-      if (fileType.includes("word")) return "📄 Document";
-      if (fileType === "text/plain") return "📝 Text file";
+    setAlertDialog({
+      isOpen: true,
+      title: "Friend Request Sent!",
+      message: "Your friend request has been sent successfully.",
+      type: "success",
+    });
 
-      return "📎 File";
-    }
+    setAllUsers(allUsers.filter((u) => u._id !== userId));
+    setTimeout(() => {
+      setShowAddFriendModal(false);
+      setSearchUsers("");
+      setAllUsers([]);
+    }, 1000);
+  } catch (err) {
+    const errorMessage =
+      err.response?.data?.message || "Failed to send request";
 
-    return message.text || message.content || "";
-  };
-
-  const handleSearchUsers = async () => {
-    if (!searchUsers.trim()) return;
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("accessToken");
-      const res = await axiosInstance.get(
-        `${API_BASE_URL}/api/users/search?q=${encodeURIComponent(searchUsers)}`,
-      );
-      setAllUsers(res.data);
-    } catch (err) {
-      console.error("Search error:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Search Failed",
-        message: "Failed to search users. Please try again.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendRequest = async (userId) => {
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      await axiosInstance.post(`${API_BASE_URL}/api/friends/request/send`, {
-        receiverId: userId,
-      });
-
-      //  Success alert
-      setAlertDialog({
-        isOpen: true,
-        title: "Friend Request Sent!",
-        message: "Your friend request has been sent successfully.",
-        type: "success",
-      });
-
-      //  Remove user from list
-      setAllUsers(allUsers.filter((u) => u._id !== userId));
-      //  AUTO-CLOSE modal after 1 seconds
-      setTimeout(() => {
-        setShowAddFriendModal(false);
-        setSearchUsers("");
-        setAllUsers([]);
-      }, 1000);
-    } catch (err) {
-      //  Show proper error message
-      const errorMessage =
-        err.response?.data?.message || "Failed to send request";
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Cannot Send Request",
-        message: errorMessage,
-        type: "error",
-      });
-    }
-  };
+    setAlertDialog({
+      isOpen: true,
+      title: "Cannot Send Request",
+      message: errorMessage,
+      type: "error",
+    });
+  }
+};
 
   const loadPendingRequests = async () => {
     try {
