@@ -1,10 +1,8 @@
 import React, { useState, useMemo, useRef } from "react";
 import UserItem from "./UserItem";
 import GroupItem from "./Group/GroupItem";
-import axiosInstance from "@/lib/axiosInstance";
 import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 import {
   searchUsers,

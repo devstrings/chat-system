@@ -8,8 +8,6 @@ import {
   clearGroupChatMessages,
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
-import API_BASE_URL from "@/config/api";
-import axiosInstance from "@/lib/axiosInstance";
 import { toggleMessageSelection, selectAllMessages, deselectAllMessages, handleBulkDelete } from "../actions/groupChat.actions";
 export default function GroupChatWindow({
   group,

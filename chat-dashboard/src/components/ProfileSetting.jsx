@@ -1,8 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import axiosInstance from "@/lib/axiosInstance";
-import AlertDialog from "@/components/base/AlertDialog";
-import API_BASE_URL from "@/config/api";
 import AlertDialog from "@/components/base/AlertDialog";
 import {
   checkLocalAuth,
