@@ -52,17 +52,13 @@ app.use(
 //  2. CORS
 app.use(
   cors({
-    origin: function (origin, callback) {
-      const allowedOrigins = [
-        config.frontend.url,
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://chat_frontend:5173",
-        "http://frontend:5173",
-        "http://192.168.0.116:5173",
-      ];
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        config.frontend.url,
+        ...config.allowedOrigins,
+      ];
 
-      if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true);
 
       if (allowedOrigins.indexOf(origin) === -1) {
         return callback(new Error("CORS policy violation"), false);

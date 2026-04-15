@@ -66,8 +66,9 @@ const config = {
 
   frontend: {
     url: env("FRONTEND_URL"),
-
   },
+  
+  allowedOrigins: env("ALLOWED_ORIGINS", "").split(",").filter(Boolean),
 
   upload: {
     maxFileSize: parseInt(env("MAX_FILE_SIZE", "52428800")),
