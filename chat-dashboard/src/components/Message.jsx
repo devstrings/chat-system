@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
-import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 import {
   handleDeleteForMe,

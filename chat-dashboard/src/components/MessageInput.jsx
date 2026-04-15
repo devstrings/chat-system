@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import axiosInstance from "@/lib/axiosInstance";
-import API_BASE_URL from "@/config/api";
 import { useDispatch, useSelector } from "react-redux";
 import {
   uploadFile,

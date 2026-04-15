@@ -2,9 +2,7 @@ import React, { useState } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
-import axiosInstance from "@/lib/axiosInstance";
 import GroupProfile from "./GroupProfile";
-import API_BASE_URL from "@/config/api"
 import { formatTime, truncateMessage, clearGroupChat, leaveGroup } from "../actions/groupItem.actions";
 
 export default function GroupItem({

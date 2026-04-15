@@ -2,10 +2,7 @@ import React, { useState, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
-import axiosInstance from "@/lib/axiosInstance";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import API_BASE_URL from "@/config/api";
-import { default as apiActions } from "@/store/apiActions";
 import {
   getFriendStatus,
   sendFriendRequest,

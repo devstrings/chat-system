@@ -15,7 +15,6 @@ import GroupChatWindow from "../../components/Group/GroupChatWindow";
 import StatusManager from "../../components/Status/StatusManager";
 import StatusViewer from "../../components/Status/StatusViewer";
 import StatusRingsList from "../../components/Status/StatusRingsList";
-import axiosInstance from "../../lib/axiosInstance";
 import NotificationToast from "@/components/NotificationToast";
 import { setUser } from "../../store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
@@ -33,6 +32,8 @@ import {
   incrementUnreadCount,
   deleteConversation,
   updateMessageStatus,
+  archiveConversation,      
+  pinConversation, 
   updateMessage,
   updateGroupMessageInSidebar,
 } from "@/store/slices/chatSlice";
@@ -46,10 +47,6 @@ import {
   loadAllStatuses,
   loadPinnedConversations,
   loadArchivedConversations,
-  archiveConversation,
-  unarchiveConversation,
-  pinConversation,
-  unpinConversation,
   clearChatMessages,
   removeProfilePicture,
   loadUserLastMessages,
@@ -565,171 +562,82 @@ useEffect(() => {
 
   //Archeived
 
- const handleArchiveConversation = async (conversationId, isArchived) => {
+const handleArchiveConversation = async (conversationId, isArchived) => {
   try {
-    // CHECK IF IT'S A GROUP
     const isGroup = groups.some((g) => g._id === conversationId);
-
-    if (isArchived) {
-      // Unarchive
-      await unarchiveConversation(conversationId, isGroup);
-
+    
+    // Dispatch Redux action instead of manual API call
+    const result = await dispatch(
+      archiveConversation({ conversationId, isArchived, isGroup })
+    ).unwrap();
+    
+    // Update local state based on result
+    if (result.isArchived) {
+      setArchivedConversations((prev) => new Set([...prev, conversationId]));
+    } else {
       setArchivedConversations((prev) => {
         const newSet = new Set(prev);
         newSet.delete(conversationId);
         return newSet;
       });
-
-      //  UPDATE REDUX STATE
-      if (isGroup) {
-        const updatedGroup = groups.find((g) => g._id === conversationId);
-        if (updatedGroup) {
-          const newArchivedBy =
-            updatedGroup.archivedBy?.filter(
-              (a) => a.userId !== currentUserId,
-            ) || [];
-
-          dispatch(
-            updateGroup({
-              ...updatedGroup,
-              archivedBy: newArchivedBy,
-            }),
-          );
-        }
-      }
-
-      setAlertDialog({
-        isOpen: true,
-        title: isGroup ? "Group Unarchived" : "Chat Unarchived",
-        message: isGroup
-          ? "Group has been restored to main list."
-          : "Chat has been restored to main list.",
-        type: "success",
-      });
-    } else {
-      // Archive
-      await archiveConversation(conversationId, isGroup);
-
-      setArchivedConversations((prev) => new Set([...prev, conversationId]));
-
-      //  UPDATE REDUX STATE
-      if (isGroup) {
-        const updatedGroup = groups.find((g) => g._id === conversationId);
-        if (updatedGroup) {
-          const newArchivedBy = [
-            ...(updatedGroup.archivedBy || []),
-            { userId: currentUserId, archivedAt: new Date() },
-          ];
-
-          dispatch(
-            updateGroup({
-              ...updatedGroup,
-              archivedBy: newArchivedBy,
-            }),
-          );
-        }
-      }
-
-      setAlertDialog({
-        isOpen: true,
-        title: isGroup ? "Group Archived" : "Chat Archived",
-        message: isGroup
-          ? "Group has been moved to archive."
-          : "Chat has been moved to archive.",
-        type: "success",
-      });
     }
+    
+    setAlertDialog({
+      isOpen: true,
+      title: result.isArchived 
+        ? (isGroup ? "Group Archived" : "Chat Archived")
+        : (isGroup ? "Group Unarchived" : "Chat Unarchived"),
+      message: result.isArchived
+        ? (isGroup ? "Group has been moved to archive." : "Chat has been moved to archive.")
+        : (isGroup ? "Group has been restored to main list." : "Chat has been restored to main list."),
+      type: "success",
+    });
   } catch (err) {
     setAlertDialog({
       isOpen: true,
       title: "Error",
-      message:
-        err.response?.data?.message || "Failed to update archive status",
+      message: err.message || "Failed to update archive status",
       type: "error",
     });
   }
 };
 
   // Pin/Unpin conversation handler
- const handlePinConversation = async (conversationId, isPinned) => {
+const handlePinConversation = async (conversationId, isPinned) => {
   try {
-    // CHECK IF IT'S A GROUP
     const isGroup = groups.some((g) => g._id === conversationId);
-
-    if (isPinned) {
-      // Unpin
-      await unpinConversation(conversationId, isGroup);
-
+    
+    // Dispatch Redux action instead of manual API call
+    const result = await dispatch(
+      pinConversation({ conversationId, isPinned, isGroup })
+    ).unwrap();
+    
+    // Update local state based on result
+    if (result.isPinned) {
+      setPinnedConversations((prev) => new Set([...prev, conversationId]));
+    } else {
       setPinnedConversations((prev) => {
         const newSet = new Set(prev);
         newSet.delete(conversationId);
         return newSet;
       });
-
-      //  UPDATE REDUX STATE
-      if (isGroup) {
-        const updatedGroup = groups.find((g) => g._id === conversationId);
-        if (updatedGroup) {
-          const newPinnedBy =
-            updatedGroup.pinnedBy?.filter(
-              (p) => p.userId !== currentUserId,
-            ) || [];
-
-          dispatch(
-            updateGroup({
-              ...updatedGroup,
-              pinnedBy: newPinnedBy,
-            }),
-          );
-        }
-      }
-
-      setAlertDialog({
-        isOpen: true,
-        title: isGroup ? "Group Unpinned" : "Chat Unpinned",
-        message: isGroup
-          ? "Group has been unpinned successfully."
-          : "Chat has been unpinned successfully.",
-        type: "success",
-      });
-    } else {
-      // Pin
-      await pinConversation(conversationId, isGroup);
-
-      setPinnedConversations((prev) => new Set([...prev, conversationId]));
-
-      //  UPDATE REDUX STATE
-      if (isGroup) {
-        const updatedGroup = groups.find((g) => g._id === conversationId);
-        if (updatedGroup) {
-          const newPinnedBy = [
-            ...(updatedGroup.pinnedBy || []),
-            { userId: currentUserId, pinnedAt: new Date() },
-          ];
-
-          dispatch(
-            updateGroup({
-              ...updatedGroup,
-              pinnedBy: newPinnedBy,
-            }),
-          );
-        }
-      }
-
-      setAlertDialog({
-        isOpen: true,
-        title: isGroup ? "Group Pinned" : "Chat Pinned",
-        message: isGroup
-          ? "Group has been pinned to the top."
-          : "Chat has been pinned to the top.",
-        type: "success",
-      });
     }
+    
+    setAlertDialog({
+      isOpen: true,
+      title: result.isPinned 
+        ? (isGroup ? "Group Pinned" : "Chat Pinned")
+        : (isGroup ? "Group Unpinned" : "Chat Unpinned"),
+      message: result.isPinned
+        ? (isGroup ? "Group has been pinned to the top." : "Chat has been pinned to the top.")
+        : (isGroup ? "Group has been unpinned successfully." : "Chat has been unpinned successfully."),
+      type: "success",
+    });
   } catch (err) {
     setAlertDialog({
       isOpen: true,
       title: "Error",
-      message: err.response?.data?.message || "Failed to update pin status",
+      message: err.message || "Failed to update pin status",
       type: "error",
     });
   }
