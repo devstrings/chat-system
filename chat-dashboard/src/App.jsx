@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 
 // Middleware
 import Middleware from '@/Middleware';
@@ -22,7 +22,7 @@ function RootRedirect() {
   const refreshToken = localStorage.getItem("refreshToken");
 
   if (isAuthenticated || accessToken || refreshToken) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/conversation/home" replace />; 
   }
 
   return <Navigate to="/login" replace />;
@@ -51,11 +51,19 @@ export default function App() {
           }
         />
         <Route
+          path="/conversation/home"  
+          element={
+            <Middleware>
+              <Conversation />
+            </Middleware>
+          }
+        />
+        <Route
           path="/conversation/:conversationId"
           element={
             <Middleware>
-  <Dashboard />
-              </Middleware>
+              <Conversation />
+            </Middleware>
           }
         />
 
