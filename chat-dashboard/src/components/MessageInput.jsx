@@ -12,7 +12,7 @@ import {
   getEmojisList,
   formatRecordingTime,
   setupMediaRecorder
-} from "../actions/messageInput.actions";
+} from "@/actions/messageInput.actions";
 export default function MessageInput({
   conversationId,
   groupId,

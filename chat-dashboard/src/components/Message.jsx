@@ -6,7 +6,7 @@ import {
   handleDeleteForEveryone,
   handleFileDownload,
   fetchSecureImages,
-} from "../actions/message.actions";
+} from "@/actions/message.actions";
 export default function Message({
   message,
   isOwn,

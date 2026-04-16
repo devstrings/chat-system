@@ -16,7 +16,7 @@ import {
   getOrCreateConversation,
   formatTime,
   truncateMessage,
-} from "../actions/userItem.actions";
+} from "@/actions/userItem.actions";
 const UserItem = memo(function UserItem({
   user,
   selected,

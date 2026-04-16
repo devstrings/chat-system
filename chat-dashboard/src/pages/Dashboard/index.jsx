@@ -1,22 +1,22 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import API_BASE_URL from "../../config/api";
+import API_BASE_URL from "@/config/api";
 import { useNavigate, useParams } from "react-router-dom";
-import Sidebar from "../../components/SideBar";
-import ChatWindow from "../../components/ChatWindow";
-import { useWebRTC } from "../../hooks/useWebRTC";
-import VideoCall from "../../components/Call/VideoCall";
-import IncomingCall from "../../components/Call/IncomingCall";
-import MessageInput from "../../components/MessageInput";
+import Sidebar from "@/components/SideBar";
+import ChatWindow from "@/components/ChatWindow";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import VideoCall from "@/components/Call/VideoCall";
+import IncomingCall from "@/components/Call/IncomingCall";
+import MessageInput from "@/components/MessageInput";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
-import { useAuthImage } from "../../hooks/useAuthImage";
-import ProfileSetting from "../../components/ProfileSetting";
-import GroupChatWindow from "../../components/Group/GroupChatWindow";
-import StatusManager from "../../components/Status/StatusManager";
-import StatusViewer from "../../components/Status/StatusViewer";
-import StatusRingsList from "../../components/Status/StatusRingsList";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import ProfileSetting from "@/components/ProfileSetting";
+import GroupChatWindow from "@/components/Group/GroupChatWindow";
+import StatusManager from "@/components/Status/StatusManager";
+import StatusViewer from "@/components/Status/StatusViewer";
+import StatusRingsList from "@/components/Status/StatusRingsList";
 import NotificationToast from "@/components/NotificationToast";
-import { setUser } from "../../store/slices/authSlice";
+import { setUser } from "@/store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "@/store/slices/authSlice";
 import {
@@ -57,7 +57,7 @@ import {
   requestNotificationPermission,
   registerServiceWorker,
   processCallRecordMessage,
-} from "../actions/dashboard.actions";
+} from "@/actions/dashboard.actions";
 export default function Dashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(

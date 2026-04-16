@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import Button from "@/components/base/Button";
 import FriendListItem from "@/components/FriendListItem";
-import axiosInstance from "@/lib/axiosInstance";
-import API_BASE_URL from "@/config/api";
 import AlertDialog from "@/components/base/AlertDialog";
-import { handleCreate } from "../actions/createGroupDialog.actions";
+import { handleCreate } from "@/actions/createGroupDialog.actions";
 export default function CreateGroupDialog({
   friends = [],
   onClose,

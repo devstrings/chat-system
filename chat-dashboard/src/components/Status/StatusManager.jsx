@@ -1,14 +1,14 @@
 //(Upload + Privacy + My Status)
 import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
-import ConfirmationDialog from "../base/ConfirmationDialog";
+import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
 import {
   loadMyStatuses,
   handleCreateStatus,
   handleDeleteStatus,
   handleViewStatusViewers,
-} from "../actions/statusManager.actions";
+} from "@/actions/statusManager.actions";
 export default function StatusManager({
   currentUser,
   onClose,

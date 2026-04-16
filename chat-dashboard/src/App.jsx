@@ -6,14 +6,14 @@ import { useSelector, useDispatch } from "react-redux";
 import Middleware from '@/Middleware';
 
 // Pages
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyOTP from "./pages/VerifyOTP";
-import Conversation from "./pages/Conversation";
-import NotFound from "./pages/NotFound"; 
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Dashboard from "@/pages/Dashboard";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import VerifyOTP from "@/pages/VerifyOTP";
+import Conversation from "@/pages/Conversation";
+import NotFound from "@/pages/NotFound"; 
 
 
 function RootRedirect() {
@@ -54,8 +54,8 @@ export default function App() {
           path="/conversation/:conversationId"
           element={
             <Middleware>
-              <Conversation />
-            </Middleware>
+  <Dashboard />
+              </Middleware>
           }
         />
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
-import { loadStatuses } from "../actions/statusRingsList.actions";
-//  Profile Image Component
+import { loadStatuses } from "@/actions/statusRingsList.actions";
 function ProfileImageWithAuth({ user, size = "w-16 h-16", ring = true }) {
   const [imageSrc, setImageSrc] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
-import UserItem from "./UserItem";
-import GroupItem from "./Group/GroupItem";
+import UserItem from "@/components/UserItem";
+import GroupItem from "@/components/Group/GroupItem";
 import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { useDispatch, useSelector } from "react-redux";
@@ -9,7 +9,7 @@ import {
   sendFriendRequest,
   formatLastMessageText,
   formatTime,
-} from "../actions/sidebar.actions";
+} from "@/actions/sidebar.actions";
 import {
   fetchPendingRequests,
   fetchBlockedUsers,
@@ -24,7 +24,7 @@ import BlockedUsersModal from "@/components/BlockedUsersModal";
 import FriendRequestModal from "@/components/FriendRequestModal";
 import AddFriendModal from "@/components/AddFriendModal";
 
-import StatusRingsList from "./Status/StatusRingsList";
+import StatusRingsList from "@/components/Status/StatusRingsList";
 export default function Sidebar({
   selectedUserId,
   onSelectUser,

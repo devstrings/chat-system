@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
-import GroupProfile from "./GroupProfile";
-import { formatTime, truncateMessage, clearGroupChat, leaveGroup } from "../actions/groupItem.actions";
+import GroupProfile from "@/components/Group/GroupProfile";
+import { formatTime, truncateMessage, clearGroupChat, leaveGroup } from "@/actions/groupItem.actions";
 
 export default function GroupItem({
   group,

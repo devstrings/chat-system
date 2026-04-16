@@ -12,7 +12,7 @@ import {
   handleRemoveAdmin,
   handleExitGroup,
   handleDeleteGroup,
-} from "../actions/groupProfile.actions";
+} from "@/actions/groupProfile.actions";
 
 // AlertDialog Component
 function AlertDialog({ isOpen, onClose, title, message, type }) {

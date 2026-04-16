@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import Message from "./Message";
+import Message from "@/components/Message";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import {
   fetchMessages,
@@ -16,7 +16,7 @@ import {
   deselectAllMessages,
   toggleSelectionMode,
   confirmBulkDelete,
-} from "../actions/chatWindow.actions";
+} from "@/actions/chatWindow.actions";
 export default function ChatWindow({
   conversationId,
   currentUserId,

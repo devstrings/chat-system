@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import Message from "../Message";
+import Message from "@/components/Message";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchGroupMessages,
@@ -8,7 +8,7 @@ import {
   clearGroupChatMessages,
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
-import { toggleMessageSelection, selectAllMessages, deselectAllMessages, handleBulkDelete } from "../actions/groupChat.actions";
+import { toggleMessageSelection, selectAllMessages, deselectAllMessages, handleBulkDelete } from "@/actions/groupChat.actions";
 export default function GroupChatWindow({
   group,
   currentUserId,

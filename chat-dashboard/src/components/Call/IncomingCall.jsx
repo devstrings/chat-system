@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useSelector } from "react-redux";
-import { startRinging, stopRinging, rejectCall } from "../actions/incomingCall.actions";
+import { startRinging, stopRinging, rejectCall } from "@/actions/incomingCall.actions";
 
 export default function IncomingCall({
   onCallAccepted,

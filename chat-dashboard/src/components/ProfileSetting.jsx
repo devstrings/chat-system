@@ -14,7 +14,7 @@ import {
   unblockUser,
   acceptFriendRequest,
   rejectFriendRequest,
-} from "../actions/profileSettings.actions";
+} from "@/actions/profileSettings.actions";
 function AuthImage({ imageUrl, username, className }) {
   const { imageSrc, loading } = useAuthImage(imageUrl);
   if (loading)

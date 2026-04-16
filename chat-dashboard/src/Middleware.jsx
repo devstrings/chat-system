@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { checkAuth } from "./store/slices/authSlice";
-import Sidebar from "./components/SideBar";
+import { checkAuth } from "@/store/slices/authSlice";
+import Sidebar from "@/components/SideBar";
+import { Navigate } from "react-router-dom"; 
 
 export default function Middleware({ children }) {
     const dispatch = useDispatch();

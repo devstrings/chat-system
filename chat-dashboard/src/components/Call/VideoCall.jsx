@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
-import { endCall } from "../actions/videoCall.actions";
+import { endCall } from "@/actions/videoCall.actions";
 export default function VideoCall({
   remoteUser,
   callType,
