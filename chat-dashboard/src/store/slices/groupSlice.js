@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 
@@ -50,7 +51,14 @@ export const fetchGroupMessages = createAsyncThunk(
         (msg) => !msg.deletedFor?.includes(currentUserId),
       );
 
-      return { groupId, messages: filteredMessages };
+      const decryptedMessages = await Promise.all(
+        filteredMessages.map(async (msg) => {
+          msg.text = await decryptMessageHelper(msg, currentUserId);
+          return msg;
+        })
+      );
+
+      return { groupId, messages: decryptedMessages };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }

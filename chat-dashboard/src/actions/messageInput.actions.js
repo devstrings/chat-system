@@ -61,13 +61,14 @@ export const uploadVoiceMessage = async (audioBlob, duration, conversationId, is
 };
 
 //  Send message via socket (individual)
-export const sendIndividualMessage = (socket, conversationId, text, attachments, replyTo) => {
+export const sendIndividualMessage = (socket, conversationId, text, attachments, replyTo, encryptionData = null) => {
   if (!socket) return;
   
   socket.emit("sendMessage", {
     conversationId,
     text: text.trim(),
     attachments,
+    encryptionData,
     replyTo: replyTo ? {
       _id: replyTo._id,
       text: replyTo.text,
@@ -80,13 +81,14 @@ export const sendIndividualMessage = (socket, conversationId, text, attachments,
 };
 
 //  Send message via socket (group)
-export const sendGroupMessage = (socket, groupId, text, attachments, replyTo) => {
+export const sendGroupMessage = (socket, groupId, text, attachments, replyTo, encryptionData = null) => {
   if (!socket) return;
   
   socket.emit("sendGroupMessage", {
     groupId,
     text: text.trim(),
     attachments,
+    encryptionData,
     replyTo: replyTo ? {
       _id: replyTo._id,
       text: replyTo.text,

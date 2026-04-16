@@ -126,6 +126,16 @@ replyTo: {
             ref: "User"
         }
     }
+},
+encryptionData: {
+    iv: {
+        type: String,
+        default: ""
+    },
+    keys: {
+        type: Map,
+        of: String
+    }
 }
 
 });

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { encryptMessage } from "@/utils/cryptoUtils";
 import {
   uploadFile,
   uploadVoiceMessage,
@@ -23,6 +24,7 @@ export default function MessageInput({
 }) {
   const dispatch = useDispatch();
   const currentUserId = useSelector((state) => state.auth.currentUserId);
+  const selectedGroup = useSelector((state) => state.group.groups.find((g) => g._id === groupId));
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -94,13 +96,40 @@ useEffect(() => {
   
   //  Using action to stop typing
   stopAllTyping(socket, isGroup, groupId, conversationId);
+
+  let cipherText = text.trim();
+  let encryptionData = null;
+
+  try {
+    const textToEncrypt = text.trim() || (attachments.length > 0 ? "📎 Attachment" : "");
+    if (textToEncrypt) {
+      const publicKeysObj = {};
+      publicKeysObj[currentUserId] = localStorage.getItem(`chat_pk_${currentUserId}`);
+
+      if (!isGroup && selectedUser && selectedUser.publicKey) {
+        publicKeysObj[selectedUser._id] = selectedUser.publicKey;
+      } else if (isGroup && selectedGroup && selectedGroup.members) {
+        selectedGroup.members.forEach(member => {
+          if (member.publicKey) {
+            publicKeysObj[member._id] = member.publicKey;
+          }
+        });
+      }
+
+      const encrypted = await encryptMessage(textToEncrypt, publicKeysObj);
+      cipherText = encrypted.cipherText;
+      encryptionData = encrypted.encryptionData;
+    }
+  } catch (err) {
+    console.error("Encryption failed before sending:", err);
+  }
   
   if (!isGroup && conversationId) {
-    sendIndividualMessage(socket, conversationId, text, attachments, replyTo);
+    sendIndividualMessage(socket, conversationId, cipherText, attachments, replyTo, encryptionData);
   }
   
   if (isGroup && groupId) {
-    sendGroupMessage(socket, groupId, text, attachments, replyTo);
+    sendGroupMessage(socket, groupId, cipherText, attachments, replyTo, encryptionData);
   }
   
   setText("");

@@ -13,6 +13,7 @@ import {
   refreshToken,
   verifyOTP,
   resendOTP,
+  updatePublicKey,
 } from "#controllers/auth.controller";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validate } from "../validators//middleware/validate.js";
@@ -143,4 +144,6 @@ router.post("/google", googleCallback);
 router.post("/facebook", facebookCallback);
 router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
+router.post("/public-key", verifyToken, updatePublicKey);
+
 export default router;

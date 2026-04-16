@@ -103,3 +103,11 @@ export const resendOTP = asyncHandler(async (req, res) => {
   const result = await authService.resendOTPService(email);
   res.json(result);
 });
+
+// UPDATE PUBLIC KEY CONTROLLER
+export const updatePublicKey = asyncHandler(async (req, res) => {
+  const { publicKey } = req.body;
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.updatePublicKeyService(userId, publicKey);
+  res.json(result);
+});

@@ -3,11 +3,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { checkAuth } from "@/store/slices/authSlice";
 import Sidebar from "@/components/SideBar";
 import { Navigate } from "react-router-dom"; 
+import useCryptoInit from "@/hooks/useCryptoInit";
 
 export default function Middleware({ children }) {
     const dispatch = useDispatch();
     const { loading, currentUser } = useSelector((state) => state.auth);
     const fetchInitiated = useRef(false);
+    
+    useCryptoInit();
 
     const accessToken = localStorage.getItem("accessToken");
     const refreshToken = localStorage.getItem("refreshToken");

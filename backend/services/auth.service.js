@@ -518,3 +518,14 @@ user.emailOTP = hashedOTP;
 
   return { message: "OTP resent successfully" };
 };
+
+// UPDATE PUBLIC KEY SERVICE
+export const updatePublicKeyService = async (userId, publicKey) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+
+  user.publicKey = publicKey;
+  await user.save();
+
+  return { message: "Public key updated successfully" };
+};

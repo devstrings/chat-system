@@ -94,7 +94,7 @@ export const fetchMessages = async (
     deletedForEveryone: { $ne: true },
     deletedFor: { $ne: currentUserId },
   })
-   .populate("sender", "username email profileImage")
+   .populate("sender", "username email profileImage publicKey")
     .populate("callCaller", "username email profileImage")
     .populate("callReceiver", "username email profileImage")
     .populate({
@@ -146,7 +146,7 @@ export const fetchUserConversations = async (currentUserId) => {
     "archivedBy.userId": { $ne: currentUserId },
     "deletedBy.userId": { $ne: currentUserId },
   })
-    .populate("participants", "username email profileImage")
+    .populate("participants", "username email profileImage publicKey")
     .populate("lastMessageSender", "username")
     .sort({ lastMessageTime: -1 });
 
@@ -437,7 +437,7 @@ export const fetchPinnedConversations = async (userId) => {
   const pinnedConversations = await Conversation.find({
     "pinnedBy.userId": userId,
   })
-    .populate("participants", "username email profileImage")
+    .populate("participants", "username email profileImage publicKey")
     .sort({ "pinnedBy.pinnedAt": -1 });
 
   return pinnedConversations;
@@ -485,7 +485,7 @@ export const fetchArchivedConversations = async (userId) => {
   const archivedConversations = await Conversation.find({
     "archivedBy.userId": userId,
   })
-    .populate("participants", "username email profileImage")
+    .populate("participants", "username email profileImage publicKey")
     .populate("lastMessageSender", "username")
     .sort({ "archivedBy.archivedAt": -1 });
 
@@ -505,7 +505,7 @@ export const fetchGroupMessages = async (groupId, limit, skip) => {
     isGroupMessage: true,
     isDeleted: false,
   })
-    .populate("sender", "username email profileImage")
+    .populate("sender", "username email profileImage publicKey")
     .populate({
       path: "attachments",
       select:
