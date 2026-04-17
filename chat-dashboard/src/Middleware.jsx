@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { checkAuth, logout } from "@/store/slices/authSlice";
 import { Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "@/components/SideBar";
-<<<<<<< HEAD
 import ProfileSetting from "@/components/ProfileSetting";
 import StatusManager from "@/components/Status/StatusManager";
 import StatusViewer from "@/components/Status/StatusViewer";
@@ -32,17 +31,6 @@ export default function Middleware({ children }) {
   const { groups } = useSelector((state) => state.group);
   const { lastMessages } = useSelector((state) => state.chat);
   const fetchInitiated = useRef(false);
-=======
-import { Navigate } from "react-router-dom"; 
-import useCryptoInit from "@/hooks/useCryptoInit";
-
-export default function Middleware({ children }) {
-    const dispatch = useDispatch();
-    const { loading, currentUser } = useSelector((state) => state.auth);
-    const fetchInitiated = useRef(false);
-    
-    useCryptoInit();
->>>>>>> 2ce4dfde7e578b5d7658b706f8c9c9b9fbf2c02c
 
   const accessToken = localStorage.getItem("accessToken");
   const refreshToken = localStorage.getItem("refreshToken");
