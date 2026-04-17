@@ -10,11 +10,11 @@ import {
 export function handleMessage(io, socket) {
   socket.on(
     "sendMessage",
-    async ({ conversationId, text, attachments = [], replyTo = null }) => {
+    async ({ conversationId, text, attachments = [], replyTo = null, encryptionData = null }) => {
       try {
         const conversation = await Conversation.findById(
           conversationId,
-        ).populate("participants", "_id username email");
+        ).populate("participants", "_id username email publicKey");
 
         if (!conversation) {
           console.warn(" Warning: Conversation not found:", conversationId);
@@ -90,13 +90,14 @@ export function handleMessage(io, socket) {
           conversationId,
           sender: socket.user.id,
           text: text || "",
+          encryptionData: encryptionData || undefined,
           attachments: attachmentIds,
           status: "sent",
           replyTo: replyTo || null,
         });
 
         // Populate sender AND attachments with ALL required fields
-        await msg.populate("sender", "username email");
+        await msg.populate("sender", "username email publicKey");
         await msg.populate({
           path: "attachments",
           select:
@@ -149,6 +150,7 @@ export function handleMessage(io, socket) {
           },
           receiver: receiverId ? { _id: receiverId } : null,
           text: msg.text,
+          encryptionData: msg.encryptionData,
           attachments: transformedAttachments,
           status: msg.status,
           createdAt: msg.createdAt,
@@ -599,12 +601,12 @@ export function handleMessage(io, socket) {
   /// GROUP MESSAGE HANDLER
   socket.on(
     "sendGroupMessage",
-    async ({ groupId, text, attachments = [], replyTo = null }) => {
+    async ({ groupId, text, attachments = [], replyTo = null, encryptionData = null }) => {
       try {
 
         const group = await Group.findById(groupId).populate(
           "members",
-          "_id username email profileImage",
+          "_id username email profileImage publicKey",
         );
         if (!group)
           return socket.emit("errorMessage", { message: "Group not found" });
@@ -633,13 +635,14 @@ export function handleMessage(io, socket) {
           groupId,
           sender: socket.user.id,
           text: text || "",
+          encryptionData: encryptionData || undefined,
           attachments: attachmentIds,
           isGroupMessage: true,
           status: "sent",
           replyTo: replyTo || null,
         });
 
-        await msg.populate("sender", "username email profileImage");
+        await msg.populate("sender", "username email profileImage publicKey");
         await msg.populate({
           path: "attachments",
           select:
@@ -673,6 +676,7 @@ export function handleMessage(io, socket) {
             profileImage: msg.sender.profileImage,
           },
           text: msg.text,
+          encryptionData: msg.encryptionData,
           attachments: transformedAttachments,
           status: msg.status,
           createdAt: msg.createdAt,

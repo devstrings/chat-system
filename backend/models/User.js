@@ -53,6 +53,11 @@ emailOTP:
 emailOTPExpires:
  { type: Date, default: null },
 
+publicKey: {
+  type: String,
+  default: ""
+},
+
 }, { 
   timestamps: true 
 });
