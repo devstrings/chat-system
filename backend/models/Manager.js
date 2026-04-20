@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 
 const ROLES = ["super_admin", "content_manager", "feature_manager", "user_manager"];
 

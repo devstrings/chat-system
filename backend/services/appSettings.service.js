@@ -1,14 +1,16 @@
 import crypto from "crypto";
 import AppSettings from "#models/AppSettings";
 
-const ENCRYPTION_KEY = process.env.SETTINGS_ENCRYPTION_KEY || "chat-system-32-byte-secret-key!!"; // 32 bytes
+const ENCRYPTION_SECRET =
+  process.env.SETTINGS_ENCRYPTION_KEY || "chat-system-32-byte-secret-key!!";
+const ENCRYPTION_KEY = crypto.createHash("sha256").update(ENCRYPTION_SECRET).digest();
 const IV_LENGTH = 16;
 
 // --- Encryption helpers ---
 const encrypt = (text) => {
   if (!text) return null;
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY), iv);
+  const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
   const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
   return iv.toString("hex") + ":" + encrypted.toString("hex");
 };
@@ -19,7 +21,7 @@ const decrypt = (encryptedText) => {
     const [ivHex, encHex] = encryptedText.split(":");
     const iv = Buffer.from(ivHex, "hex");
     const encryptedBuffer = Buffer.from(encHex, "hex");
-    const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY), iv);
+    const decipher = crypto.createDecipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
     const decrypted = Buffer.concat([decipher.update(encryptedBuffer), decipher.final()]);
     return decrypted.toString();
   } catch {

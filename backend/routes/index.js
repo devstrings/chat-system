@@ -10,6 +10,9 @@ import groupRoutes from "./group.route.js";
 import friendRoutes from "./friend.route.js";
 import statusRoutes from "./status.route.js";
 import socketRoutes from "./socket.routes.js";
+import adminAuthRoutes from "./adminAuth.route.js";
+import adminRoutes from "./admin.route.js";
+import aiRoutes from "./ai.route.js";
 
 export { socketRoutes };
 
@@ -31,5 +34,8 @@ export default function (app) {
   router.use("/friends", friendRoutes);
   router.use("/groups", groupRoutes);
   router.use("/status", statusRoutes);
+  router.use("/admin/auth", adminAuthRoutes);
+  router.use("/admin", adminRoutes);
+  router.use("/ai", aiRoutes);
   app.use("/api", apiLimiter, router);
 }

@@ -1,12 +1,10 @@
 import asyncHandler from "express-async-handler";
-import AppSettings from "#models/AppSettings";
 import Message from "#models/Message";
-import * as aiService from "#services/ai";
+import { aiService } from "#services";
 
 // POST /api/ai/summarize
 export const summarize = asyncHandler(async (req, res) => {
   const { conversationId, groupId } = req.body;
-  const currentUserId = req.user.id;
 
   let messages;
   if (groupId) {
@@ -34,7 +32,6 @@ export const summarize = asyncHandler(async (req, res) => {
 // POST /api/ai/search
 export const search = asyncHandler(async (req, res) => {
   const { query, conversationId, groupId } = req.body;
-  const currentUserId = req.user.id;
 
   if (!query?.trim()) {
     return res.status(400).json({ message: "Query is required" });
