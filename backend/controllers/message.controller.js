@@ -1,8 +1,10 @@
 import { messageService } from "#services";
 import Message from "#models/Message";
+import Group from "#models/Group";
 import Conversation from "#models/Conversation";
 import asyncHandler from "express-async-handler";
-// GET OR CREATE CONVERSATION CONTROLLER
+
+
 export const getOrCreateConversation = asyncHandler(async (req, res) => {
   const currentUserId = req.user.id;
   const { otherUserId, skipCreate } = req.body;
@@ -28,16 +30,14 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
   res.json(conversation);
 });
 
-// SEND MESSAGE CONTROLLER (handles both individual and group messages)
+
 export const sendMessage = asyncHandler(async (req, res) => {
   const { conversationId, groupId, text, attachments, encryptionData, replyTo } = req.body;
   const currentUserId = req.user.id;
   const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
   const io = req.app.get("webSocket");
 
-  // --- GROUP MESSAGE ---
   if (groupId) {
-    const Group = (await import("#models/Group")).default;
     const group = await Group.findById(groupId).populate("members", "_id");
     if (!group) return res.status(404).json({ message: "Group not found" });
 
@@ -367,4 +367,4 @@ export const checkConversationExists = asyncHandler(async (req, res) => {
   } catch (err) {
     res.json({ exists: false });
   }
-});
+});
