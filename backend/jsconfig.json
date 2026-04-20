@@ -5,7 +5,7 @@
       "#config/*": ["config/*.js"],
       "#models/*": ["models/*.js"],
       "#routes": ["routes/index.js"],
-      "#routes/*": ["routes/*.js"],
+      "#controllers": ["controllers/index.js"],
       "#controllers/*": ["controllers/*.js"],
       "#providers/*": ["providers/*.js"],
       "#shared/*": ["shared/*.js"],

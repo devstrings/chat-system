@@ -1,26 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import {
-  getOrCreateConversation,
-  getMessages,
-  getUserConversations,
-  clearChat,
-  sendMessage,
-  deleteConversation,
-  deleteMessageForMe,
-  deleteMessageForEveryone,
-  bulkDeleteMessages,
-  pinConversation,
-  unpinConversation,
-  getPinnedConversations,
-  archiveConversation,
-  unarchiveConversation,
-  getArchivedConversations,
-  getGroupMessages,
-  sendGroupMessage,
-  editMessage,
-  checkConversationExists,
-} from "#controllers/message.controller";
+import { messageController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { validate } from "#middleware/validate";
 import {
@@ -44,7 +24,7 @@ import {
   validateBulkMessageIds,
   validateGroupExists,
   validateGroupMember,
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -62,7 +42,7 @@ const messageLimiter = rateLimit({
  *     summary: Get all conversations of the user
  *     tags: [Messages]
  */
-router.get("/conversations", verifyToken, getUserConversations);
+router.get("/conversations", verifyToken, messageController.getUserConversations);
 
 /**
  * @swagger
@@ -71,7 +51,7 @@ router.get("/conversations", verifyToken, getUserConversations);
  *     summary: Get pinned conversations
  *     tags: [Messages]
  */
-router.get("/pinned", verifyToken, getPinnedConversations);
+router.get("/pinned", verifyToken, messageController.getPinnedConversations);
 
 /**
  * @swagger
@@ -80,7 +60,7 @@ router.get("/pinned", verifyToken, getPinnedConversations);
  *     summary: Get archived conversations
  *     tags: [Messages]
  */
-router.get("/archived", verifyToken, getArchivedConversations);
+router.get("/archived", verifyToken, messageController.getArchivedConversations);
 
 /**
  * @swagger
@@ -92,7 +72,7 @@ router.get("/archived", verifyToken, getArchivedConversations);
 router.get(
   "/conversation/:conversationId/exists",
   verifyToken,
-  checkConversationExists
+  messageController.checkConversationExists
 );
 
 /**
@@ -107,7 +87,7 @@ router.get(
   verifyToken,
   validateGroupExists,
   validateGroupMember,
-  getGroupMessages
+  messageController.getGroupMessages
 );
 
 /**
@@ -124,7 +104,7 @@ router.post(
   validateGroupExists,
   validateGroupMember,
   validateMessageContent,
-  sendGroupMessage
+  messageController.sendGroupMessage
 );
 
 /**
@@ -140,7 +120,7 @@ router.post(
   getOrCreateConversationValidation,
   validate,
   validateFriendship,
-  getOrCreateConversation
+  messageController.getOrCreateConversation
 );
 
 /**
@@ -159,7 +139,7 @@ router.post(
   validateConversationExists,
   validateConversationParticipant,
   validateMessageContent,
-  sendMessage
+  messageController.sendMessage
 );
 
 /**
@@ -175,7 +155,7 @@ router.post(
   bulkDeleteValidation,
   validate,
   validateBulkMessageIds,
-  bulkDeleteMessages
+  messageController.bulkDeleteMessages
 );
 
 /**
@@ -193,7 +173,7 @@ router.patch(
   validateMessageExists,
   validateMessageSender,
   validateMessageEditTime,
-  editMessage
+  messageController.editMessage
 );
 
 /**
@@ -209,7 +189,7 @@ router.post(
   validateConversationExists,
   validateConversationParticipant,
   validateConversationPinLimit,
-  pinConversation
+  messageController.pinConversation
 );
 
 /**
@@ -223,7 +203,7 @@ router.delete(
   "/conversation/:conversationId/unpin",
   verifyToken,
   validateConversationExists,
-  unpinConversation
+  messageController.unpinConversation
 );
 
 /**
@@ -239,7 +219,7 @@ router.post(
   validateConversationExists,
   validateConversationParticipant,
   validateConversationArchive,
-  archiveConversation
+  messageController.archiveConversation
 );
 
 /**
@@ -253,7 +233,7 @@ router.delete(
   "/conversation/:conversationId/unarchive",
   verifyToken,
   validateConversationExists,
-  unarchiveConversation
+  messageController.unarchiveConversation
 );
 
 /**
@@ -268,7 +248,7 @@ router.patch(
   verifyToken,
   validateConversationExists,
   validateConversationParticipant,
-  clearChat
+  messageController.clearChat
 );
 
 /**
@@ -281,7 +261,7 @@ router.patch(
 router.delete(
   "/conversation/:conversationId/delete",
   verifyToken,
-  deleteConversation
+  messageController.deleteConversation
 );
 
 /**
@@ -296,7 +276,7 @@ router.delete(
   verifyToken,
   validateMessageExists,
   validateMessageParticipant,
-  deleteMessageForMe
+  messageController.deleteMessageForMe
 );
 
 /**
@@ -312,7 +292,7 @@ router.delete(
   validateMessageExists,
   validateMessageSender,
   validateMessageDeleteTime,
-  deleteMessageForEveryone
+  messageController.deleteMessageForEveryone
 );
 
 /**
@@ -327,7 +307,7 @@ router.get(
   verifyToken,
   validateConversationExists,
   validateConversationParticipant,
-  getMessages
+  messageController.getMessages
 );
 
 export default router;

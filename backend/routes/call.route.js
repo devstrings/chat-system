@@ -1,18 +1,9 @@
 import express from "express";
 import { verifyToken } from "#middleware/authMiddleware";
-import Call from "#models/Call";
-import {
-  getCallHistory,
-  getCallStats,
-  deleteCallHistory,
-  clearCallHistory,
-  getRecentCalls,
-  getCallById,
-  getTurnCredentials
-} from "#controllers/call.controller";
+import { callController } from "#controllers";
 
 const router = express.Router();
-router.get("/turn-credentials", verifyToken, getTurnCredentials);
+router.get("/turn-credentials", verifyToken, callController.getTurnCredentials);
 
 /**
  * @swagger
@@ -21,7 +12,7 @@ router.get("/turn-credentials", verifyToken, getTurnCredentials);
  *     summary: Get call history
  *     tags: [Calls]
  */
-router.get("/history", verifyToken, getCallHistory);
+router.get("/history", verifyToken, callController.getCallHistory);
 
 /**
  * @swagger
@@ -30,7 +21,7 @@ router.get("/history", verifyToken, getCallHistory);
  *     summary: Get recent calls
  *     tags: [Calls]
  */
-router.get("/recent", verifyToken, getRecentCalls);
+router.get("/recent", verifyToken, callController.getRecentCalls);
 
 /**
  * @swagger
@@ -39,7 +30,7 @@ router.get("/recent", verifyToken, getRecentCalls);
  *     summary: Get call stats
  *     tags: [Calls]
  */
-router.get("/stats", verifyToken, getCallStats);
+router.get("/stats", verifyToken, callController.getCallStats);
 
 /**
  * @swagger
@@ -48,19 +39,7 @@ router.get("/stats", verifyToken, getCallStats);
  *     summary: Get calls with a specific user
  *     tags: [Calls]
  */
-router.get("/conversation/:otherUserId", verifyToken, async (req, res) => {
-  try {
-    const calls = await Call.find({
-      $or: [
-        { caller: req.user.id, receiver: req.params.otherUserId },
-        { caller: req.params.otherUserId, receiver: req.user.id }
-      ]
-    }).sort({ createdAt: 1 });
-    res.json(calls);
-  } catch (err) {
-    res.json([]);
-  }
-});
+router.get("/conversation/:otherUserId", verifyToken, callController.getCallsWithUser);
 
 /**
  * @swagger
@@ -69,7 +48,7 @@ router.get("/conversation/:otherUserId", verifyToken, async (req, res) => {
  *     summary: Delete a specific call
  *     tags: [Calls]
  */
-router.delete("/history/:callId", verifyToken, deleteCallHistory);
+router.delete("/history/:callId", verifyToken, callController.deleteCallHistory);
 
 /**
  * @swagger
@@ -78,7 +57,7 @@ router.delete("/history/:callId", verifyToken, deleteCallHistory);
  *     summary: Clear all call history
  *     tags: [Calls]
  */
-router.delete("/clear-history", verifyToken, clearCallHistory);
+router.delete("/clear-history", verifyToken, callController.clearCallHistory);
 
 /**
  * @swagger
@@ -87,6 +66,6 @@ router.delete("/clear-history", verifyToken, clearCallHistory);
  *     summary: Get call by ID
  *     tags: [Calls]
  */
-router.get("/:callId", verifyToken, getCallById);
+router.get("/:callId", verifyToken, callController.getCallById);
 
 export default router;

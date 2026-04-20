@@ -7,9 +7,8 @@ import compression from "compression";
 import swaggerUi from "swagger-ui-express";
 import connectDB from "#config/db";
 import { connectRedis } from "#config/redis";
-import routes from "#routes";
+import routes, { socketRoutes } from "#routes";
 import config from "#config/index";
-import socketRoutes from "#routes/socket.routes";
 import swaggerSpec from "./swagger.js";
 import errorHandler from "#middleware/errorHandler";
 

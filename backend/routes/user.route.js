@@ -1,16 +1,5 @@
 import express from "express";
-import {
-  getUsers,
-  searchUsers,
-  getUserById,
-  getCurrentUser,
-  updateProfileImage,
-  removeProfileImage,
-  uploadProfileImage,
-  serveProfileImage,
-  uploadCoverPhoto,
-  removeCoverPhoto,
-} from "#controllers/user.controller";
+import { userController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { uploadProfile } from "#config/multer";
 import { validate } from "#middleware/validate";  
@@ -23,7 +12,7 @@ import {
   validateUserNotBlocked,
   validateFileUploaded,
   validateProfileImageUrl,  
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -34,7 +23,7 @@ const router = express.Router();
  *     summary: Get all users
  *     tags: [Users]
  */
-router.get("/", verifyToken, getUsers);
+router.get("/", verifyToken, userController.getUsers);
 
 /**
  * @swagger
@@ -43,7 +32,7 @@ router.get("/", verifyToken, getUsers);
  *     summary: Search users by query
  *     tags: [Users]
  */
-router.get("/search", verifyToken, validateSearchQuery, searchUsers);
+router.get("/search", verifyToken, validateSearchQuery, userController.searchUsers);
 
 /**
  * @swagger
@@ -52,7 +41,7 @@ router.get("/search", verifyToken, validateSearchQuery, searchUsers);
  *     summary: Get current authenticated user
  *     tags: [Users]
  */
-router.get("/auth/me", verifyToken, getCurrentUser);
+router.get("/auth/me", verifyToken, userController.getCurrentUser);
 
 /**
  * @swagger
@@ -61,7 +50,7 @@ router.get("/auth/me", verifyToken, getCurrentUser);
  *     summary: Serve user profile image
  *     tags: [Users]
  */
-router.get("/image/:filename", verifyToken, serveProfileImage);
+router.get("/image/:filename", verifyToken, userController.serveProfileImage);
 
 /**
  * @swagger
@@ -75,7 +64,7 @@ router.post(
   verifyToken,
   uploadProfile.single("image"),
   validateFileUploaded,
-  uploadProfileImage
+  userController.uploadProfileImage
 );
 
 /**
@@ -91,7 +80,7 @@ router.put(
   profileImageUrlValidation,  
   validate,                    
   validateProfileImageUrl,     
-  updateProfileImage
+  userController.updateProfileImage
 );
 
 /**
@@ -101,7 +90,7 @@ router.put(
  *     summary: Remove profile image
  *     tags: [Users]
  */
-router.delete("/profile/remove-image", verifyToken, removeProfileImage);
+router.delete("/profile/remove-image", verifyToken, userController.removeProfileImage);
 
 /**
  * @swagger
@@ -115,7 +104,7 @@ router.post(
   verifyToken,
   uploadProfile.single("coverPhoto"),
   validateFileUploaded,
-  uploadCoverPhoto
+  userController.uploadCoverPhoto
 );
 
 /**
@@ -125,7 +114,7 @@ router.post(
  *     summary: Remove cover photo
  *     tags: [Users]
  */
-router.delete("/profile/remove-cover", verifyToken, removeCoverPhoto);
+router.delete("/profile/remove-cover", verifyToken, userController.removeCoverPhoto);
 
 /**
  * @swagger
@@ -134,6 +123,6 @@ router.delete("/profile/remove-cover", verifyToken, removeCoverPhoto);
  *     summary: Get user by ID
  *     tags: [Users]
  */
-router.get("/:id", verifyToken, validateUserNotBlocked, getUserById);
+router.get("/:id", verifyToken, validateUserNotBlocked, userController.getUserById);
 
 export default router;

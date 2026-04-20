@@ -1,14 +1,5 @@
 import express from "express";
-import {
-  createStatus,
-  getStatuses,
-  getUserStatuses,
-  markAsViewed,
-  deleteStatus,
-  getStatusViewers,
-  updateStatusPrivacy,
-  createFriendshipTest,
-} from "#controllers/status.controller";
+import { statusController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { uploadStatus } from "#config/multer";
 import { validate } from "#middleware/validate";
@@ -17,7 +8,7 @@ import {
   validateStatusExists,
   validateStatusOwner,
   validateStatusViewPermission,
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -34,7 +25,7 @@ router.post(
   uploadStatus.single("file"),
   createStatusValidation,
   validate,
-  createStatus
+  statusController.createStatus
 );
 
 /**
@@ -44,7 +35,7 @@ router.post(
  *     summary: Get all statuses from friends
  *     tags: [Status]
  */
-router.get("/", verifyToken, getStatuses);
+router.get("/", verifyToken, statusController.getStatuses);
 
 /**
  * @swagger
@@ -53,7 +44,7 @@ router.get("/", verifyToken, getStatuses);
  *     summary: Get statuses of a specific user
  *     tags: [Status]
  */
-router.get("/user/:userId", verifyToken, getUserStatuses);
+router.get("/user/:userId", verifyToken, statusController.getUserStatuses);
 
 /**
  * @swagger
@@ -67,7 +58,7 @@ router.post(
   verifyToken,
   validateStatusExists,
   validateStatusViewPermission,
-  markAsViewed
+  statusController.markAsViewed
 );
 
 /**
@@ -82,7 +73,7 @@ router.delete(
   verifyToken,
   validateStatusExists,
   validateStatusOwner,
-  deleteStatus
+  statusController.deleteStatus
 );
 
 /**
@@ -97,7 +88,7 @@ router.get(
   verifyToken,
   validateStatusExists,
   validateStatusOwner,
-  getStatusViewers
+  statusController.getStatusViewers
 );
 
 /**
@@ -107,7 +98,7 @@ router.get(
  *     summary: Update status privacy settings
  *     tags: [Status]
  */
-router.put("/privacy", verifyToken, updateStatusPrivacy);
+router.put("/privacy", verifyToken, statusController.updateStatusPrivacy);
 
 /**
  * @swagger
@@ -116,6 +107,6 @@ router.put("/privacy", verifyToken, updateStatusPrivacy);
  *     summary: TEMP - Create friendship (for testing)
  *     tags: [Status]
  */
-router.post("/test/create-friendship", verifyToken, createFriendshipTest);
+router.post("/test/create-friendship", verifyToken, statusController.createFriendshipTest);
 
 export default router;

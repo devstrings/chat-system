@@ -1,6 +1,7 @@
 import {
   callService
 } from "#services";
+import Call from "#models/Call";
 import asyncHandler from "express-async-handler";
 
 
@@ -51,4 +52,18 @@ export const getCallById = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const call = await callService.fetchCallById(callId, userId);
   res.json({ call });
+});
+
+export const getCallsWithUser = asyncHandler(async (req, res) => {
+  try {
+    const calls = await Call.find({
+      $or: [
+        { caller: req.user.id, receiver: req.params.otherUserId },
+        { caller: req.params.otherUserId, receiver: req.user.id }
+      ]
+    }).sort({ createdAt: 1 });
+    res.json(calls);
+  } catch (err) {
+    res.json([]);
+  }
 });

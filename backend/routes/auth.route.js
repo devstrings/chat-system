@@ -1,20 +1,5 @@
 import express from "express";
-import {
-  register,
-  login,
-  logout,
-  googleCallback,
-  facebookCallback,
-  forgotPassword,
-  resetPassword,
-  setPassword,
-  changePassword,
-  getCurrentUser,
-  refreshToken,
-  verifyOTP,
-  resendOTP,
-  updatePublicKey,
-} from "#controllers/auth.controller";
+import { authController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { validate } from "#middleware/validate";
 import {
@@ -36,7 +21,7 @@ const router = express.Router();
  *     summary: Register a new user
  *     tags: [Auth]
  */
-router.post("/register", registerValidation, validate, register);
+router.post("/register", registerValidation, validate, authController.register);
 
 /**
  * @swagger
@@ -45,7 +30,7 @@ router.post("/register", registerValidation, validate, register);
  *     summary: Login a user
  *     tags: [Auth]
  */
-router.post("/login", loginValidation, validate, login);
+router.post("/login", loginValidation, validate, authController.login);
 
 /**
  * @swagger
@@ -63,7 +48,7 @@ router.post("/login", loginValidation, validate, login);
  *       500:
  *         description: Logout failed
  */
-router.post("/logout", verifyToken, logout);
+router.post("/logout", verifyToken, authController.logout);
 /**
  * @swagger
  * /auth/refresh-token:
@@ -71,7 +56,7 @@ router.post("/logout", verifyToken, logout);
  *     summary: Refresh JWT token
  *     tags: [Auth]
  */
-router.post("/refresh-token", refreshTokenValidation, validate, refreshToken);
+router.post("/refresh-token", refreshTokenValidation, validate, authController.refreshToken);
 
 /**
  * @swagger
@@ -84,7 +69,7 @@ router.post(
   "/forgot-password",
   forgotPasswordValidation,
   validate,
-  forgotPassword,
+  authController.forgotPassword,
 );
 
 /**
@@ -98,7 +83,7 @@ router.post(
   "/reset-password",
   resetPasswordValidation,
   validate,
-  resetPassword,
+  authController.resetPassword,
 );
 
 /**
@@ -113,7 +98,7 @@ router.post(
   verifyToken,
   setPasswordValidation,
   validate,
-  setPassword,
+  authController.setPassword,
 );
 
 /**
@@ -128,7 +113,7 @@ router.post(
   verifyToken,
   changePasswordValidation,
   validate,
-  changePassword,
+  authController.changePassword,
 );
 
 /**
@@ -138,12 +123,12 @@ router.post(
  *     summary: Get current authenticated user
  *     tags: [Auth]
  */
-router.get("/me", verifyToken, getCurrentUser);
+router.get("/me", verifyToken, authController.getCurrentUser);
 
-router.post("/google", googleCallback);
-router.post("/facebook", facebookCallback);
-router.post("/verify-otp", verifyOTP);
-router.post("/resend-otp", resendOTP);
-router.post("/public-key", verifyToken, updatePublicKey);
+router.post("/google", authController.googleCallback);
+router.post("/facebook", authController.facebookCallback);
+router.post("/verify-otp", authController.verifyOTP);
+router.post("/resend-otp", authController.resendOTP);
+router.post("/public-key", verifyToken, authController.updatePublicKey);
 
 export default router;

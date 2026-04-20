@@ -1,26 +1,6 @@
 import express from "express";
 import multer from "multer";
-import {
-  createGroup,
-  getUserGroups,
-  getGroupDetails,
-  addGroupMembers,
-  removeGroupMember,
-  leaveGroup,
-  makeAdmin,
-  removeAdmin,
-  updateGroupImage,
-  removeGroupImage,
-  deleteGroup,
-  updateGroup,
-  pinGroup,
-  unpinGroup,
-  archiveGroup,
-  unarchiveGroup,
-  clearGroupChat,
-  serveGroupImage,
-  editGroupMessage,
-} from "#controllers/group.controller";
+import { groupController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { validate } from "#middleware/validate";
 import {
@@ -43,7 +23,7 @@ import {
   validateGroupMessageText,
   validateFileUploaded,
   validateFilename,
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -81,7 +61,7 @@ router.post(
   verifyToken,
   createGroupValidation,
   validate,
-  createGroup
+  groupController.createGroup
 );
 
 /**
@@ -91,7 +71,7 @@ router.post(
  *     summary: Get all groups of the user
  *     tags: [Groups]
  */
-router.get("/list", verifyToken, getUserGroups);
+router.get("/list", verifyToken, groupController.getUserGroups);
 
 /**
  * @swagger
@@ -100,7 +80,7 @@ router.get("/list", verifyToken, getUserGroups);
  *     summary: Serve group image
  *     tags: [Groups]
  */
-router.get("/image/:filename", verifyToken, validateFilename, serveGroupImage);
+router.get("/image/:filename", verifyToken, validateFilename, groupController.serveGroupImage);
 
 /**
  * @swagger
@@ -116,7 +96,7 @@ router.put(
   validate,
   validateGroupMessageSender,
   validateGroupMessageText,
-  editGroupMessage
+  groupController.editGroupMessage
 );
 
 /**
@@ -131,7 +111,7 @@ router.get(
   verifyToken,
   validateGroupExists,
   validateGroupMember,
-  getGroupDetails
+  groupController.getGroupDetails
 );
 
 /**
@@ -146,7 +126,7 @@ router.put(
   verifyToken,
   validateGroupExists,
   validateGroupAdmin,
-  updateGroup
+  groupController.updateGroup
 );
 
 /**
@@ -163,7 +143,7 @@ router.put(
   validateFileUploaded,
   validateGroupExists,
   validateGroupAdmin,
-  updateGroupImage
+  groupController.updateGroupImage
 );
 
 /**
@@ -178,7 +158,7 @@ router.delete(
   verifyToken,
   validateGroupExists,
   validateGroupAdmin,
-  removeGroupImage
+  groupController.removeGroupImage
 );
 
 /**
@@ -195,7 +175,7 @@ router.post(
   validate,
   validateGroupExists,
   validateGroupAdmin,
-  addGroupMembers
+  groupController.addGroupMembers
 );
 
 /**
@@ -211,7 +191,7 @@ router.delete(
   validateGroupExists,
   validateGroupAdmin,
   validateNotGroupCreator,
-  removeGroupMember
+  groupController.removeGroupMember
 );
 
 /**
@@ -221,7 +201,7 @@ router.delete(
  *     summary: Leave a group (any member)
  *     tags: [Groups]
  */
-router.post("/:groupId/leave", verifyToken, validateGroupExists, leaveGroup);
+router.post("/:groupId/leave", verifyToken, validateGroupExists, groupController.leaveGroup);
 
 /**
  * @swagger
@@ -237,7 +217,7 @@ router.post(
   validateGroupAdmin,
   validateMemberIsInGroup,
   validateMemberIsNotAdmin,
-  makeAdmin
+  groupController.makeAdmin
 );
 
 /**
@@ -254,7 +234,7 @@ router.delete(
   validateGroupAdmin,
   validateMemberIsAdmin,
   validateNotGroupCreator,
-  removeAdmin
+  groupController.removeAdmin
 );
 
 /**
@@ -269,7 +249,7 @@ router.delete(
   verifyToken,
   validateGroupExists,
   validateGroupCreator,
-  deleteGroup
+  groupController.deleteGroup
 );
 
 /**
@@ -285,7 +265,7 @@ router.post(
   validateGroupExists,
   validateGroupMember,
   validateGroupPinLimit,
-  pinGroup
+  groupController.pinGroup
 );
 
 /**
@@ -295,7 +275,7 @@ router.post(
  *     summary: Unpin a group
  *     tags: [Groups]
  */
-router.delete("/:groupId/unpin", verifyToken, validateGroupExists, unpinGroup);
+router.delete("/:groupId/unpin", verifyToken, validateGroupExists, groupController.unpinGroup);
 
 /**
  * @swagger
@@ -310,7 +290,7 @@ router.post(
   validateGroupExists,
   validateGroupMember,
   validateGroupArchive,
-  archiveGroup
+  groupController.archiveGroup
 );
 
 /**
@@ -324,7 +304,7 @@ router.delete(
   "/:groupId/unarchive",
   verifyToken,
   validateGroupExists,
-  unarchiveGroup
+  groupController.unarchiveGroup
 );
 
 /**
@@ -339,7 +319,7 @@ router.delete(
   verifyToken,
   validateGroupExists,
   validateGroupMember,
-  clearGroupChat
+  groupController.clearGroupChat
 );
 
 export default router;

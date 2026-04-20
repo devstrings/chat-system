@@ -3,9 +3,7 @@ import rateLimit from "express-rate-limit";
 import { uploadMessage } from "#config/multer";
 import { verifyToken } from "#middleware/authMiddleware";
 import { validate } from "#middleware/validate";
-import { downloadFile, uploadFile } from "#controllers/file.controller";
-import { serveProfileImage } from "#controllers/user.controller";
-import { serveGroupImage } from "#controllers/group.controller";
+import { fileController, userController, groupController } from "#controllers";
 import {
   uploadFileValidation,
   downloadFileValidation,
@@ -13,7 +11,7 @@ import {
 import {
   validateFileUploaded,
   validateFilename,
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -44,7 +42,7 @@ router.post(
   uploadMessage.single("file"),
   uploadFileValidation,
   validate,
-  uploadFile
+  fileController.uploadFile
 );
 
 /**
@@ -61,7 +59,7 @@ router.get(
   downloadFileValidation,
   validate,
   validateFilename,
-  downloadFile
+  fileController.downloadFile
 );
 
 /**
@@ -71,7 +69,7 @@ router.get(
  *     summary: Serve profile image (authenticated)
  *     tags: [Files]
  */
-router.get("/profile/:filename", verifyToken, serveProfileImage);
+router.get("/profile/:filename", verifyToken, userController.serveProfileImage);
 
 /**
  * @swagger
@@ -80,6 +78,6 @@ router.get("/profile/:filename", verifyToken, serveProfileImage);
  *     summary: Serve group image (authenticated)
  *     tags: [Files]
  */
-router.get("/group/:filename", verifyToken, downloadLimiter, serveGroupImage);
+router.get("/group/:filename", verifyToken, downloadLimiter, groupController.serveGroupImage);
 
 export default router;

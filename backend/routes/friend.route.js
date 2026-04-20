@@ -1,17 +1,5 @@
 import express from "express";
-import {
-  sendFriendRequest,
-  acceptFriendRequest,
-  rejectFriendRequest,
-  getPendingRequests,
-  getSentRequests,
-  unfriend,
-  blockUser,
-  unblockUser,
-  getBlockedUsers,
-  getRelationshipStatus,
-  getFriends,
-} from "#controllers/friend.controller";
+import { friendController } from "#controllers";
 import { verifyToken } from "#middleware/authMiddleware";
 import { validate } from "#middleware/validate";
 import {
@@ -23,7 +11,7 @@ import {
   validateNotBlocked,
   validateFriendRequest,
   validateFriendRequestForReject,
-} from "#validators/middleware/validation.middleware";
+} from "#middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -41,7 +29,7 @@ router.post(
   validate,
   validateNotSelf,
   validateNotBlocked,
-  sendFriendRequest
+  friendController.sendFriendRequest
 );
 
 /**
@@ -55,7 +43,7 @@ router.post(
   "/request/:requestId/accept",
   verifyToken,
   validateFriendRequest,
-  acceptFriendRequest
+  friendController.acceptFriendRequest
 );
 
 /**
@@ -69,7 +57,7 @@ router.delete(
   "/request/:requestId/reject",
   verifyToken,
   validateFriendRequestForReject,
-  rejectFriendRequest
+  friendController.rejectFriendRequest
 );
 
 /**
@@ -79,7 +67,7 @@ router.delete(
  *     summary: Get pending friend requests
  *     tags: [Friends]
  */
-router.get("/requests/pending", verifyToken, getPendingRequests);
+router.get("/requests/pending", verifyToken, friendController.getPendingRequests);
 
 /**
  * @swagger
@@ -88,7 +76,7 @@ router.get("/requests/pending", verifyToken, getPendingRequests);
  *     summary: Get sent friend requests
  *     tags: [Friends]
  */
-router.get("/requests/sent", verifyToken, getSentRequests);
+router.get("/requests/sent", verifyToken, friendController.getSentRequests);
 
 /**
  * @swagger
@@ -97,7 +85,7 @@ router.get("/requests/sent", verifyToken, getSentRequests);
  *     summary: Unfriend a user
  *     tags: [Friends]
  */
-router.delete("/unfriend/:friendId", verifyToken, unfriend);
+router.delete("/unfriend/:friendId", verifyToken, friendController.unfriend);
 
 /**
  * @swagger
@@ -112,7 +100,7 @@ router.post(
   blockUserValidation,
   validate,
   validateNotSelf,
-  blockUser
+  friendController.blockUser
 );
 
 /**
@@ -122,7 +110,7 @@ router.post(
  *     summary: Unblock a user
  *     tags: [Friends]
  */
-router.delete("/unblock/:userId", verifyToken, unblockUser);
+router.delete("/unblock/:userId", verifyToken, friendController.unblockUser);
 
 /**
  * @swagger
@@ -131,7 +119,7 @@ router.delete("/unblock/:userId", verifyToken, unblockUser);
  *     summary: Get blocked users
  *     tags: [Friends]
  */
-router.get("/blocked", verifyToken, getBlockedUsers);
+router.get("/blocked", verifyToken, friendController.getBlockedUsers);
 
 /**
  * @swagger
@@ -140,7 +128,7 @@ router.get("/blocked", verifyToken, getBlockedUsers);
  *     summary: Get relationship status with a user
  *     tags: [Friends]
  */
-router.get("/status/:userId", verifyToken, getRelationshipStatus);
+router.get("/status/:userId", verifyToken, friendController.getRelationshipStatus);
 
 /**
  * @swagger
@@ -149,6 +137,6 @@ router.get("/status/:userId", verifyToken, getRelationshipStatus);
  *     summary: Get friends list
  *     tags: [Friends]
  */
-router.get("/list", verifyToken, getFriends);
+router.get("/list", verifyToken, friendController.getFriends);
 
 export default router;
