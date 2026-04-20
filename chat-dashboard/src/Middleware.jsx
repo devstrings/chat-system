@@ -346,9 +346,12 @@ export default function Middleware({ children }) {
 
         <Sidebar
           selectedUserId={selectedUserId}
-          onSelectUser={(user) => {
-            dispatch(setSelectedUserId(user._id));
-            navigate(`/conversation/${user._id}`);
+          onSelectUser={(item) => {
+            const convoId = item.isGroup
+              ? item._id
+              : lastMessages[item._id]?.conversationId || item._id;
+            dispatch(setSelectedUserId(item.isGroup ? null : item._id));
+            navigate(`/conversation/${convoId}`);
             setIsMobileSidebarOpen(false);
           }}
           currentUsername={currentUser?.username || ""}

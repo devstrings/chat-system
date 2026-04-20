@@ -518,9 +518,9 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   }, [users, groups, loading]);
   useEffect(() => {
     if (loading) return;
-    if (users.length === 0 && groups.length === 0) return;
     if (!urlConversationId) return;
 
+    // 1. Try resolving as a Group ID
     const group = groups.find((g) => g._id === urlConversationId);
     if (group) {
       setSelectedGroup(group);
@@ -529,11 +529,21 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
       return;
     }
 
-    const userId = Object.keys(lastMessages).find(
+    // 2. Try resolving as a User ID (Directly)
+    const userDirect = users.find((u) => u._id === urlConversationId);
+    if (userDirect) {
+      setSelectedUser(userDirect);
+      setIsGroupChat(false);
+      setSelectedGroup(null);
+      return;
+    }
+
+    // 3. Try resolving as a Conversation ID (Lookup via lastMessages)
+    const userIdFromConvo = Object.keys(lastMessages).find(
       (uid) => lastMessages[uid]?.conversationId === urlConversationId,
     );
-    if (userId) {
-      const user = users.find((u) => u._id === userId);
+    if (userIdFromConvo) {
+      const user = users.find((u) => u._id === userIdFromConvo);
       if (user) {
         setSelectedUser(user);
         setIsGroupChat(false);
