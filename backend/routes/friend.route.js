@@ -12,18 +12,18 @@ import {
   getRelationshipStatus,
   getFriends,
 } from "#controllers/friend.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import { validate } from "../validators/middleware/validate.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import { validate } from "#middleware/validate";
 import {
   sendFriendRequestValidation,
   blockUserValidation,
-} from "../validators/index.js";
+} from "#validators";
 import {
   validateNotSelf,
   validateNotBlocked,
   validateFriendRequest,
   validateFriendRequestForReject,
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 

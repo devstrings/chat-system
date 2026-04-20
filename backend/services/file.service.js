@@ -5,7 +5,7 @@ import { getAudioDurationInSeconds } from "get-audio-duration";
 import Attachment from "#models/Attachment";
 import Conversation from "#models/Conversation";
 import Group from "#models/Group";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 // Calculate SHA256 hash of file
 const calculateFileHash = (filePath) =>
   new Promise((resolve, reject) => {

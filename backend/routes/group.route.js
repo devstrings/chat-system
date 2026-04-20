@@ -21,13 +21,13 @@ import {
   serveGroupImage,
   editGroupMessage,
 } from "#controllers/group.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import { validate } from "../validators/middleware/validate.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import { validate } from "#middleware/validate";
 import {
   createGroupValidation,
   addMembersValidation,
   editGroupMessageValidation,
-} from "../validators/index.js";
+} from "#validators";
 import {
   validateGroupExists,
   validateGroupMember,
@@ -43,7 +43,7 @@ import {
   validateGroupMessageText,
   validateFileUploaded,
   validateFilename,
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 

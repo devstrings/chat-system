@@ -1,7 +1,7 @@
 import { authService } from "#services";
 import { redisClient } from "#config/redis";
 import asyncHandler from "express-async-handler";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 // REGISTER CONTROLLER
 export const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;

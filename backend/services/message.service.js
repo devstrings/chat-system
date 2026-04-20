@@ -4,7 +4,7 @@ import Attachment from "#models/Attachment";
 import Friendship from "#models/Friendship";
 import Group from "#models/Group";
 import User from "#models/User";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 import { encryptWithPublicKey, generateSymmetricKey } from "../utils/crypto.js";
 //  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {

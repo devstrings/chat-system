@@ -3,7 +3,7 @@ import User from "#models/User";
 import Message from "#models/Message";
 import fs from "fs";
 import path from "path";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 
 // CREATE GROUP SERVICE
 export const processCreateGroup = async (

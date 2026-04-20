@@ -5,7 +5,7 @@ import AuthProvider from "#models/AuthProvider";
 import config from "#config/index";
 import crypto from "crypto";
 import { redisClient } from "#config/redis";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 import axios from "axios";
 import { OAuth2Client } from "google-auth-library";
 import { sendOTPEmail } from "#config/email";

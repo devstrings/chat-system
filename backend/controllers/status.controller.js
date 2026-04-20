@@ -1,4 +1,5 @@
 import { statusService } from "#services";
+import Friendship from "#models/Friendship";
 import asyncHandler from "express-async-handler";
 
 // CREATE STATUS CONTROLLER
@@ -79,4 +80,32 @@ export const updateStatusPrivacy = asyncHandler(async (req, res) => {
   const result = await statusService.processUpdatePrivacySettings(userId, req.body);
   if (!result) return res.status(404).json({ message: "User not found" });
   res.json({ message: "Privacy settings updated", statusPrivacy: result.statusPrivacy, mutedStatuses: result.mutedStatuses });
+});
+
+// TEMP - CREATE FRIENDSHIP FOR TESTING
+export const createFriendshipTest = asyncHandler(async (req, res) => {
+  try {
+    const { friendId } = req.body;
+    const userId = req.user.id;
+
+    const existing = await Friendship.findOne({
+      $or: [
+        { user1: userId, user2: friendId },
+        { user1: friendId, user2: userId },
+      ],
+    });
+
+    if (existing) {
+      return res.json({
+        message: "Friendship already exists",
+        friendship: existing,
+      });
+    }
+
+    const friendship = new Friendship({ user1: userId, user2: friendId });
+    await friendship.save();
+    res.json({ message: "Friendship created!", friendship });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });

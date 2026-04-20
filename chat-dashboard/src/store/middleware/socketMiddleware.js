@@ -53,6 +53,7 @@ const socketMiddleware = (store) => {
       console.log(" Initializing socket connection...");
       socket = io(SOCKET_URL, {
         auth: { token: accessToken },
+        path: "/webSocket",
         transports: ["websocket"],
         reconnection: true,
         reconnectionDelay: 1000,

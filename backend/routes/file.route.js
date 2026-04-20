@@ -1,19 +1,19 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { uploadMessage } from "#config/multer";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import { validate } from "../validators/middleware/validate.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import { validate } from "#middleware/validate";
 import { downloadFile, uploadFile } from "#controllers/file.controller";
 import { serveProfileImage } from "#controllers/user.controller";
 import { serveGroupImage } from "#controllers/group.controller";
 import {
   uploadFileValidation,
   downloadFileValidation,
-} from "../validators/index.js";
+} from "#validators";
 import {
   validateFileUploaded,
   validateFilename,
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 

@@ -1,5 +1,6 @@
 import { messageService } from "#services";
 import Message from "#models/Message";
+import Conversation from "#models/Conversation";
 import asyncHandler from "express-async-handler";
 // GET OR CREATE CONVERSATION CONTROLLER
 export const getOrCreateConversation = asyncHandler(async (req, res) => {
@@ -12,7 +13,7 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: "No conversation found", exists: false });
   }
   if (isNewConversation && conversation) {
-    const io = req.app.get("io");
+    const io = req.app.get("webSocket");
     if (io) {
       io.to(currentUserId).emit("newConversation", {
         conversationId: conversation._id.toString(),
@@ -63,13 +64,70 @@ export const sendMessage = asyncHandler(async (req, res) => {
       isVoiceMessage: att.isVoiceMessage || false,
     }));
   }
-  const io = req.app.get("io");
+  const io = req.app.get("webSocket");
   if (io) {
     const otherUserId = conversation.participants.find(
       (p) => p.toString() !== currentUserId,
     );
-    io.to(otherUserId.toString()).emit("receiveMessage", messageObj);
+    // Emit to both participants
+    io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
   }
+  res.json(messageObj);
+});
+
+// SEND GROUP MESSAGE CONTROLLER
+export const sendGroupMessage = asyncHandler(async (req, res) => {
+  const { groupId, text, attachments, encryptionData, replyTo } = req.body;
+  const currentUserId = req.user.id;
+  const Group = (await import("#models/Group")).default;
+
+  const group = await Group.findById(groupId).populate("members", "_id");
+  if (!group) return res.status(404).json({ message: "Group not found" });
+
+  const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
+  const message = await Message.create({
+    groupId,
+    sender: currentUserId,
+    text: text || "",
+    encryptionData: encryptionData || undefined,
+    attachments: attachmentIds,
+    isGroupMessage: true,
+    status: "sent",
+    replyTo: replyTo || null,
+  });
+
+  await message.populate("sender", "username email profileImage");
+  await message.populate({
+    path: "attachments",
+    select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+  });
+
+  group.lastMessage = text || "📎 Attachment";
+  group.lastMessageTime = new Date();
+  group.lastMessageSender = currentUserId;
+  await group.save();
+
+  const messageObj = message.toObject();
+  if (messageObj.attachments && messageObj.attachments.length > 0) {
+    messageObj.attachments = messageObj.attachments.map((att) => ({
+      url: `/api/file/get/${att.serverFileName}`,
+      filename: att.fileName,
+      fileType: att.fileType,
+      fileSize: att.sizeInKilobytes * 1024,
+      attachmentId: att._id,
+      duration: att.duration || 0,
+      isVoiceMessage: att.isVoiceMessage || false,
+    }));
+  }
+
+  const io = req.app.get("webSocket");
+  if (io) {
+    // Emit to all group members
+    group.members.forEach(member => {
+      io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
+    });
+  }
+
   res.json(messageObj);
 });
 
@@ -146,7 +204,7 @@ export const deleteConversation = asyncHandler(async (req, res) => {
   const currentUserId = req.user.id;
   const { otherUserId } = req.body;
   const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
-  const io = req.app.get("io");
+  const io = req.app.get("webSocket");
   if (io) {
     const userSocket = [...io.sockets.sockets.values()].find(
       (s) => s.user && s.user.id === currentUserId,
@@ -247,3 +305,14 @@ export const editMessage = asyncHandler(async (req, res) => {
   const result = await messageService.processEditMessage(messageId, text);
   res.json(result);
 });
+
+// CHECK CONVERSATION EXISTS CONTROLLER
+export const checkConversationExists = asyncHandler(async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const conversation = await Conversation.findById(conversationId);
+    res.json({ exists: !!conversation });
+  } catch (err) {
+    res.json({ exists: false });
+  }
+});

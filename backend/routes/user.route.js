@@ -11,19 +11,19 @@ import {
   uploadCoverPhoto,
   removeCoverPhoto,
 } from "#controllers/user.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken } from "#middleware/authMiddleware";
 import { uploadProfile } from "#config/multer";
-import { validate } from "../validators/middleware/validate.js";  
+import { validate } from "#middleware/validate";  
 import {
   searchQueryValidation,
   profileImageUrlValidation,
-} from "../validators/index.js";
+} from "#validators";
 import {
   validateSearchQuery,
   validateUserNotBlocked,
   validateFileUploaded,
   validateProfileImageUrl,  
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 

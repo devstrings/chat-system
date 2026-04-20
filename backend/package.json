@@ -41,7 +41,13 @@
     "#routes": "./routes/index.js",
     "#routes/*": "./routes/*.js",
     "#controllers/*": "./controllers/*.js",
+    "#providers/*": "./providers/*.js",
+    "#shared/*": "./shared/*.js",
+    "#middleware/*": "./middleware/*.js",
+    "#validators": "./validators/index.js",
+    "#validators/*": "./validators/*.js",
     "#utils": "./utils/index.js",
-    "#services": "./services/index.js"
+    "#services": "./services/index.js",
+    "#socket/*": "./socket/*.js"
   }
 }

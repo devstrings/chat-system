@@ -1,6 +1,6 @@
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import Call from "../models/Call.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import Call from "#models/Call";
 import {
   getCallHistory,
   getCallStats,

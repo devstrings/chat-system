@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import config from "#config/index";
 
 import Call from "#models/Call";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 
 
 export const fetchTurnCredentials = async () => {

@@ -60,44 +60,58 @@ export const uploadVoiceMessage = async (audioBlob, duration, conversationId, is
   return { ...response.data, duration };
 };
 
-//  Send message via socket (individual)
-export const sendIndividualMessage = (socket, conversationId, text, attachments, replyTo, encryptionData = null) => {
-  if (!socket) return;
-  
-  socket.emit("sendMessage", {
-    conversationId,
-    text: text.trim(),
-    attachments,
-    encryptionData,
-    replyTo: replyTo ? {
-      _id: replyTo._id,
-      text: replyTo.text,
-      sender: {
-        _id: replyTo.sender?._id || replyTo.sender,
-        username: replyTo.sender?.username || "Unknown",
-      },
-    } : null,
-  });
+//  Send message via API (individual)
+export const sendIndividualMessage = async (socket, conversationId, text, attachments, replyTo, encryptionData = null) => {
+  try {
+    const response = await axiosInstance.post(
+      `${API_BASE_URL}/api/messages/send`,
+      {
+        conversationId,
+        text: text.trim(),
+        attachments,
+        encryptionData,
+        replyTo: replyTo ? {
+          _id: replyTo._id,
+          text: replyTo.text,
+          sender: {
+            _id: replyTo.sender?._id || replyTo.sender,
+            username: replyTo.sender?.username || "Unknown",
+          },
+        } : null,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("sendIndividualMessage error:", error);
+    throw error;
+  }
 };
 
-//  Send message via socket (group)
-export const sendGroupMessage = (socket, groupId, text, attachments, replyTo, encryptionData = null) => {
-  if (!socket) return;
-  
-  socket.emit("sendGroupMessage", {
-    groupId,
-    text: text.trim(),
-    attachments,
-    encryptionData,
-    replyTo: replyTo ? {
-      _id: replyTo._id,
-      text: replyTo.text,
-      sender: {
-        _id: replyTo.sender?._id || replyTo.sender,
-        username: replyTo.sender?.username || "Unknown",
-      },
-    } : null,
-  });
+//  Send message via API (group)
+export const sendGroupMessage = async (socket, groupId, text, attachments, replyTo, encryptionData = null) => {
+  try {
+    const response = await axiosInstance.post(
+      `${API_BASE_URL}/api/messages/group/${groupId}/send`,
+      {
+        groupId,
+        text: text.trim(),
+        attachments,
+        encryptionData,
+        replyTo: replyTo ? {
+          _id: replyTo._id,
+          text: replyTo.text,
+          sender: {
+            _id: replyTo.sender?._id || replyTo.sender,
+            username: replyTo.sender?.username || "Unknown",
+          },
+        } : null,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("sendGroupMessage error:", error);
+    throw error;
+  }
 };
 
 //  Emit typing indicator (individual)

@@ -1,5 +1,5 @@
 // middleware/errorHandler.js
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 
 const errorHandler = (err, req, res, next) => {
   console.error("Global Error:", err);

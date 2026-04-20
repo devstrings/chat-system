@@ -3,7 +3,7 @@ import Friendship from "#models/Friendship";
 import BlockedUser from "#models/BlockedUser";
 import mongoose from "mongoose";
 import config from "#config/index";
-import AppError from "../shared/AppError.js";
+import AppError from "#shared/AppError";
 //  HELPER FUNCTION TO FORMAT USER WITH FULL IMAGE URL
 const formatUserWithFullImageUrl = (user) => {
   const userObj = user.toObject ? user.toObject() : user;

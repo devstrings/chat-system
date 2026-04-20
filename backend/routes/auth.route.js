@@ -15,8 +15,8 @@ import {
   resendOTP,
   updatePublicKey,
 } from "#controllers/auth.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import { validate } from "../validators//middleware/validate.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import { validate } from "#middleware/validate";
 import {
   registerValidation,
   loginValidation,
@@ -25,7 +25,7 @@ import {
   resetPasswordValidation,
   setPasswordValidation,
   changePasswordValidation,
-} from "../validators/index.js";
+} from "#validators";
 
 const router = express.Router();
 

@@ -128,18 +128,25 @@ useEffect(() => {
     console.error("Encryption failed before sending:", err);
   }
   
-  if (!isGroup && conversationId) {
-    sendIndividualMessage(socket, conversationId, cipherText, attachments, replyTo, encryptionData);
+  try {
+    if (!isGroup && conversationId) {
+      await sendIndividualMessage(socket, conversationId, cipherText, attachments, replyTo, encryptionData);
+    }
+    
+    if (isGroup && groupId) {
+      await sendGroupMessage(socket, groupId, cipherText, attachments, replyTo, encryptionData);
+    }
+    
+    setText("");
+    onCancelReply();
+  } catch (err) {
+    console.error("Failed to send message:", err);
+    alert("Message failed to send. Please check your connection.");
+  } finally {
+    setSending(false);
   }
-  
-  if (isGroup && groupId) {
-    sendGroupMessage(socket, groupId, cipherText, attachments, replyTo, encryptionData);
-  }
-  
-  setText("");
-  onCancelReply();
-  setTimeout(() => setSending(false), 100);
 };
+
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);
     setShowEmojiPicker(false);

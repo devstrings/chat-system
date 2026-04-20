@@ -7,16 +7,17 @@ import {
   deleteStatus,
   getStatusViewers,
   updateStatusPrivacy,
+  createFriendshipTest,
 } from "#controllers/status.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken } from "#middleware/authMiddleware";
 import { uploadStatus } from "#config/multer";
-import { validate } from "../validators/middleware/validate.js";
-import { createStatusValidation } from "../validators/index.js";
+import { validate } from "#middleware/validate";
+import { createStatusValidation } from "#validators";
 import {
   validateStatusExists,
   validateStatusOwner,
   validateStatusViewPermission,
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -115,32 +116,6 @@ router.put("/privacy", verifyToken, updateStatusPrivacy);
  *     summary: TEMP - Create friendship (for testing)
  *     tags: [Status]
  */
-router.post("/test/create-friendship", verifyToken, async (req, res) => {
-  try {
-    const Friendship = (await import("../models/Friendship.js")).default;
-    const { friendId } = req.body;
-    const userId = req.user.id;
-
-    const existing = await Friendship.findOne({
-      $or: [
-        { user1: userId, user2: friendId },
-        { user1: friendId, user2: userId },
-      ],
-    });
-
-    if (existing) {
-      return res.json({
-        message: "Friendship already exists",
-        friendship: existing,
-      });
-    }
-
-    const friendship = new Friendship({ user1: userId, user2: friendId });
-    await friendship.save();
-    res.json({ message: "Friendship created!", friendship });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.post("/test/create-friendship", verifyToken, createFriendshipTest);
 
 export default router;

@@ -17,16 +17,18 @@ import {
   unarchiveConversation,
   getArchivedConversations,
   getGroupMessages,
+  sendGroupMessage,
   editMessage,
+  checkConversationExists,
 } from "#controllers/message.controller";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import { validate } from "../validators/middleware/validate.js";
+import { verifyToken } from "#middleware/authMiddleware";
+import { validate } from "#middleware/validate";
 import {
   getOrCreateConversationValidation,
   sendMessageValidation,
   editMessageValidation,
   bulkDeleteValidation,
-} from "../validators/index.js";
+} from "#validators";
 import {
   validateFriendship,
   validateConversationExists,
@@ -42,7 +44,7 @@ import {
   validateBulkMessageIds,
   validateGroupExists,
   validateGroupMember,
-} from "../validators/middleware/validation.middleware.js";
+} from "#validators/middleware/validation.middleware";
 
 const router = express.Router();
 
@@ -90,16 +92,7 @@ router.get("/archived", verifyToken, getArchivedConversations);
 router.get(
   "/conversation/:conversationId/exists",
   verifyToken,
-  async (req, res) => {
-    try {
-      const Conversation = (await import("../models/Conversation.js")).default;
-      const { conversationId } = req.params;
-      const conversation = await Conversation.findById(conversationId);
-      res.json({ exists: !!conversation });
-    } catch (err) {
-      res.json({ exists: false });
-    }
-  }
+  checkConversationExists
 );
 
 /**
@@ -115,6 +108,23 @@ router.get(
   validateGroupExists,
   validateGroupMember,
   getGroupMessages
+);
+
+/**
+ * @swagger
+ * /messages/group/{groupId}/send:
+ *   post:
+ *     summary: Send a message to a group
+ *     tags: [Messages]
+ */
+router.post(
+  "/group/:groupId/send",
+  messageLimiter,
+  verifyToken,
+  validateGroupExists,
+  validateGroupMember,
+  validateMessageContent,
+  sendGroupMessage
 );
 
 /**
