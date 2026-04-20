@@ -2,6 +2,7 @@
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 import apiActions from "@/store/apiActions";
+import { decryptMessageHelper } from "@/utils/cryptoUtils";
 
 //  Load all statuses
 export const loadAllStatuses = async () => {
@@ -81,11 +82,16 @@ export const loadUserLastMessages = async (userId, currentUserId) => {
     const conversationId = convRes?._id;
     if (!conversationId) return null;
     
-    const messages = await apiActions.getPaginatedConversationMessagesById(
+    const messagesRaw = await apiActions.getPaginatedConversationMessagesById(
       conversationId,
       1,
       20
     );
+
+    const messages = await Promise.all(messagesRaw.map(async msg => {
+        msg.text = await decryptMessageHelper(msg, currentUserId);
+        return msg;
+    }));
     
     const visibleMessages = messages.filter(
       (msg) => !msg.deletedFor?.includes(currentUserId)
@@ -110,7 +116,11 @@ export const loadGroupLastMessages = async (groupId, currentUserId) => {
     `${API_BASE_URL}/api/messages/group/${groupId}`
   );
   
-  const messages = response.data;
+  const messagesRaw = response.data;
+  const messages = await Promise.all(messagesRaw.map(async msg => {
+      msg.text = await decryptMessageHelper(msg, currentUserId);
+      return msg;
+  }));
   const visibleMessages = messages.filter(
     (msg) => !msg.deletedFor?.includes(currentUserId)
   );

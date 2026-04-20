@@ -14,8 +14,8 @@ import ProfileSetting from "@/components/ProfileSetting";
 import GroupChatWindow from "@/components/Group/GroupChatWindow";
 import StatusManager from "@/components/Status/StatusManager";
 import StatusViewer from "@/components/Status/StatusViewer";
-import StatusRingsList from "@/components/Status/StatusRingsList";
 import NotificationToast from "@/components/NotificationToast";
+import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import { setUser } from "@/store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "@/store/slices/authSlice";
@@ -36,6 +36,7 @@ import {
   pinConversation, 
   updateMessage,
   updateGroupMessageInSidebar,
+  decryptAndStoreSharedKey
 } from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
@@ -82,7 +83,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
   );
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
-  const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
+  const { unreadCounts, lastMessages, sharedKeys } = useSelector((state) => state.chat);
 
   const [loading, setLoading] = useState(true);
 
@@ -211,7 +212,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
     console.log("🔌 Setting up sidebar socket listeners");
 
     //  Individual message received
-    const handleSidebarMessage = (msg) => {
+    const handleSidebarMessage = async (msg) => {
 
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver?._id || msg.receiver;
@@ -240,6 +241,10 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
       }
 
       console.log(` Updating Redux for userId: "${otherUserId}"`);
+
+      // Decrypt message
+      const currentSharedKey = sharedKeys[msg.conversationId];
+      msg.text = await decryptMessageHelper(msg, currentUserId, currentSharedKey);
 
       //  UPDATE REDUX
       dispatch(
@@ -279,7 +284,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
     };
 
     //  Group message received
-    const handleSidebarGroupMessage = (msg) => {
+    const handleSidebarGroupMessage = async (msg) => {
       console.log(" [SIDEBAR] Group message:", msg._id);
 
       // Update group messages in groupSlice
@@ -429,7 +434,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
       socket.off("call:record", handleCallRecord);
       socket.off("friendRequestReceived", handleFriendRequest);
     };
-  }, [socket, currentUserId, dispatch, lastMessages]); // Load all statuses
+  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); // Added sharedKeys to dependencies
 useEffect(() => {
   const loadAllStatusesHandler = async () => {
     try {
@@ -784,8 +789,20 @@ useEffect(() => {
               continue;
             }
 
-            const conversationId = convRes?._id;
-            if (!conversationId) continue;
+            // Decrypt and store shared key if present
+            let activeSharedKey = sharedKeys[conversationId];
+            if (convRes.sharedEncryptedKeys && !activeSharedKey) {
+               try {
+                 const result = await dispatch(decryptAndStoreSharedKey({
+                    conversationId,
+                    sharedEncryptedKeys: convRes.sharedEncryptedKeys,
+                    currentUserId
+                 })).unwrap();
+                 activeSharedKey = result.sharedKey;
+               } catch (err) {
+                 console.error("Failed to decrypt key for conversation:", conversationId, err);
+               }
+            }
 
             const msgRes = await apiActions.getPaginatedConversationMessagesById(
               conversationId,
@@ -793,7 +810,12 @@ useEffect(() => {
               20,
             );
 
-            const messages = msgRes;
+            const messagesRaw = msgRes;
+            const messages = await Promise.all(messagesRaw.map(async msg => {
+               // Use the local activeSharedKey which contains the newly decrypted key
+               msg.text = await decryptMessageHelper(msg, currentUserId, activeSharedKey);
+               return msg;
+            }));
             const visibleMessages = messages.filter(
               (msg) => !msg.deletedFor?.includes(currentUserId),
             );

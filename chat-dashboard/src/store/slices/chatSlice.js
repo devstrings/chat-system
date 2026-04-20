@@ -1,20 +1,51 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { decryptMessageHelper } from "@/utils/cryptoUtils";
+import { decryptMessageHelper, decryptSharedKey } from "@/utils/cryptoUtils";
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 
 // ASYNC THUNKS
 
+// Decrypt and Store Shared Key
+export const decryptAndStoreSharedKey = createAsyncThunk(
+  "chat/decryptAndStoreSharedKey",
+  async ({ conversationId, sharedEncryptedKeys, currentUserId }, { rejectWithValue }) => {
+    try {
+      const encryptedKey = sharedEncryptedKeys[currentUserId];
+      if (!encryptedKey) return rejectWithValue("No encrypted key for current user");
+
+      const privateKey = localStorage.getItem(`chat_sk_${currentUserId}`);
+      if (!privateKey) return rejectWithValue("No private key found");
+
+      const sharedKey = await decryptSharedKey(encryptedKey, privateKey);
+      return { conversationId, sharedKey };
+    } catch (error) {
+      return rejectWithValue("Failed to decrypt shared key");
+    }
+  }
+);
+
 // Fetch Conversation
 export const fetchConversation = createAsyncThunk(
   "chat/fetchConversation",
-  async ({ otherUserId, skipCreate = false }, { rejectWithValue }) => {
+  async ({ otherUserId, skipCreate = false }, { dispatch, getState, rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/messages/conversation`,
         { otherUserId, skipCreate },
       );
-      return response.data;
+      
+      const conversation = response.data;
+      const { currentUserId } = getState().auth;
+
+      if (conversation.sharedEncryptedKeys && currentUserId) {
+        await dispatch(decryptAndStoreSharedKey({
+          conversationId: conversation._id,
+          sharedEncryptedKeys: conversation.sharedEncryptedKeys,
+          currentUserId
+        })).unwrap();
+      }
+
+      return conversation;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }
@@ -24,7 +55,7 @@ export const fetchConversation = createAsyncThunk(
 // Fetch Messages
 export const fetchMessages = createAsyncThunk(
   "chat/fetchMessages",
-  async ({ conversationId, currentUserId }, { rejectWithValue }) => {
+  async ({ conversationId, currentUserId }, { getState, rejectWithValue }) => {
     try {
       const response = await axiosInstance.get(
         `${API_BASE_URL}/api/messages/${conversationId}`,
@@ -35,9 +66,12 @@ export const fetchMessages = createAsyncThunk(
         (msg) => !msg.deletedFor?.includes(currentUserId),
       );
 
+      // Get shared key for this conversation
+      const sharedKey = getState().chat.sharedKeys[conversationId];
+
       const decryptedMessages = await Promise.all(
         filteredMessages.map(async (msg) => {
-          msg.text = await decryptMessageHelper(msg, currentUserId);
+          msg.text = await decryptMessageHelper(msg, currentUserId, sharedKey);
           return msg;
         })
       );
@@ -223,6 +257,7 @@ const chatSlice = createSlice({
     pinnedConversations: [],
     archivedConversations: [],
     typingUsers: {}, // { conversationId: Set of userIds }
+    sharedKeys: {}, // { conversationId: CryptoKey }
     loading: false,
     error: null,
   },
@@ -449,6 +484,10 @@ const chatSlice = createSlice({
             loading: false,
           };
         }
+      })
+      .addCase("chat/decryptAndStoreSharedKey/fulfilled", (state, action) => {
+        const { conversationId, sharedKey } = action.payload;
+        state.sharedKeys[conversationId] = sharedKey;
       })
 
       // Fetch Messages

@@ -23,6 +23,7 @@ export default function MessageInput({
   onCancelReply = () => { },
 }) {
   const dispatch = useDispatch();
+  const { sharedKeys } = useSelector((state) => state.chat);
   const currentUserId = useSelector((state) => state.auth.currentUserId);
   const selectedGroup = useSelector((state) => state.group.groups.find((g) => g._id === groupId));
   const [text, setText] = useState("");
@@ -116,7 +117,10 @@ useEffect(() => {
         });
       }
 
-      const encrypted = await encryptMessage(textToEncrypt, publicKeysObj);
+      // Find shared key in store
+      const sharedKey = sharedKeys[conversationId];
+
+      const encrypted = await encryptMessage(textToEncrypt, publicKeysObj, sharedKey);
       cipherText = encrypted.cipherText;
       encryptionData = encrypted.encryptionData;
     }

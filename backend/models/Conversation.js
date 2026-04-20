@@ -64,6 +64,11 @@ const conversationSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  sharedEncryptedKeys: {
+    type: Map,
+    of: String,
+    default: {}
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 

@@ -3,7 +3,9 @@ import Conversation from "#models/Conversation";
 import Attachment from "#models/Attachment";
 import Friendship from "#models/Friendship";
 import Group from "#models/Group";
+import User from "#models/User";
 import AppError from "../shared/AppError.js";
+import { encryptWithPublicKey, generateSymmetricKey } from "../utils/crypto.js";
 //  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {
   //  Convert to string for proper comparison
@@ -36,6 +38,7 @@ export const findExistingConversation = async (currentUserId, otherUserId) => {
 export const createNewConversation = async (currentUserId, otherUserId) => {
   const conversation = await Conversation.create({
     participants: [currentUserId, otherUserId],
+    sharedEncryptedKeys: {}, // Will be populated in processGetOrCreate
   });
 
   return conversation;
@@ -58,6 +61,27 @@ export const processGetOrCreateConversation = async (
   // Create new if doesn't exist (only when NOT skipping)
   if (!conversation) {
     conversation = await createNewConversation(currentUserId, otherUserId);
+  }
+
+  // Handle Shared Encrypted Keys if missing (for E2EE)
+  if (!conversation.sharedEncryptedKeys || conversation.sharedEncryptedKeys.size === 0) {
+    const participants = await User.find({ _id: { $in: [currentUserId, otherUserId] } });
+    const sharedKey = generateSymmetricKey();
+    const encryptedKeys = new Map();
+
+    participants.forEach(user => {
+      if (user.publicKey) {
+        const encrypted = encryptWithPublicKey(user.publicKey, sharedKey);
+        if (encrypted) {
+          encryptedKeys.set(user._id.toString(), encrypted);
+        }
+      }
+    });
+
+    if (encryptedKeys.size > 0) {
+      conversation.sharedEncryptedKeys = encryptedKeys;
+      await conversation.save();
+    }
   }
 
   return conversation;

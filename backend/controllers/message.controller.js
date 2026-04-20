@@ -29,7 +29,7 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
 
 // SEND MESSAGE CONTROLLER
 export const sendMessage = asyncHandler(async (req, res) => {
-  const { conversationId, text, attachments } = req.body;
+  const { conversationId, text, attachments, encryptionData } = req.body;
   const currentUserId = req.user.id;
   const conversation = req.validatedConversation;
   const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
@@ -37,6 +37,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     conversationId,
     sender: currentUserId,
     text: text || "",
+    encryptionData: encryptionData || undefined,
     attachments: attachmentIds,
     status: "sent",
     isGroupMessage: false,

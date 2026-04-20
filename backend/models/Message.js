@@ -135,6 +135,10 @@ encryptionData: {
     keys: {
         type: Map,
         of: String
+    },
+    isSharedKey: {
+        type: Boolean,
+        default: false
     }
 }
 

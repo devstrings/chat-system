@@ -67,18 +67,25 @@ export async function importPrivateKey(pem) {
   );
 }
 
-// Encrypt plaintext for a set of public keys
+// Encrypt plaintext for a set of public keys OR using an existing shared key
 // publicKeys is an object: { userId: publicKeyBase64 }
-export async function encryptMessage(text, publicKeysObj) {
-  // 1. Generate random AES-GCM key
-  const aesKey = await window.crypto.subtle.generateKey(
-    {
-      name: "AES-GCM",
-      length: 256,
-    },
-    true,
-    ["encrypt", "decrypt"]
-  );
+// existingKey is an optional CryptoKey (AES-GCM)
+export async function encryptMessage(text, publicKeysObj, existingKey = null) {
+  // 1. Use existing key or generate random AES-GCM key
+  let aesKey;
+  if (existingKey) {
+     // existingKey is a hex string
+     aesKey = await hexToKey(existingKey);
+  } else {
+     aesKey = await window.crypto.subtle.generateKey(
+      {
+        name: "AES-GCM",
+        length: 256,
+      },
+      true,
+      ["encrypt", "decrypt"]
+    );
+  }
 
   // 2. Generate random IV
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -96,6 +103,17 @@ export async function encryptMessage(text, publicKeysObj) {
   
   const encryptedTextBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedContent)));
   const ivBase64 = btoa(String.fromCharCode.apply(null, iv));
+
+  if (existingKey) {
+     // If using existing key, we don't need to return encryptedKeys (they are already in the conversation)
+     return {
+       cipherText: encryptedTextBase64,
+       encryptionData: {
+         iv: ivBase64,
+         isSharedKey: true
+       }
+     };
+  }
 
   // 4. Export the AES raw key to encrypt it with RSA
   const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
@@ -128,35 +146,42 @@ export async function encryptMessage(text, publicKeysObj) {
   };
 }
 
-// Decrypt message using User's private key
-export async function decryptMessage(cipherText, encryptedAesKeyB64, ivB64, privateKeyB64) {
-  if (!cipherText || !encryptedAesKeyB64 || !ivB64 || !privateKeyB64) {
+// Decrypt message using User's private key OR a shared key
+export async function decryptMessage(cipherText, encryptedAesKeyB64, ivB64, privateKeyB64, sharedKey = null) {
+  if (!cipherText || (!encryptedAesKeyB64 && !sharedKey) || !ivB64) {
       return cipherText; // Probably not encrypted
   }
   try {
-    // 1. Import Private Key
-    const privateKey = await importPrivateKey(privateKeyB64);
+    let aesKey;
 
-    // 2. Decrypt the AES key
-    const encryptedAesKeyArray = new Uint8Array(atob(encryptedAesKeyB64).split("").map(c => c.charCodeAt(0)));
-    const rawAesKey = await window.crypto.subtle.decrypt(
-      {
-        name: "RSA-OAEP"
-      },
-      privateKey,
-      encryptedAesKeyArray
-    );
+    if (sharedKey) {
+      // sharedKey is a hex string
+      aesKey = await hexToKey(sharedKey);
+    } else {
+      // 1. Import Private Key
+      const privateKey = await importPrivateKey(privateKeyB64);
 
-    // 3. Import the AES Key
-    const aesKey = await window.crypto.subtle.importKey(
-      "raw",
-      rawAesKey,
-      {
-        name: "AES-GCM",
-      },
-      true,
-      ["decrypt"]
-    );
+      // 2. Decrypt the AES key
+      const encryptedAesKeyArray = new Uint8Array(atob(encryptedAesKeyB64).split("").map(c => c.charCodeAt(0)));
+      const rawAesKey = await window.crypto.subtle.decrypt(
+        {
+          name: "RSA-OAEP"
+        },
+        privateKey,
+        encryptedAesKeyArray
+      );
+
+      // 3. Import the AES Key
+      aesKey = await window.crypto.subtle.importKey(
+        "raw",
+        rawAesKey,
+        {
+          name: "AES-GCM",
+        },
+        true,
+        ["decrypt"]
+      );
+    }
 
     // 4. Decrypt the message
     const ivArray = new Uint8Array(atob(ivB64).split("").map(c => c.charCodeAt(0)));
@@ -179,15 +204,97 @@ export async function decryptMessage(cipherText, encryptedAesKeyB64, ivB64, priv
 }
 
 // Helper to decrypt a full message object
-export async function decryptMessageHelper(msg, currentUserId) {
-  if (msg && msg.encryptionData && msg.encryptionData.iv && msg.encryptionData.keys) {
-    const encryptedAesKey = msg.encryptionData.keys[currentUserId];
-    if (encryptedAesKey) {
-      const privKey = localStorage.getItem(`chat_sk_${currentUserId}`);
-      if (privKey) {
-         return await decryptMessage(msg.text, encryptedAesKey, msg.encryptionData.iv, privKey);
+export async function decryptMessageHelper(msg, currentUserId, sharedKey = null) {
+  if (msg && msg.encryptionData && msg.encryptionData.iv) {
+    // 1. If using conversation-level shared key
+    if (msg.encryptionData.isSharedKey && sharedKey) {
+      return await decryptMessage(msg.text, null, msg.encryptionData.iv, null, sharedKey);
+    }
+
+    // 2. Fallback to per-message keys (backward compatibility)
+    if (msg.encryptionData.keys) {
+      const encryptedAesKey = msg.encryptionData.keys[currentUserId];
+      if (encryptedAesKey) {
+        // Try current private key first
+        const privKey = localStorage.getItem(`chat_sk_${currentUserId}`);
+        if (privKey) {
+           const decodedText = await decryptMessage(msg.text, encryptedAesKey, msg.encryptionData.iv, privKey);
+           if (decodedText !== "[Encrypted Message]") {
+               return decodedText;
+           }
+        }
+        
+        // Fallback to history keys
+        const historyJson = localStorage.getItem(`chat_sk_history_${currentUserId}`);
+        if (historyJson) {
+           const history = JSON.parse(historyJson);
+           for (let i = history.length - 1; i >= 0; i--) {
+              const oldKey = history[i];
+              const decodedTextOld = await decryptMessage(msg.text, encryptedAesKey, msg.encryptionData.iv, oldKey);
+              if (decodedTextOld !== "[Encrypted Message]") {
+                  return decodedTextOld;
+              }
+           }
+        }
+        return "[Encrypted Message]";
       }
     }
   }
   return msg.text;
+}
+
+// Function to refresh E2EE key pair and archive old private keys locally
+export async function refreshKeyPair(userId) {
+  // 1. Archive current private key
+  const currentPrivKey = localStorage.getItem(`chat_sk_${userId}`);
+  if (currentPrivKey) {
+    const historyJson = localStorage.getItem(`chat_sk_history_${userId}`);
+    const history = historyJson ? JSON.parse(historyJson) : [];
+    history.push(currentPrivKey);
+    localStorage.setItem(`chat_sk_history_${userId}`, JSON.stringify(history));
+  }
+
+  // 2. Generate new key pair
+  const keyPair = await generateKeyPair();
+  const pubKeyB64 = await exportPublicKey(keyPair.publicKey);
+  const privKeyB64 = await exportPrivateKey(keyPair.privateKey);
+
+  // 3. Save new keys to local storage
+  localStorage.setItem(`chat_pk_${userId}`, pubKeyB64);
+  localStorage.setItem(`chat_sk_${userId}`, privKeyB64);
+
+  return pubKeyB64;
+}
+
+// Decrypt the conversation-level shared key using user's private key
+export async function decryptSharedKey(encryptedKeyB64, privateKeyB64) {
+  if (!encryptedKeyB64 || !privateKeyB64) return null;
+  try {
+    const privateKey = await importPrivateKey(privateKeyB64);
+    const encryptedKeyArray = new Uint8Array(atob(encryptedKeyB64).split("").map(c => c.charCodeAt(0)));
+    
+    const decryptedRaw = await window.crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      privateKey,
+      encryptedKeyArray
+    );
+
+    const hexKey = new TextDecoder().decode(decryptedRaw);
+    return hexKey;
+  } catch (err) {
+    console.error("Shared key decryption failed", err);
+    return null;
+  }
+}
+
+// Convert hex symmetric key to CryptoKey
+export async function hexToKey(hex) {
+  const binary = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  return await window.crypto.subtle.importKey(
+    "raw",
+    binary.buffer,
+    { name: "AES-GCM" },
+    true,
+    ["encrypt", "decrypt"]
+  );
 }

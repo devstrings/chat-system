@@ -8,6 +8,7 @@ import {
   removeOnlineUser,
   clearSocket,
 } from "@/store/slices/socketSlice";
+import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import {
   addMessage,
   updateMessageStatus,
@@ -117,7 +118,8 @@ const socketMiddleware = (store) => {
       });
 
       // INDIVIDUAL CHAT MESSAGES
-      socket.on("receiveMessage", (msg) => {
+      socket.on("receiveMessage", async (msg) => {
+        msg.text = await decryptMessageHelper(msg, currentUserId);
         const senderId = msg.sender?._id || msg.sender;
         const receiverId = msg.receiver?._id || msg.receiver;
 
@@ -296,7 +298,8 @@ const socketMiddleware = (store) => {
       });
 
       //  GROUP CHAT MESSAGES
-      socket.on("receiveGroupMessage", (msg) => {
+      socket.on("receiveGroupMessage", async (msg) => {
+        msg.text = await decryptMessageHelper(msg, currentUserId);
         // Group messages update
         store.dispatch(
           addGroupMessage({
