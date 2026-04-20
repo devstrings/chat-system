@@ -1,16 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import API_BASE_URL from "@/config/api";
 import { useNavigate, useParams } from "react-router-dom";
-import Sidebar from "@/components/SideBar";
 import ChatWindow from "@/components/ChatWindow";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoCall from "@/components/Call/VideoCall";
 import IncomingCall from "@/components/Call/IncomingCall";
 import MessageInput from "@/components/MessageInput";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
-import AlertDialog from "@/components/base/AlertDialog";
 import { useAuthImage } from "@/hooks/useAuthImage";
-import ProfileSetting from "@/components/ProfileSetting";
 import GroupChatWindow from "@/components/Group/GroupChatWindow";
 import StatusManager from "@/components/Status/StatusManager";
 import StatusViewer from "@/components/Status/StatusViewer";
@@ -18,6 +15,7 @@ import NotificationToast from "@/components/NotificationToast";
 import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import { setUser } from "@/store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
+import AlertDialog from "@/components/base/AlertDialog";
 import { logout } from "@/store/slices/authSlice";
 import {
   fetchFriendsList,
@@ -26,14 +24,11 @@ import {
 import { fetchGroups } from "@/store/slices/groupSlice";
 import {
   fetchConversation,
-
   clearUnreadCount,
   addMessage,
   incrementUnreadCount,
   deleteConversation,
   updateMessageStatus,
-  archiveConversation,      
-  pinConversation, 
   updateMessage,
   updateGroupMessageInSidebar,
   decryptAndStoreSharedKey
@@ -45,11 +40,7 @@ import {
 } from "@/store/slices/groupSlice";
 import apiActions from "@/store/apiActions";
 import {
-  loadAllStatuses,
-  loadPinnedConversations,
-  loadArchivedConversations,
   clearChatMessages,
-  removeProfilePicture,
   loadUserLastMessages,
   loadGroupLastMessages,
   formatAttachmentText,
@@ -59,15 +50,16 @@ import {
   registerServiceWorker,
   processCallRecordMessage,
 } from "@/actions/dashboard.actions";
-export default function Conversation() {
-      const [selectedUser, setSelectedUser] = useState(null);
+export default function Conversation({ onOpenMobileSidebar = () => {} }) {
+  const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(
     () => localStorage.getItem("selectedUserId") || null,
   );
-//   const [conversationId, setConversationId] = useState(null);
-const { conversationId: urlConversationId } = useParams();
-const [conversationId, setConversationId] = useState(urlConversationId || null);
-  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  //   const [conversationId, setConversationId] = useState(null);
+  const { conversationId: urlConversationId } = useParams();
+  const [conversationId, setConversationId] = useState(
+    urlConversationId || null,
+  );
   const socket = useSelector((state) => state.socket.socket);
 
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
@@ -75,7 +67,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-//   const { conversationId: urlConversationId } = useParams();
+  //   const { conversationId: urlConversationId } = useParams();
   const [replyTo, setReplyTo] = useState(null);
   // Redux state
   const { currentUser, currentUserId, isAuthenticated } = useSelector(
@@ -84,7 +76,6 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages, sharedKeys } = useSelector((state) => state.chat);
-
   const [loading, setLoading] = useState(true);
 
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -114,13 +105,7 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
   const lastMessagesRef = useRef({});
   const hasRestored = useRef(false);
   const hasLoadedMessages = useRef(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [pinnedConversations, setPinnedConversations] = useState(new Set());
-  const [archivedConversations, setArchivedConversations] = useState(new Set());
-  const [showArchived, setShowArchived] = useState(false);
 
-  const [sharedProfileImage, setSharedProfileImage] = useState(null);
-  const [sharedCoverPhoto, setSharedCoverPhoto] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [savedSelectedGroupId] = useState(
     () => localStorage.getItem("selectedGroupId") || null,
@@ -128,15 +113,6 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
   const [isGroupChat, setIsGroupChat] = useState(() => {
     return localStorage.getItem("isGroupChat") === "true";
   });
-
-  const [profileSettingsView, setProfileSettingsView] = useState("all");
-
-  const [showStatusManager, setShowStatusManager] = useState(false);
-  const [statusManagerMode, setStatusManagerMode] = useState("create");
-  const [showStatusViewer, setShowStatusViewer] = useState(false);
-  const [statusViewerIndex, setStatusViewerIndex] = useState(0);
-  const [allStatuses, setAllStatuses] = useState([]);
-  const [showStatusRings, setShowStatusRings] = useState(false);
 
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
@@ -147,7 +123,6 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
     isOpen: false,
     username: "",
   });
-
 
   // Show notification
   const showNotification = useCallback(
@@ -209,11 +184,10 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
   useEffect(() => {
     if (!socket || !currentUserId) return;
 
-    console.log("🔌 Setting up sidebar socket listeners");
+    console.log(" Setting up sidebar socket listeners");
 
     //  Individual message received
     const handleSidebarMessage = async (msg) => {
-
       const senderId = msg.sender?._id || msg.sender;
       const receiverId = msg.receiver?._id || msg.receiver;
 
@@ -258,7 +232,6 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
 
       // Notification
       if (msg.sender?._id !== currentUserId) {
-
         playNotificationSound();
         const senderIdStr =
           msg.sender?._id?.toString() || msg.sender?.toString();
@@ -286,6 +259,9 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
     //  Group message received
     const handleSidebarGroupMessage = async (msg) => {
       console.log(" [SIDEBAR] Group message:", msg._id);
+
+      // Group messages haven't migrated to shared keys yet, but decryptMessageHelper handles legacy too
+      msg.text = await decryptMessageHelper(msg, currentUserId, null);
 
       // Update group messages in groupSlice
       dispatch(
@@ -434,21 +410,8 @@ const [conversationId, setConversationId] = useState(urlConversationId || null);
       socket.off("call:record", handleCallRecord);
       socket.off("friendRequestReceived", handleFriendRequest);
     };
-  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); // Added sharedKeys to dependencies
-useEffect(() => {
-  const loadAllStatusesHandler = async () => {
-    try {
-      const data = await loadAllStatuses();
-      setAllStatuses(data);
-    } catch (err) {
-      console.error("Load statuses error:", err);
-    }
-  };
+  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); 
 
-  if (currentUserId) {
-    loadAllStatusesHandler();
-  }
-}, [currentUserId]);
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
@@ -465,190 +428,18 @@ useEffect(() => {
       console.log(" Saved selectedGroupId:", selectedGroup._id);
     }
   }, [selectedGroup]);
- useEffect(() => {
-  requestNotificationPermission();
-  registerServiceWorker();
-}, []);
+  useEffect(() => {
+    requestNotificationPermission();
+    registerServiceWorker();
+  }, []);
   useEffect(() => {
     lastMessagesRef.current = lastMessages;
   }, [lastMessages]);
-
-  // Load pinned conversations
-useEffect(() => {
-  const loadPinnedConversationsHandler = async () => {
-    try {
-      const pinnedIdsArray = await loadPinnedConversations();
-      setPinnedConversations(new Set(pinnedIdsArray));
-    } catch (err) {
-      console.error("Failed to load pinned conversations:", err);
-    }
-  };
-
-  if (currentUserId) {
-    loadPinnedConversationsHandler();
-  }
-}, [currentUserId]);
 
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage,
   );
 
-  // Load archived conversations
- useEffect(() => {
-  const loadArchivedConversationsHandler = async () => {
-    try {
-      const archivedIdsArray = await loadArchivedConversations();
-      setArchivedConversations(new Set(archivedIdsArray));
-    } catch (err) {
-      console.error("Failed to load archived conversations:", err);
-    }
-  };
-
-  if (currentUserId) {
-    loadArchivedConversationsHandler();
-  }
-}, [currentUserId]);
-
-  //  - LOAD ARCHIVED GROUPS
-  useEffect(() => {
-    const loadArchivedGroups = () => {
-      if (!groups || groups.length === 0) return;
-
-      // Extract archived group IDs
-      const archivedGroupIds = groups
-        .filter((g) => g.archivedBy?.some((a) => a.userId === currentUserId))
-        .map((g) => g._id);
-
-      // Add to archivedConversations Set
-      setArchivedConversations((prev) => {
-        const newSet = new Set(prev);
-        archivedGroupIds.forEach((id) => newSet.add(id));
-        return newSet;
-      });
-    };
-
-    loadArchivedGroups();
-  }, [groups, currentUserId]);
-  // Handler to update profile image from ProfileSettings
-  const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
-    if (isCoverPhoto) {
-      //  UPDATE BOTH STATES
-      setSharedCoverPhoto(newImageUrl);
-      dispatch(setUser({ ...currentUser, coverPhoto: newImageUrl }));
-    } else {
-      setSharedProfileImage(newImageUrl);
-      dispatch(setUser({ ...currentUser, profileImage: newImageUrl }));
-    }
-  };
-  //   handleRemoveProfileImage function
-  const handleRemoveProfileImage = async () => {
-    try {
-  await removeProfilePicture();
-
-      // UPDATE SHARED STATE
-      setSharedProfileImage(null);
-      dispatch(setUser({ ...currentUser, profileImage: null }));
-      setShowProfileSettings(false);
-
-      setAlertDialog({
-        isOpen: true,
-        title: "Success!",
-        message: "Profile picture removed successfully",
-        type: "success",
-      });
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message:
-          err.response?.data?.message || "Failed to remove profile picture",
-        type: "error",
-      });
-    }
-  };
-
-  //Archeived
-
-const handleArchiveConversation = async (conversationId, isArchived) => {
-  try {
-    const isGroup = groups.some((g) => g._id === conversationId);
-    
-    // Dispatch Redux action instead of manual API call
-    const result = await dispatch(
-      archiveConversation({ conversationId, isArchived, isGroup })
-    ).unwrap();
-    
-    // Update local state based on result
-    if (result.isArchived) {
-      setArchivedConversations((prev) => new Set([...prev, conversationId]));
-    } else {
-      setArchivedConversations((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(conversationId);
-        return newSet;
-      });
-    }
-    
-    setAlertDialog({
-      isOpen: true,
-      title: result.isArchived 
-        ? (isGroup ? "Group Archived" : "Chat Archived")
-        : (isGroup ? "Group Unarchived" : "Chat Unarchived"),
-      message: result.isArchived
-        ? (isGroup ? "Group has been moved to archive." : "Chat has been moved to archive.")
-        : (isGroup ? "Group has been restored to main list." : "Chat has been restored to main list."),
-      type: "success",
-    });
-  } catch (err) {
-    setAlertDialog({
-      isOpen: true,
-      title: "Error",
-      message: err.message || "Failed to update archive status",
-      type: "error",
-    });
-  }
-};
-
-  // Pin/Unpin conversation handler
-const handlePinConversation = async (conversationId, isPinned) => {
-  try {
-    const isGroup = groups.some((g) => g._id === conversationId);
-    
-    // Dispatch Redux action instead of manual API call
-    const result = await dispatch(
-      pinConversation({ conversationId, isPinned, isGroup })
-    ).unwrap();
-    
-    // Update local state based on result
-    if (result.isPinned) {
-      setPinnedConversations((prev) => new Set([...prev, conversationId]));
-    } else {
-      setPinnedConversations((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(conversationId);
-        return newSet;
-      });
-    }
-    
-    setAlertDialog({
-      isOpen: true,
-      title: result.isPinned 
-        ? (isGroup ? "Group Pinned" : "Chat Pinned")
-        : (isGroup ? "Group Unpinned" : "Chat Unpinned"),
-      message: result.isPinned
-        ? (isGroup ? "Group has been pinned to the top." : "Chat has been pinned to the top.")
-        : (isGroup ? "Group has been unpinned successfully." : "Chat has been unpinned successfully."),
-      type: "success",
-    });
-  } catch (err) {
-    setAlertDialog({
-      isOpen: true,
-      title: "Error",
-      message: err.message || "Failed to update pin status",
-      type: "error",
-    });
-  }
-};
   const handleConversationDeleted = (userId) => {
     console.log(
       " [DASHBOARD] Handling conversation deletion for user:",
@@ -678,23 +469,11 @@ const handlePinConversation = async (conversationId, isPinned) => {
 
     // Remove from pinned/archived sets (local state)
     if (conversationIdToRemove) {
-      setPinnedConversations((prev) => {
-        const updated = new Set(prev);
-        updated.delete(conversationIdToRemove);
-        return updated;
-      });
-
-      setArchivedConversations((prev) => {
-        const updated = new Set(prev);
-        updated.delete(conversationIdToRemove);
-        return updated;
-      });
       console.log(" Removed from pinned/archived");
     }
 
     console.log(" Conversation fully deleted from all states");
   };
- 
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -716,7 +495,6 @@ const handlePinConversation = async (conversationId, isPinned) => {
   }, [dispatch, navigate]);
 
   useEffect(() => {
-
     if (loading) return;
     if (hasRestored.current) return;
     if (!savedSelectedUserId && !savedSelectedGroupId) return;
@@ -739,32 +517,32 @@ const handlePinConversation = async (conversationId, isPinned) => {
     }
   }, [users, groups, loading]);
   useEffect(() => {
-  if (loading) return;
-  if (users.length === 0 && groups.length === 0) return;
-  if (!urlConversationId) return;
+    if (loading) return;
+    if (users.length === 0 && groups.length === 0) return;
+    if (!urlConversationId) return;
 
-  const group = groups.find((g) => g._id === urlConversationId);
-  if (group) {
-    setSelectedGroup(group);
-    setIsGroupChat(true);
-    setSelectedUser(null);
-    return;
-  }
-
-  const userId = Object.keys(lastMessages).find(
-    (uid) => lastMessages[uid]?.conversationId === urlConversationId
-  );
-  if (userId) {
-    const user = users.find((u) => u._id === userId);
-    if (user) {
-      setSelectedUser(user);
-      setIsGroupChat(false);
-      setSelectedGroup(null);
+    const group = groups.find((g) => g._id === urlConversationId);
+    if (group) {
+      setSelectedGroup(group);
+      setIsGroupChat(true);
+      setSelectedUser(null);
+      return;
     }
-  }
-}, [urlConversationId, users, groups, loading, lastMessages]);
 
-useEffect(() => {
+    const userId = Object.keys(lastMessages).find(
+      (uid) => lastMessages[uid]?.conversationId === urlConversationId,
+    );
+    if (userId) {
+      const user = users.find((u) => u._id === userId);
+      if (user) {
+        setSelectedUser(user);
+        setIsGroupChat(false);
+        setSelectedGroup(null);
+      }
+    }
+  }, [urlConversationId, users, groups, loading, lastMessages]);
+
+  useEffect(() => {
     if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
     if (hasLoadedMessages.current) return;
     hasLoadedMessages.current = true;
@@ -782,33 +560,32 @@ useEffect(() => {
             }
 
             // Skip if conversation was deleted
-            if (
-              convRes?.deletedBy?.some((d) => d.userId === currentUserId)
-            ) {
+            if (convRes?.deletedBy?.some((d) => d.userId === currentUserId)) {
               console.log(` Conversation with ${user._id} deleted, skipping`);
               continue;
             }
 
             // Decrypt and store shared key if present
-            let activeSharedKey = sharedKeys[conversationId];
+            let activeSharedKey = sharedKeys[convRes._id];
             if (convRes.sharedEncryptedKeys && !activeSharedKey) {
                try {
                  const result = await dispatch(decryptAndStoreSharedKey({
-                    conversationId,
+                    conversationId: convRes._id,
                     sharedEncryptedKeys: convRes.sharedEncryptedKeys,
                     currentUserId
                  })).unwrap();
                  activeSharedKey = result.sharedKey;
                } catch (err) {
-                 console.error("Failed to decrypt key for conversation:", conversationId, err);
+                 console.error("Failed to decrypt key for conversation:", convRes._id, err);
                }
             }
 
-            const msgRes = await apiActions.getPaginatedConversationMessagesById(
-              conversationId,
-              1,
-              20,
-            );
+            const msgRes =
+              await apiActions.getPaginatedConversationMessagesById(
+                convRes._id,
+                1,
+                20,
+              );
 
             const messagesRaw = msgRes;
             const messages = await Promise.all(messagesRaw.map(async msg => {
@@ -848,7 +625,7 @@ useEffect(() => {
 
               dispatch(
                 addMessage({
-                  conversationId,
+                  conversationId: convRes._id,
                   message: {
                     ...processedMsg,
                     _loadedTimestamp: messageTimestamp,
@@ -873,7 +650,7 @@ useEffect(() => {
               // Empty conversation exists
               dispatch(
                 addMessage({
-                  conversationId,
+                  conversationId: convRes._id,
                   message: {
                     _id: `temp-${Date.now()}`,
                     text: "",
@@ -898,10 +675,13 @@ useEffect(() => {
           }
         }
 
-             //  Load messages for all groups
+        //  Load messages for all groups
         for (const group of groups) {
           try {
-            const result = await loadGroupLastMessages(group._id, currentUserId);
+            const result = await loadGroupLastMessages(
+              group._id,
+              currentUserId,
+            );
             const messages = result.messages;
 
             if (messages.length > 0) {
@@ -1011,13 +791,6 @@ useEffect(() => {
     };
   }, [socket]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("selectedUserId");
-    localStorage.removeItem("selectedGroupId");
-    localStorage.removeItem("isGroupChat");
-    dispatch(logout());
-    navigate("/login", { replace: true });
-  };
   const handleClearChat = async () => {
     try {
       const token = localStorage.getItem("accessToken");
@@ -1029,7 +802,7 @@ useEffect(() => {
 
       console.log(" Clearing chat for conversation:", conversationId);
 
-  await clearChatMessages(conversationId);
+      await clearChatMessages(conversationId);
 
       console.log(" Backend cleared successfully");
 
@@ -1056,10 +829,6 @@ useEffect(() => {
       });
     }
   };
-  const handleOpenStatusManager = (mode = "create") => {
-    setStatusManagerMode(mode);
-    setShowStatusManager(true);
-  };
 
   if (loading) {
     return (
@@ -1071,148 +840,12 @@ useEffect(() => {
       </div>
     );
   }
-  const handleOpenStatusViewer = (userStatusOrIndex) => {
-    if (!allStatuses || allStatuses.length === 0) {
-      setAlertDialog({
-        isOpen: true,
-        title: "No Status Available",
-        message: "This user's status is not available right now.",
-        type: "info",
-      });
-      return;
-    }
-
-    let targetIndex = 0;
-
-    //  Handle both object (userStatus) and number (index) inputs
-    if (typeof userStatusOrIndex === "object" && userStatusOrIndex?.user?._id) {
-      // Find index by user ID
-      targetIndex = allStatuses.findIndex(
-        (status) => status.user._id === userStatusOrIndex.user._id,
-      );
-
-      if (targetIndex === -1) {
-        console.error(" User status not found in allStatuses");
-        setAlertDialog({
-          isOpen: true,
-          title: "Status Not Found",
-          message: "Could not find this user's status.",
-          type: "error",
-        });
-        return;
-      }
-    } else if (typeof userStatusOrIndex === "number") {
-      targetIndex = userStatusOrIndex;
-    } else {
-      console.error(" Invalid parameter type:", typeof userStatusOrIndex);
-      return;
-    }
-
-    //validation
-    if (targetIndex < 0 || targetIndex >= allStatuses.length) {
-      console.error(
-        " Index out of bounds:",
-        targetIndex,
-        "Max:",
-        allStatuses.length - 1,
-      );
-      return;
-    }
-
-    setStatusViewerIndex(targetIndex);
-    setShowStatusViewer(true);
-  };
-
-  const handleCreateStatus = () => {
-    setStatusManagerMode("create");
-    setShowStatusManager(true);
-    setShowStatusRings(false);
-  };
-
-  const handleViewMyStatus = () => {
-    setStatusManagerMode("myStatus");
-    setShowStatusManager(true);
-    setShowStatusRings(false);
-  };
-
- const handleStatusCreated = async (newStatus) => {
-  try {
-    const data = await loadAllStatuses();
-    setAllStatuses(data);
-  } catch (err) {
-    console.error("Reload statuses error:", err);
-  }
-};
 
   return (
     <>
       <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
         {/* Status Manager Modal */}
 
-        {/*  MOBILE OVERLAY */}
-        {isMobileSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          />
-        )}
-
-        {/*  RESPONSIVE SIDEBAR */}
-
-        <Sidebar
-          selectedUserId={selectedUser?._id}
-      onSelectUser={(user) => {
-  if (user.isGroup) {
-    setSelectedGroup(user);
-    setSelectedUser(null);
-    setIsGroupChat(true);
-    setConversationId(null);
-    navigate(`/conversation/${user._id}`);
-  } else {
-    setSelectedUser(user);
-    setSelectedGroup(null);
-    setIsGroupChat(false);
-    navigate(`/conversation/${user._id}`);
-  }
-  setIsMobileSidebarOpen(false);
-}}
-          currentUsername={currentUser?.username || ""}
-          currentUserId={currentUserId}
-          onLogout={handleLogout}
-          isMobileSidebarOpen={isMobileSidebarOpen}
-          onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
-          onOpenProfileSettings={(view = "all") => {
-            setProfileSettingsView(view);
-            setShowProfileSettings(true);
-          }}
-          profileImageUrl={sharedProfileImage}
-          pinnedConversations={pinnedConversations}
-          onPinConversation={handlePinConversation}
-          archivedConversations={archivedConversations}
-          onArchiveConversation={handleArchiveConversation}
-          showArchived={showArchived}
-          onToggleArchived={(show) => setShowArchived(show)}
-          onGroupUpdate={(updatedGroup) => {
-            dispatch(updateGroup(updatedGroup));
-          }}
-          onConversationDeleted={handleConversationDeleted}
-          onOpenStatusManager={handleOpenStatusManager}
-          allStatuses={allStatuses}
-          onOpenStatusViewer={handleOpenStatusViewer}
-          onCreateStatus={handleCreateStatus}
-          onViewMyStatus={handleViewMyStatus}
-          currentUserForStatus={currentUser}
-        />
-
-        {showProfileSettings && (
-          <ProfileSetting
-            currentUser={currentUser}
-            onClose={() => setShowProfileSettings(false)}
-            onProfileImageUpdate={handleProfileImageUpdate}
-            coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto}
-            initialView={profileSettingsView}
-          />
-        )}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
           {selectedUser || selectedGroup ? (
             <>
@@ -1221,7 +854,7 @@ useEffect(() => {
                   <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
                     {/* HAMBURGER MENU (MOBILE ONLY) */}
                     <button
-                      onClick={() => setIsMobileSidebarOpen(true)}
+                      onClick={onOpenMobileSidebar}
                       className="md:hidden p-2 text-black transition-colors flex-shrink-0"
                     >
                       <svg
@@ -1569,7 +1202,7 @@ useEffect(() => {
                     currentUserId={currentUserId}
                     searchQuery={searchInChat}
                     selectedUser={selectedUser}
-                    onUpdateLastMessageStatus={(updateData) => { }}
+                    onUpdateLastMessageStatus={(updateData) => {}}
                     isSelectionMode={isSelectionMode}
                     setIsSelectionMode={setIsSelectionMode}
                     selectedMessages={selectedMessages}
@@ -1589,7 +1222,7 @@ useEffect(() => {
             <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
               <div className="text-center">
                 <button
-                  onClick={() => setIsMobileSidebarOpen(true)}
+                  onClick={onOpenMobileSidebar}
                   className="md:hidden mb-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg"
                 >
                   Open Chats
@@ -1643,9 +1276,9 @@ useEffect(() => {
             setActiveCall(null);
           }}
           onCallRejected={() => {
-  setShowVideoCall(false);
-  setActiveCall(null);
-}}
+            setShowVideoCall(false);
+            setActiveCall(null);
+          }}
         />
       )}
       {/* Incoming Call */}
@@ -1769,9 +1402,9 @@ useEffect(() => {
                 <p className="text-gray-900 text-sm">
                   {selectedUser?.createdAt
                     ? new Date(selectedUser.createdAt).toLocaleDateString(
-                      "en-US",
-                      { year: "numeric", month: "long", day: "numeric" },
-                    )
+                        "en-US",
+                        { year: "numeric", month: "long", day: "numeric" },
+                      )
                     : "N/A"}
                 </p>
               </div>
@@ -1787,96 +1420,36 @@ useEffect(() => {
         message={alertDialog.message}
         type={alertDialog.type}
       />
-      {/* Status Manager */}
-      {showStatusManager && (
-        <StatusManager
-          currentUser={currentUser}
-          onClose={() => setShowStatusManager(false)}
-          onStatusCreated={handleStatusCreated}
-          mode={statusManagerMode}
-        />
-      )}
 
-      {/* Status Viewer */}
-      {showStatusViewer && allStatuses.length > 0 && (
-        <StatusViewer
-          statuses={allStatuses}
-          currentUserId={currentUserId}
-          onClose={() => setShowStatusViewer(false)}
-          initialUserIndex={statusViewerIndex}
-        />
-      )}
-
-      {/* Status Rings Panel */}
-      {showStatusRings && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowStatusRings(false)}
-          />
-          <div className="fixed right-0 top-0 bottom-0 w-96 bg-white shadow-2xl z-50 overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Status Updates</h2>
-              <button
-                onClick={() => setShowStatusRings(false)}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors"
-              >
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <StatusRingsList
-              onOpenViewer={handleOpenStatusViewer}
-              currentUserId={currentUserId}
-              onCreateStatus={handleCreateStatus}
-              onViewMyStatus={handleViewMyStatus}
-            />
-          </div>
-        </>
-      )}
       <NotificationToast
         notifications={toastNotifications}
         onClose={(id) => {
           setToastNotifications((prev) => prev.filter((n) => n.id !== id));
         }}
-    onSelect={(notif) => {
-  console.log("=== NOTIFICATION CLICKED ===", notif);
-  if (notif.isGroup) {
-    const group = groups.find((g) => g._id === notif.groupId);
-    if (group) {
-      setSelectedGroup(group);
-      setSelectedUser(null);
-      setIsGroupChat(true);
-      setConversationId(null);
-      setIsMobileSidebarOpen(false);
-      navigate(`/conversation/${group._id}`);
-    }
-  } else {
-    const senderId = notif.senderId?._id || notif.senderId;
-    const user =
-      users.find((u) => u._id === senderId) || notif.senderObj;
-    console.log("User found:", user, "senderId:", senderId);
-    if (user) {
-      setSelectedUser(user);
-      setSelectedGroup(null);
-      setIsGroupChat(false);
-      setIsMobileSidebarOpen(false);
-      navigate(`/conversation/${user._id}`);
-    }
-  }
-}}
+        onSelect={(notif) => {
+          console.log("=== NOTIFICATION CLICKED ===", notif);
+          if (notif.isGroup) {
+            const group = groups.find((g) => g._id === notif.groupId);
+            if (group) {
+              setSelectedGroup(group);
+              setSelectedUser(null);
+              setIsGroupChat(true);
+              setConversationId(null);
+              navigate(`/conversation/${group._id}`);
+            }
+          } else {
+            const senderId = notif.senderId?._id || notif.senderId;
+            const user =
+              users.find((u) => u._id === senderId) || notif.senderObj;
+            console.log("User found:", user, "senderId:", senderId);
+            if (user) {
+              setSelectedUser(user);
+              setSelectedGroup(null);
+              setIsGroupChat(false);
+              navigate(`/conversation/${user._id}`);
+            }
+          }
+        }}
       />
     </>
   );

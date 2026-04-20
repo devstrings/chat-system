@@ -252,6 +252,7 @@ const chatSlice = createSlice({
   initialState: {
     conversations: {}, // { conversationId: { messages: [], loading: false } }
     selectedConversationId: null,
+    selectedUserId: null,
     unreadCounts: {}, // { userId: count }
     lastMessages: {}, // { userId: { text, time, sender, status } }
     pinnedConversations: [],
@@ -264,6 +265,10 @@ const chatSlice = createSlice({
   reducers: {
     setSelectedConversation: (state, action) => {
       state.selectedConversationId = action.payload;
+    },
+
+    setSelectedUserId: (state, action) => {
+      state.selectedUserId = action.payload;
     },
 
     addMessage: (state, action) => {
@@ -334,7 +339,7 @@ const chatSlice = createSlice({
       const targetKey = isGroup ? conversationId : userId;
 
       state.lastMessages[targetKey] = {
-        text: isGroup ? messageText : (messageText || ""),
+        text: isGroup ? messageText : messageText || "",
         time: message.createdAt || new Date().toISOString(),
         sender: senderId,
         status: message.status || "sent",
@@ -348,7 +353,6 @@ const chatSlice = createSlice({
         callStatus: message.callStatus || null,
         callDuration: message.callDuration || 0,
       };
-
     },
     updateMessageStatus: (state, action) => {
       const { conversationId, messageId, status } = action.payload;
@@ -593,6 +597,7 @@ const chatSlice = createSlice({
         return {
           conversations: {},
           selectedConversationId: null,
+          selectedUserId: null,
           unreadCounts: {},
           lastMessages: {},
           pinnedConversations: [],
@@ -607,6 +612,7 @@ const chatSlice = createSlice({
 
 export const {
   setSelectedConversation,
+  setSelectedUserId,
   addMessage,
   updateMessageStatus,
   deleteMessage,

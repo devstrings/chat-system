@@ -33,20 +33,20 @@ export default function Sidebar({
   onLogout,
   isMobileSidebarOpen = false,
   profileImageUrl,
-  onCloseMobileSidebar = () => { },
-  onOpenProfileSettings = (view = "all") => { },
+  onCloseMobileSidebar = () => {},
+  onOpenProfileSettings = (view = "all") => {},
   pinnedConversations = new Set(),
-  onPinConversation = () => { },
+  onPinConversation = () => {},
   archivedConversations = new Set(),
-  onArchiveConversation = () => { },
+  onArchiveConversation = () => {},
   showArchived = false,
-  onToggleArchived = () => { },
-  onGroupUpdate = () => { },
-  onConversationDeleted = () => { },
-  onOpenStatusManager = () => { },
+  onToggleArchived = () => {},
+  onGroupUpdate = () => {},
+  onConversationDeleted = () => {},
+  onOpenStatusManager = () => {},
   allStatuses = [],
-  onOpenStatusViewer = () => { },
-  onViewMyStatus = () => { },
+  onOpenStatusViewer = () => {},
+  onViewMyStatus = () => {},
   currentUserForStatus = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,8 +115,6 @@ export default function Sidebar({
     message: "",
     type: "success",
   });
-
- 
 
   const memoizedItems = useMemo(() => {
     // If searching, show ALL friends matching search
@@ -268,56 +266,54 @@ export default function Sidebar({
     return convId && archivedConversations.has(convId);
   }).length;
 
+  const handleSearchUsers = async () => {
+    if (!searchUsers.trim()) return;
+    setLoading(true);
+    try {
+      const data = await searchUsers(searchUsers);
+      setAllUsers(data);
+    } catch (err) {
+      console.error("Search error:", err);
+      setAlertDialog({
+        isOpen: true,
+        title: "Search Failed",
+        message: "Failed to search users. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleSendRequest = async (userId) => {
+    try {
+      await sendFriendRequest(userId);
 
- const handleSearchUsers = async () => {
-  if (!searchUsers.trim()) return;
-  setLoading(true);
-  try {
-    const data = await searchUsers(searchUsers);
-    setAllUsers(data);
-  } catch (err) {
-    console.error("Search error:", err);
-    setAlertDialog({
-      isOpen: true,
-      title: "Search Failed",
-      message: "Failed to search users. Please try again.",
-      type: "error",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      setAlertDialog({
+        isOpen: true,
+        title: "Friend Request Sent!",
+        message: "Your friend request has been sent successfully.",
+        type: "success",
+      });
 
- const handleSendRequest = async (userId) => {
-  try {
-    await sendFriendRequest(userId);
+      setAllUsers(allUsers.filter((u) => u._id !== userId));
+      setTimeout(() => {
+        setShowAddFriendModal(false);
+        setSearchUsers("");
+        setAllUsers([]);
+      }, 1000);
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.message || "Failed to send request";
 
-    setAlertDialog({
-      isOpen: true,
-      title: "Friend Request Sent!",
-      message: "Your friend request has been sent successfully.",
-      type: "success",
-    });
-
-    setAllUsers(allUsers.filter((u) => u._id !== userId));
-    setTimeout(() => {
-      setShowAddFriendModal(false);
-      setSearchUsers("");
-      setAllUsers([]);
-    }, 1000);
-  } catch (err) {
-    const errorMessage =
-      err.response?.data?.message || "Failed to send request";
-
-    setAlertDialog({
-      isOpen: true,
-      title: "Cannot Send Request",
-      message: errorMessage,
-      type: "error",
-    });
-  }
-};
+      setAlertDialog({
+        isOpen: true,
+        title: "Cannot Send Request",
+        message: errorMessage,
+        type: "error",
+      });
+    }
+  };
 
   const loadPendingRequests = async () => {
     try {
@@ -420,10 +416,11 @@ export default function Sidebar({
   return (
     <>
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${isMobileSidebarOpen
-          ? "translate-x-0"
-          : "-translate-x-full md:translate-x-0"
-          }`}
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-[85vw] sm:w-80 md:w-96 h-screen bg-white border-r border-gray-200 shadow-lg flex flex-col transform transition-transform duration-300 ease-in-out ${
+          isMobileSidebarOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        }`}
       >
         <button
           onClick={onCloseMobileSidebar}
@@ -746,19 +743,21 @@ export default function Sidebar({
           <div className="flex gap-1 mb-2">
             <button
               onClick={() => setActiveTab("chats")}
-              className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${activeTab === "chats"
-                ? "bg-white text-blue-600 shadow-md"
-                : "bg-white/10 text-white hover:bg-white/20"
-                }`}
+              className={`flex-1 py-1.5 px-2 rounded-md font-medium transition-all text-xs ${
+                activeTab === "chats"
+                  ? "bg-white text-blue-600 shadow-md"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
             >
               Chats
             </button>
             <button
               onClick={() => setActiveTab("status")}
-              className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${activeTab === "status"
-                ? "bg-white text-purple-600 shadow-md"
-                : "bg-white/10 text-white hover:bg-white/20"
-                }`}
+              className={`flex-1 py-1.5 px-3 rounded-md font-medium transition-all text-xs ${
+                activeTab === "status"
+                  ? "bg-white text-purple-600 shadow-md"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
             >
               Status
             </button>

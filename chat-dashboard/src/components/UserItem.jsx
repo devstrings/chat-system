@@ -32,9 +32,9 @@ const UserItem = memo(function UserItem({
   isPinned = false,
   isArchived = false,
   conversationId,
-  onPinConversation = () => { },
-  onArchiveConversation = () => { },
-  onConversationDeleted = () => { },
+  onPinConversation = () => {},
+  onArchiveConversation = () => {},
+  onConversationDeleted = () => {},
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
@@ -91,26 +91,23 @@ const UserItem = memo(function UserItem({
   };
 
   // Fetch relationship status
- useEffect(() => {
-  const fetchStatus = async () => {
-    try {
-      const data = await getFriendStatus(user._id);
-      setRelationshipStatus(data.status);
-      if (data.requestId) {
-        setRequestId(data.requestId);
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const data = await getFriendStatus(user._id);
+        setRelationshipStatus(data.status);
+        if (data.requestId) {
+          setRequestId(data.requestId);
+        }
+      } catch (err) {
+        console.error("Fetch status error:", err);
       }
-    } catch (err) {
-      console.error("Fetch status error:", err);
+    };
+
+    if (user._id) {
+      fetchStatus();
     }
-  };
-
-  if (user._id) {
-    fetchStatus();
-  }
-}, [user._id]);
-
-  
-
+  }, [user._id]);
 
   const displayMessage = truncateMessage(lastMessage);
   const isOwnMessage =
@@ -152,277 +149,279 @@ const UserItem = memo(function UserItem({
     }
   };
 
-const handleSendRequest = async () => {
-  try {
-    await sendFriendRequest(user._id);
-    setRelationshipStatus("request_sent");
-    setAlertDialog({
-      isOpen: true,
-      title: "Friend Request Sent!",
-      message: `Friend request sent to ${user.username}`,
-      type: "success",
-    });
-    if (onRelationshipChange) onRelationshipChange();
-  } catch (err) {
-    setAlertDialog({
-      isOpen: true,
-      title: "Error",
-      message: err.message || "Failed to send request",
-      type: "error",
-    });
-  }
-  setShowMenu(false);
-};
+  const handleSendRequest = async () => {
+    try {
+      await sendFriendRequest(user._id);
+      setRelationshipStatus("request_sent");
+      setAlertDialog({
+        isOpen: true,
+        title: "Friend Request Sent!",
+        message: `Friend request sent to ${user.username}`,
+        type: "success",
+      });
+      if (onRelationshipChange) onRelationshipChange();
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to send request",
+        type: "error",
+      });
+    }
+    setShowMenu(false);
+  };
 
- const handleAcceptRequest = async () => {
-  try {
-    await acceptFriendRequest(requestId);
-    setRelationshipStatus("friends");
-    setAlertDialog({
-      isOpen: true,
-      title: "Friend Request Accepted!",
-      message: `You are now friends with ${user.username}`,
-      type: "success",
-    });
-    if (onRelationshipChange) onRelationshipChange();
-  } catch (err) {
-    setAlertDialog({
-      isOpen: true,
-      title: "Error",
-      message: err.message || "Failed to accept request",
-      type: "error",
-    });
-  }
-  setShowMenu(false);
-};
+  const handleAcceptRequest = async () => {
+    try {
+      await acceptFriendRequest(requestId);
+      setRelationshipStatus("friends");
+      setAlertDialog({
+        isOpen: true,
+        title: "Friend Request Accepted!",
+        message: `You are now friends with ${user.username}`,
+        type: "success",
+      });
+      if (onRelationshipChange) onRelationshipChange();
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to accept request",
+        type: "error",
+      });
+    }
+    setShowMenu(false);
+  };
 
- const handleRejectRequest = async () => {
-  try {
-    await rejectFriendRequest(requestId);
-    setRelationshipStatus("none");
-    setAlertDialog({
-      isOpen: true,
-      title: "Request Rejected",
-      message: "Friend request rejected",
-      type: "info",
-    });
-    if (onRelationshipChange) onRelationshipChange();
-  } catch (err) {
-    setAlertDialog({
-      isOpen: true,
-      title: "Error",
-      message: err.message || "Failed to reject request",
-      type: "error",
-    });
-  }
-  setShowMenu(false);
-};
+  const handleRejectRequest = async () => {
+    try {
+      await rejectFriendRequest(requestId);
+      setRelationshipStatus("none");
+      setAlertDialog({
+        isOpen: true,
+        title: "Request Rejected",
+        message: "Friend request rejected",
+        type: "info",
+      });
+      if (onRelationshipChange) onRelationshipChange();
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to reject request",
+        type: "error",
+      });
+    }
+    setShowMenu(false);
+  };
 
- const handleUnfriend = () => {
-  setConfirmDialog({
-    isOpen: true,
-    title: "Unfriend User?",
-    message: `Are you sure you want to unfriend ${user.username}?`,
-    confirmText: "Unfriend",
-    cancelText: "Cancel",
-    icon: "unfriend",
-    type: "danger",
-    onConfirm: async () => {
-      try {
-        await unfriendUser(user._id);
-        setRelationshipStatus("none");
-        setAlertDialog({
-          isOpen: true,
-          title: "Unfriended",
-          message: `You are no longer friends with ${user.username}`,
-          type: "info",
-        });
-        if (onRelationshipChange) onRelationshipChange();
-      } catch (err) {
-        setAlertDialog({
-          isOpen: true,
-          title: "Error",
-          message: err.message || "Failed to unfriend",
-          type: "error",
-        });
-      }
-    },
-  });
-  setShowMenu(false);
-};
+  const handleUnfriend = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Unfriend User?",
+      message: `Are you sure you want to unfriend ${user.username}?`,
+      confirmText: "Unfriend",
+      cancelText: "Cancel",
+      icon: "unfriend",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await unfriendUser(user._id);
+          setRelationshipStatus("none");
+          setAlertDialog({
+            isOpen: true,
+            title: "Unfriended",
+            message: `You are no longer friends with ${user.username}`,
+            type: "info",
+          });
+          if (onRelationshipChange) onRelationshipChange();
+        } catch (err) {
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.message || "Failed to unfriend",
+            type: "error",
+          });
+        }
+      },
+    });
+    setShowMenu(false);
+  };
 
   const handleBlock = () => {
-  setConfirmDialog({
-    isOpen: true,
-    title: "Block User?",
-    message: `Block ${user.username}? They won't be able to message you.`,
-    confirmText: "Block",
-    cancelText: "Cancel",
-    highlightText: user.username,
-    icon: "block",
-    type: "danger",
-    onConfirm: async () => {
-      try {
-        await blockUser(user._id);
-        setRelationshipStatus("blocked");
-        setAlertDialog({
-          isOpen: true,
-          title: "User Blocked",
-          message: `${user.username} has been blocked successfully`,
-          type: "success",
-        });
-        if (onRelationshipChange) onRelationshipChange();
-      } catch (err) {
-        setAlertDialog({
-          isOpen: true,
-          title: "Error",
-          message: err.message || "Failed to block user",
-          type: "error",
-        });
-      }
-    },
-  });
-  setShowMenu(false);
-};
+    setConfirmDialog({
+      isOpen: true,
+      title: "Block User?",
+      message: `Block ${user.username}? They won't be able to message you.`,
+      confirmText: "Block",
+      cancelText: "Cancel",
+      highlightText: user.username,
+      icon: "block",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await blockUser(user._id);
+          setRelationshipStatus("blocked");
+          setAlertDialog({
+            isOpen: true,
+            title: "User Blocked",
+            message: `${user.username} has been blocked successfully`,
+            type: "success",
+          });
+          if (onRelationshipChange) onRelationshipChange();
+        } catch (err) {
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.message || "Failed to block user",
+            type: "error",
+          });
+        }
+      },
+    });
+    setShowMenu(false);
+  };
 
- const handleUnblock = () => {
-  setConfirmDialog({
-    isOpen: true,
-    title: "Unblock User?",
-    message: `Unblock ${user.username}? They will be able to message you again.`,
-    confirmText: "Unblock",
-    cancelText: "Cancel",
-    highlightText: user.username,
-    icon: "success",
-    type: "success",
-    onConfirm: async () => {
-      try {
-        await unblockUser(user._id);
-        setRelationshipStatus("none");
-        setAlertDialog({
-          isOpen: true,
-          title: "User Unblocked",
-          message: `${user.username} has been unblocked`,
-          type: "success",
-        });
-        if (onRelationshipChange) onRelationshipChange();
-      } catch (err) {
-        setAlertDialog({
-          isOpen: true,
-          title: "Error",
-          message: err.message || "Failed to unblock user",
-          type: "error",
-        });
-      }
-    },
-  });
-  setShowMenu(false);
-};
+  const handleUnblock = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Unblock User?",
+      message: `Unblock ${user.username}? They will be able to message you again.`,
+      confirmText: "Unblock",
+      cancelText: "Cancel",
+      highlightText: user.username,
+      icon: "success",
+      type: "success",
+      onConfirm: async () => {
+        try {
+          await unblockUser(user._id);
+          setRelationshipStatus("none");
+          setAlertDialog({
+            isOpen: true,
+            title: "User Unblocked",
+            message: `${user.username} has been unblocked`,
+            type: "success",
+          });
+          if (onRelationshipChange) onRelationshipChange();
+        } catch (err) {
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.message || "Failed to unblock user",
+            type: "error",
+          });
+        }
+      },
+    });
+    setShowMenu(false);
+  };
 
   const handleClearChat = async () => {
-  let convId = conversationId;
+    let convId = conversationId;
 
-  if (!convId) {
-    try {
-      const conversation = await getOrCreateConversation(user._id);
-      convId = conversation._id;
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "No conversation found.",
-        type: "error",
-      });
-      return;
-    }
-  }
-
-  setConfirmDialog({
-    isOpen: true,
-    title: "Clear Chat?",
-    message: `Delete all messages with ${user.username}? Chat stays in list.`,
-    confirmText: "Clear Messages",
-    cancelText: "Cancel",
-    highlightText: user.username,
-    icon: "delete",
-    type: "danger",
-    onConfirm: async () => {
+    if (!convId) {
       try {
-        await clearChat(convId);
-        setAlertDialog({
-          isOpen: true,
-          title: "Chat Cleared!",
-          message: "All messages have been cleared.",
-          type: "success",
-        });
-        setShowMenu(false);
+        const conversation = await getOrCreateConversation(user._id);
+        convId = conversation._id;
       } catch (err) {
-        console.error("Clear chat error:", err);
         setAlertDialog({
           isOpen: true,
           title: "Error",
-          message: err.response?.data?.message || "Could not clear messages.",
+          message: "No conversation found.",
           type: "error",
         });
+        return;
       }
-    },
-  });
-  setShowMenu(false);
-};
-  const handleDeleteConversation = async () => {
-  let convId = conversationId;
-
-  if (!convId) {
-    try {
-      const conversation = await getOrCreateConversation(user._id);
-      convId = conversation._id;
-    } catch (err) {
-      setAlertDialog({
-        isOpen: true,
-        title: "Error",
-        message: "No conversation found to delete.",
-        type: "error",
-      });
-      return;
     }
-  }
 
-  setConfirmDialog({
-    isOpen: true,
-    title: "Delete Conversation?",
-    message: `Permanently delete this conversation with ${user.username}? It will be removed from your chat list.`,
-    confirmText: "Delete Conversation",
-    cancelText: "Cancel",
-    highlightText: user.username,
-    icon: "delete",
-    type: "danger",
-    onConfirm: async () => {
-      try {
-        await deleteConversation(convId, user._id);
-        setAlertDialog({
-          isOpen: true,
-          title: "Conversation Deleted!",
-          message: "Conversation permanently removed from database.",
-          type: "success",
-        });
-        if (onConversationDeleted) {
-          onConversationDeleted(user._id);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Clear Chat?",
+      message: `Delete all messages with ${user.username}? Chat stays in list.`,
+      confirmText: "Clear Messages",
+      cancelText: "Cancel",
+      highlightText: user.username,
+      icon: "delete",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await clearChat(convId);
+          setAlertDialog({
+            isOpen: true,
+            title: "Chat Cleared!",
+            message: "All messages have been cleared.",
+            type: "success",
+          });
+          setShowMenu(false);
+        } catch (err) {
+          console.error("Clear chat error:", err);
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: err.response?.data?.message || "Could not clear messages.",
+            type: "error",
+          });
         }
-        setShowMenu(false);
-        setShowOptionsModal(false);
+      },
+    });
+    setShowMenu(false);
+  };
+  const handleDeleteConversation = async () => {
+    let convId = conversationId;
+
+    if (!convId) {
+      try {
+        const conversation = await getOrCreateConversation(user._id);
+        convId = conversation._id;
       } catch (err) {
-        console.error("Delete conversation error:", err);
         setAlertDialog({
           isOpen: true,
-          title: "Delete Failed",
-          message: err.response?.data?.message || "Could not delete conversation. Please try again.",
+          title: "Error",
+          message: "No conversation found to delete.",
           type: "error",
         });
+        return;
       }
-    },
-  });
-  setShowMenu(false);
-};
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Conversation?",
+      message: `Permanently delete this conversation with ${user.username}? It will be removed from your chat list.`,
+      confirmText: "Delete Conversation",
+      cancelText: "Cancel",
+      highlightText: user.username,
+      icon: "delete",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteConversation(convId, user._id);
+          setAlertDialog({
+            isOpen: true,
+            title: "Conversation Deleted!",
+            message: "Conversation permanently removed from database.",
+            type: "success",
+          });
+          if (onConversationDeleted) {
+            onConversationDeleted(user._id);
+          }
+          setShowMenu(false);
+          setShowOptionsModal(false);
+        } catch (err) {
+          console.error("Delete conversation error:", err);
+          setAlertDialog({
+            isOpen: true,
+            title: "Delete Failed",
+            message:
+              err.response?.data?.message ||
+              "Could not delete conversation. Please try again.",
+            type: "error",
+          });
+        }
+      },
+    });
+    setShowMenu(false);
+  };
 
   const handleShowProfile = () => {
     setShowProfileDialog(true);
@@ -447,10 +446,11 @@ const handleSendRequest = async () => {
   return (
     <>
       <div
-        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${selected
-          ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
-          : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
-          }`}
+        className={`mx-2 mb-1 px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 flex items-center gap-3 relative ${
+          selected
+            ? "bg-gradient-to-r from-[#2563EB] to-[#9333EA] shadow-lg"
+            : "hover:bg-[#DBEAFE] hover:bg-opacity-50 active:scale-95"
+        }`}
         onClick={(e) => {
           if (relationshipStatus === "friends") {
             onClick();
@@ -468,8 +468,9 @@ const handleSendRequest = async () => {
         {/* AVATAR WITH PROFILE PICTURE */}
         <div className="relative">
           <div
-            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${selected ? "ring-2 ring-white ring-opacity-40" : ""
-              }`}
+            className={`w-12 h-12 rounded-full overflow-hidden shadow-md transition-transform duration-200 cursor-pointer hover:scale-110 ${
+              selected ? "ring-2 ring-white ring-opacity-40" : ""
+            }`}
             onClick={(e) => {
               e.stopPropagation();
               handleShowProfile();
@@ -522,12 +523,13 @@ const handleSendRequest = async () => {
             {/* Left side: username + pin icon */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3
-                className={`font-semibold truncate ${selected
-                  ? "text-white"
-                  : unreadCount > 0
+                className={`font-semibold truncate ${
+                  selected
                     ? "text-white"
-                    : "text-gray-900"
-                  }`}
+                    : unreadCount > 0
+                      ? "text-white"
+                      : "text-gray-900"
+                }`}
               >
                 {user.username}
               </h3>
@@ -548,12 +550,13 @@ const handleSendRequest = async () => {
             {/* Right side: timestamp */}
             {lastMessageTime && relationshipStatus === "friends" && (
               <span
-                className={`text-xs flex-shrink-0 ml-2 ${selected
-                  ? "text-white text-opacity-90"
-                  : unreadCount > 0
-                    ? "text-blue-600 font-bold"
-                    : "text-gray-700"
-                  }`}
+                className={`text-xs flex-shrink-0 ml-2 ${
+                  selected
+                    ? "text-white text-opacity-90"
+                    : unreadCount > 0
+                      ? "text-blue-600 font-bold"
+                      : "text-gray-700"
+                }`}
               >
                 {formatTime(lastMessageTime)}
               </span>
@@ -565,12 +568,13 @@ const handleSendRequest = async () => {
             <div className="flex items-center">
               {getMessageStatusIcon()}
               <p
-                className={`text-xs truncate ${selected
-                  ? "text-white text-opacity-90"
-                  : unreadCount > 0
-                    ? "text-gray-900 font-semibold"
-                    : "text-gray-600"
-                  }`}
+                className={`text-xs truncate ${
+                  selected
+                    ? "text-white text-opacity-90"
+                    : unreadCount > 0
+                      ? "text-gray-900 font-semibold"
+                      : "text-gray-600"
+                }`}
               >
                 {displayMessage}
               </p>
@@ -587,10 +591,11 @@ const handleSendRequest = async () => {
               e.stopPropagation();
               setShowOptionsModal(true);
             }}
-            className={`p-2 rounded-lg transition-colors ${selected
-              ? "hover:bg-white/20 text-white"
-              : "hover:bg-gray-200 text-gray-700"
-              }`}
+            className={`p-2 rounded-lg transition-colors ${
+              selected
+                ? "hover:bg-white/20 text-white"
+                : "hover:bg-gray-200 text-gray-700"
+            }`}
             title="Options"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
