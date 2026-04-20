@@ -9,6 +9,7 @@ import StatusViewer from "@/components/Status/StatusViewer";
 import AlertDialog from "@/components/base/AlertDialog";
 import { setUser } from "@/store/slices/authSlice";
 import { updateGroup } from "@/store/slices/groupSlice";
+import useCryptoInit from "@/hooks/useCryptoInit";
 import {
   archiveConversation,
   pinConversation,
@@ -24,6 +25,8 @@ import {
 export default function Middleware({ children }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+    useCryptoInit(); 
+
   const { loading, currentUser, currentUserId } = useSelector(
     (state) => state.auth,
   );
