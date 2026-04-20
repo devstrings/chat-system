@@ -83,16 +83,23 @@ export const fetchMessages = createAsyncThunk(
   },
 );
 
-// Send Message
+// Send Message (unified for individual and group)
 export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
-  async ({ conversationId, text, attachments }, { rejectWithValue }) => {
+  async ({ conversationId, groupId, isGroup = false, text, attachments, encryptionData, replyTo }, { rejectWithValue }) => {
     try {
+      const body = {
+        text,
+        attachments,
+        encryptionData,
+        replyTo,
+        ...(isGroup ? { groupId } : { conversationId }),
+      };
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/messages/send`,
-        { conversationId, text, attachments },
+        body,
       );
-      return response.data;
+      return { ...response.data, isGroup, groupId, conversationId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }

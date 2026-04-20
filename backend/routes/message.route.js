@@ -123,21 +123,29 @@ router.post(
   messageController.getOrCreateConversation
 );
 
+// Middleware that skips conversation validation for group messages
+const conditionalConversationExists = (req, res, next) => {
+  if (req.body.groupId) return next();
+  return validateConversationExists(req, res, next);
+};
+const conditionalConversationParticipant = (req, res, next) => {
+  if (req.body.groupId) return next();
+  return validateConversationParticipant(req, res, next);
+};
+
 /**
  * @swagger
  * /messages/send:
  *   post:
- *     summary: Send a message
+ *     summary: Send a message (individual or group)
  *     tags: [Messages]
  */
 router.post(
   "/send",
   messageLimiter,
   verifyToken,
-  sendMessageValidation,
-  validate,
-  validateConversationExists,
-  validateConversationParticipant,
+  conditionalConversationExists,
+  conditionalConversationParticipant,
   validateMessageContent,
   messageController.sendMessage
 );

@@ -28,12 +28,65 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
   res.json(conversation);
 });
 
-// SEND MESSAGE CONTROLLER
+// SEND MESSAGE CONTROLLER (handles both individual and group messages)
 export const sendMessage = asyncHandler(async (req, res) => {
-  const { conversationId, text, attachments, encryptionData } = req.body;
+  const { conversationId, groupId, text, attachments, encryptionData, replyTo } = req.body;
   const currentUserId = req.user.id;
-  const conversation = req.validatedConversation;
   const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
+  const io = req.app.get("webSocket");
+
+  // --- GROUP MESSAGE ---
+  if (groupId) {
+    const Group = (await import("#models/Group")).default;
+    const group = await Group.findById(groupId).populate("members", "_id");
+    if (!group) return res.status(404).json({ message: "Group not found" });
+
+    const message = await Message.create({
+      groupId,
+      sender: currentUserId,
+      text: text || "",
+      encryptionData: encryptionData || undefined,
+      attachments: attachmentIds,
+      isGroupMessage: true,
+      status: "sent",
+      replyTo: replyTo || null,
+    });
+
+    await message.populate("sender", "username email profileImage");
+    await message.populate({
+      path: "attachments",
+      select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+    });
+
+    group.lastMessage = text || "📎 Attachment";
+    group.lastMessageTime = new Date();
+    group.lastMessageSender = currentUserId;
+    await group.save();
+
+    const messageObj = message.toObject();
+    if (messageObj.attachments?.length > 0) {
+      messageObj.attachments = messageObj.attachments.map((att) => ({
+        url: `/api/file/get/${att.serverFileName}`,
+        filename: att.fileName,
+        fileType: att.fileType,
+        fileSize: att.sizeInKilobytes * 1024,
+        attachmentId: att._id,
+        duration: att.duration || 0,
+        isVoiceMessage: att.isVoiceMessage || false,
+      }));
+    }
+
+    if (io) {
+      group.members.forEach((member) => {
+        io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
+      });
+    }
+
+    return res.json(messageObj);
+  }
+
+  // --- INDIVIDUAL MESSAGE ---
+  const conversation = req.validatedConversation;
   const message = await Message.create({
     conversationId,
     sender: currentUserId,
@@ -42,6 +95,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     attachments: attachmentIds,
     status: "sent",
     isGroupMessage: false,
+    replyTo: replyTo || null,
   });
   await message.populate("sender", "username email profileImage");
   await message.populate({
@@ -53,7 +107,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   conversation.lastMessageSender = currentUserId;
   await conversation.save();
   const messageObj = message.toObject();
-  if (messageObj.attachments && messageObj.attachments.length > 0) {
+  if (messageObj.attachments?.length > 0) {
     messageObj.attachments = messageObj.attachments.map((att) => ({
       url: `/api/file/get/${att.serverFileName}`,
       filename: att.fileName,
@@ -64,12 +118,10 @@ export const sendMessage = asyncHandler(async (req, res) => {
       isVoiceMessage: att.isVoiceMessage || false,
     }));
   }
-  const io = req.app.get("webSocket");
   if (io) {
     const otherUserId = conversation.participants.find(
       (p) => p.toString() !== currentUserId,
     );
-    // Emit to both participants
     io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
   }
   res.json(messageObj);

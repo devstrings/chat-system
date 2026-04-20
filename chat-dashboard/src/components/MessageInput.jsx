@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { encryptMessage } from "@/utils/cryptoUtils";
+import { sendMessage } from "@/store/slices/chatSlice";
 import {
   uploadFile,
   uploadVoiceMessage,
-  sendIndividualMessage,
-  sendGroupMessage,
   emitTyping,
   emitGroupTyping,
   stopAllTyping,
@@ -129,14 +128,23 @@ useEffect(() => {
   }
   
   try {
-    if (!isGroup && conversationId) {
-      await sendIndividualMessage(socket, conversationId, cipherText, attachments, replyTo, encryptionData);
-    }
-    
-    if (isGroup && groupId) {
-      await sendGroupMessage(socket, groupId, cipherText, attachments, replyTo, encryptionData);
-    }
-    
+    await dispatch(sendMessage({
+      conversationId: !isGroup ? conversationId : undefined,
+      groupId: isGroup ? groupId : undefined,
+      isGroup,
+      text: cipherText,
+      attachments,
+      encryptionData,
+      replyTo: replyTo ? {
+        _id: replyTo._id,
+        text: replyTo.text,
+        sender: {
+          _id: replyTo.sender?._id || replyTo.sender,
+          username: replyTo.sender?.username || "Unknown",
+        },
+      } : null,
+    })).unwrap();
+
     setText("");
     onCancelReply();
   } catch (err) {

@@ -57,9 +57,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   );
   //   const [conversationId, setConversationId] = useState(null);
   const { conversationId: urlConversationId } = useParams();
-  const [conversationId, setConversationId] = useState(
-    urlConversationId || null,
-  );
+  const [conversationId, setConversationId] = useState(null);
   const socket = useSelector((state) => state.socket.socket);
 
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
@@ -518,7 +516,11 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   }, [users, groups, loading]);
   useEffect(() => {
     if (loading) return;
-    if (!urlConversationId) return;
+    if (!urlConversationId || urlConversationId === "home") {
+      setSelectedUser(null);
+      setSelectedGroup(null);
+      return;
+    }
 
     // 1. Try resolving as a Group ID
     const group = groups.find((g) => g._id === urlConversationId);
@@ -526,19 +528,11 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
       setSelectedGroup(group);
       setIsGroupChat(true);
       setSelectedUser(null);
+      setConversationId(urlConversationId);
       return;
     }
 
-    // 2. Try resolving as a User ID (Directly)
-    const userDirect = users.find((u) => u._id === urlConversationId);
-    if (userDirect) {
-      setSelectedUser(userDirect);
-      setIsGroupChat(false);
-      setSelectedGroup(null);
-      return;
-    }
-
-    // 3. Try resolving as a Conversation ID (Lookup via lastMessages)
+    // 2. Try resolving as a Conversation ID (Lookup via lastMessages)
     const userIdFromConvo = Object.keys(lastMessages).find(
       (uid) => lastMessages[uid]?.conversationId === urlConversationId,
     );
@@ -548,7 +542,17 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
         setSelectedUser(user);
         setIsGroupChat(false);
         setSelectedGroup(null);
+        setConversationId(urlConversationId);
+        return;
       }
+    }
+
+    // 3. Fallback: Try resolving as a direct User ID (for manual entry/bookmarks)
+    const userDirect = users.find((u) => u._id === urlConversationId);
+    if (userDirect) {
+      setSelectedUser(userDirect);
+      setIsGroupChat(false);
+      setSelectedGroup(null);
     }
   }, [urlConversationId, users, groups, loading, lastMessages]);
 
@@ -765,6 +769,11 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
 
         setConversationId(result._id);
         dispatch(clearUnreadCount(selectedUser._id));
+
+        // Sync URL if it's currently a userId
+        if (urlConversationId === selectedUser._id) {
+          navigate(`/conversation/${result._id}`, { replace: true });
+        }
 
         if (socket) {
           socket.emit("markAsRead", { conversationId: result._id });

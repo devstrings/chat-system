@@ -21,6 +21,7 @@ import {
   loadPinnedConversations,
   loadArchivedConversations,
 } from "@/actions/dashboard.actions";
+import apiActions from "@/store/apiActions";
 
 export default function Middleware({ children }) {
   const dispatch = useDispatch();
@@ -347,12 +348,12 @@ export default function Middleware({ children }) {
         <Sidebar
           selectedUserId={selectedUserId}
           onSelectUser={(item) => {
-            const convoId = item.isGroup
+            setIsMobileSidebarOpen(false);
+            const targetId = item.isGroup
               ? item._id
               : lastMessages[item._id]?.conversationId || item._id;
             dispatch(setSelectedUserId(item.isGroup ? null : item._id));
-            navigate(`/conversation/${convoId}`);
-            setIsMobileSidebarOpen(false);
+            navigate(`/conversation/${targetId}`);
           }}
           currentUsername={currentUser?.username || ""}
           currentUserId={currentUserId}
