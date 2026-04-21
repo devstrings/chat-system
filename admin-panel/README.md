@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+CoreUI admin panel built with Next.js, NextAuth, and RTK Query.
 
 ## Getting Started
 
-First, run the development server:
+1. Create env file:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Run development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `NEXT_PUBLIC_API_URL` backend base URL (default `http://localhost:5000/api`)
+- `NEXTAUTH_URL` frontend URL (for auth callback/session)
+- `NEXTAUTH_SECRET` random secret for session JWT signing
 
-## Learn More
+## Auth Flow
 
-To learn more about Next.js, take a look at the following resources:
+- Login uses NextAuth Credentials provider calling backend `/admin/auth/login`
+- Access token is stored in NextAuth session JWT
+- Users screen consumes backend `/admin/users` via RTK Query
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Seeder (Backend)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run from `backend`:
 
-## Deploy on Vercel
+```bash
+npm run seed:super-admin
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Required backend env vars for seeder:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `MONGO_URI`
+- `SUPER_ADMIN_EMAIL`
+- `SUPER_ADMIN_PASSWORD`
+- optional `SUPER_ADMIN_NAME`
