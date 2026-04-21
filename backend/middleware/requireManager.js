@@ -10,7 +10,7 @@ export const requireManager = asyncHandler(async (req, res, next) => {
       return res.status(401).json({ message: "No admin token provided" });
     }
     const token = authHeader.split(" ")[1];
-    const decoded = verifyManagerToken(token);
+    const decoded = adminAuthService.verifyManagerToken(token);
     const manager = await Manager.findById(decoded.id).select("-password");
     if (!manager || !manager.isActive) {
       return res.status(401).json({ message: "Manager not found or inactive" });

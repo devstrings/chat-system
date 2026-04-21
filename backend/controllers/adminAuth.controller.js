@@ -8,7 +8,7 @@ export const login = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
-  const result = await loginManager(email, password);
+  const result = await adminAuthService.loginManager(email.toLowerCase().trim(), password);
   return res.json(result);
 });
 
@@ -17,5 +17,5 @@ export const me = asyncHandler(async (req, res) => {
   if (!manager || !manager.isActive) {
     return res.status(401).json({ message: "Manager not found or inactive" });
   }
-  return res.json({ manager: sanitizeManager(manager) });
+  return res.json({ manager: adminAuthService.sanitizeManager(manager) });
 });
