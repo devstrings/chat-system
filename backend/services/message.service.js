@@ -82,11 +82,34 @@ export const processGetOrCreateConversation = async (
       conversation.sharedEncryptedKeys = encryptedKeys;
       await conversation.save();
     }
+  } else {
+    const currentUserKey = conversation.sharedEncryptedKeys.get(currentUserId.toString());
+    
+    if (!currentUserKey) {
+      
+      // Get both users' public keys
+      const participants = await User.find({ _id: { $in: [currentUserId, otherUserId] } });
+      const newSharedKey = generateSymmetricKey();
+      const newEncryptedKeys = new Map();
+      
+      participants.forEach(user => {
+        if (user.publicKey) {
+          const encrypted = encryptWithPublicKey(user.publicKey, newSharedKey);
+          if (encrypted) {
+            newEncryptedKeys.set(user._id.toString(), encrypted);
+          }
+        }
+      });
+      
+      if (newEncryptedKeys.size > 0) {
+        conversation.sharedEncryptedKeys = newEncryptedKeys;
+        await conversation.save();
+      }
+    }
   }
 
   return conversation;
 };
-
 // FETCH CONVERSATION BY ID SERVICE
 export const fetchConversationById = async (conversationId) => {
   const conversation = await Conversation.findById(conversationId);

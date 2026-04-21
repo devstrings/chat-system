@@ -51,8 +51,7 @@ export default function Sidebar({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddFriend, setShowAddFriend] = useState(false);
-  const [searchUsers, setSearchUsers] = useState("");
-  const [allUsers, setAllUsers] = useState([]);
+const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
@@ -266,24 +265,24 @@ export default function Sidebar({
     return convId && archivedConversations.has(convId);
   }).length;
 
-  const handleSearchUsers = async () => {
-    if (!searchUsers.trim()) return;
-    setLoading(true);
-    try {
-      const data = await searchUsers(searchUsers);
-      setAllUsers(data);
-    } catch (err) {
-      console.error("Search error:", err);
-      setAlertDialog({
-        isOpen: true,
-        title: "Search Failed",
-        message: "Failed to search users. Please try again.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+ const handleSearchUsers = async () => {
+  if (!searchUserQuery.trim()) return;
+  setLoading(true);
+  try {
+    const data = await searchUsers(searchUserQuery);
+    setAllUsers(data);
+  } catch (err) {
+    console.error("Search error:", err);
+    setAlertDialog({
+      isOpen: true,
+      title: "Search Failed",
+      message: "Failed to search users. Please try again.",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSendRequest = async (userId) => {
     try {
@@ -1006,20 +1005,20 @@ export default function Sidebar({
         onClose={() => setShowNotificationModal(false)}
         notifications={notifications}
       />
-      <AddFriendModal
-        isOpen={showAddFriendModal}
-        onClose={() => {
-          setShowAddFriendModal(false);
-          setAllUsers([]);
-          setSearchUsers("");
-        }}
-        searchUsers={searchUsers}
-        setSearchUsers={setSearchUsers}
-        allUsers={allUsers}
-        loading={loading}
-        onSearch={handleSearchUsers}
-        onSendRequest={handleSendRequest}
-      />
+    <AddFriendModal
+  isOpen={showAddFriendModal}
+  onClose={() => {
+    setShowAddFriendModal(false);
+    setAllUsers([]);
+    setSearchUserQuery("");
+  }}
+  searchUsers={searchUserQuery}
+  setSearchUsers={setSearchUserQuery}
+  allUsers={allUsers}
+  loading={loading}
+  onSearch={handleSearchUsers}
+  onSendRequest={handleSendRequest}
+/>
     </>
   );
 }

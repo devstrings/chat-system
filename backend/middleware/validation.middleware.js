@@ -189,8 +189,7 @@ export const validateNotSelf = (req, res, next) => {
 
 export const validateConversationExists = async (req, res, next) => {
   try {
-    const { conversationId } = req.params || req.body;
-
+const conversationId = req.params.conversationId || req.body.conversationId;
     if (!conversationId) {
       return sendError(res, 400, "Conversation ID is required");
     }

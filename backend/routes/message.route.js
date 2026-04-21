@@ -90,22 +90,6 @@ router.get(
   messageController.getGroupMessages
 );
 
-/**
- * @swagger
- * /messages/group/{groupId}/send:
- *   post:
- *     summary: Send a message to a group
- *     tags: [Messages]
- */
-router.post(
-  "/group/:groupId/send",
-  messageLimiter,
-  verifyToken,
-  validateGroupExists,
-  validateGroupMember,
-  validateMessageContent,
-  messageController.sendGroupMessage
-);
 
 /**
  * @swagger

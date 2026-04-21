@@ -90,11 +90,10 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, [isRecording]);
- const handleSendMessage = async (attachments = []) => {
+const handleSendMessage = async (attachments = []) => {
   if (!socket || (!text.trim() && attachments.length === 0) || sending) return;
   setSending(true);
   
-  //  Using action to stop typing
   stopAllTyping(socket, isGroup, groupId, conversationId);
 
   let cipherText = text.trim();
@@ -116,9 +115,7 @@ useEffect(() => {
         });
       }
 
-      // Find shared key in store
       const sharedKey = sharedKeys[conversationId];
-
       const encrypted = await encryptMessage(textToEncrypt, publicKeysObj, sharedKey);
       cipherText = encrypted.cipherText;
       encryptionData = encrypted.encryptionData;

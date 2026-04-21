@@ -109,6 +109,7 @@ export default function ChatWindow({
         }),
       );
     };
+    
 
     const handleTyping = ({ userId, isTyping, conversationId }) => {
       if (conversationId !== conversationIdRef.current) return;
@@ -132,9 +133,6 @@ export default function ChatWindow({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
-
-
-
 
  
 
@@ -237,12 +235,7 @@ export default function ChatWindow({
     return groups;
   }, {});
 
-  console.log(" Rendering ChatWindow:", {
-    typingUsersSize: typingUsers.size,
-    typingUsersArray: Array.from(typingUsers),
-    hasSelectedUser: !!selectedUser,
-    selectedUserId: selectedUser?._id,
-  });
+ 
 
   return (
     <>

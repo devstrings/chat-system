@@ -108,9 +108,12 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   const [savedSelectedGroupId] = useState(
     () => localStorage.getItem("selectedGroupId") || null,
   );
-  const [isGroupChat, setIsGroupChat] = useState(() => {
-    return localStorage.getItem("isGroupChat") === "true";
-  });
+const [isGroupChat, setIsGroupChat] = useState(() => {
+  // Agar selectedGroupId nahi hai to group chat false hona chahiye
+  const savedGroupId = localStorage.getItem("selectedGroupId");
+  const savedIsGroupChat = localStorage.getItem("isGroupChat") === "true";
+  return savedGroupId && savedIsGroupChat;
+});
 
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
@@ -419,13 +422,15 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
       console.log(" Saved selectedUserId:", selectedUser._id);
     }
   }, [selectedUser]);
-  useEffect(() => {
-    if (selectedGroup?._id) {
-      localStorage.setItem("selectedGroupId", selectedGroup._id);
-      localStorage.setItem("isGroupChat", "true");
-      console.log(" Saved selectedGroupId:", selectedGroup._id);
-    }
-  }, [selectedGroup]);
+ useEffect(() => {
+  if (selectedGroup?._id) {
+    localStorage.setItem("selectedGroupId", selectedGroup._id);
+    localStorage.setItem("isGroupChat", "true");
+    console.log(" Saved selectedGroupId:", selectedGroup._id);
+  } else {
+    localStorage.removeItem("isGroupChat");
+  }
+}, [selectedGroup]);
   useEffect(() => {
     requestNotificationPermission();
     registerServiceWorker();
@@ -542,7 +547,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
         setSelectedUser(user);
         setIsGroupChat(false);
         setSelectedGroup(null);
-        setConversationId(urlConversationId);
+        // setConversationId(urlConversationId);
         return;
       }
     }
@@ -755,17 +760,20 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
     socket.emit("joinUserRoom", currentUserId);
   }, [socket, currentUserId]);
   // Get conversation
-  useEffect(() => {
-    if (!selectedUser || !selectedUser._id) {
-      setConversationId(null);
-      return;
-    }
+ useEffect(() => {
+  if (!selectedUser || !selectedUser._id) {
+    setConversationId(null);
+    return;
+  }
 
-    const getConversation = async () => {
+
+  const getConversation = async () => {
       try {
+          console.log("🔍 Fetching for user:", selectedUser._id);
         const result = await dispatch(
           fetchConversation({ otherUserId: selectedUser._id }),
         ).unwrap();
+         console.log("✅ conversationId set:", result._id); 
 
         setConversationId(result._id);
         dispatch(clearUnreadCount(selectedUser._id));
@@ -784,8 +792,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
     };
 
     getConversation();
-  }, [selectedUser?._id, socket]);
-
+}, [selectedUser?._id, socket, dispatch, navigate, urlConversationId]);
   useEffect(() => {
     if (!socket) return;
 
@@ -1197,43 +1204,62 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
               {isGroupChat ? (
                 //  GROUP CHAT
                 <>
-                  <GroupChatWindow
-                    group={selectedGroup}
-                    currentUserId={currentUserId}
-                    searchQuery={searchInChat}
-                    isSelectionMode={isSelectionMode}
-                    setIsSelectionMode={setIsSelectionMode}
-                    selectedMessages={selectedMessages}
-                    setSelectedMessages={setSelectedMessages}
-                    onReply={(msg) => setReplyTo(msg)}
-                  />
-                  <MessageInput
-                    groupId={selectedGroup._id}
-                    isGroup={true}
-                    replyTo={replyTo}
-                    onCancelReply={() => setReplyTo(null)}
-                  />
+      <GroupChatWindow
+  group={selectedGroup}
+  currentUserId={currentUserId}
+  searchQuery={searchInChat}
+  isSelectionMode={isSelectionMode}
+  setIsSelectionMode={setIsSelectionMode}
+  selectedMessages={selectedMessages}
+  setSelectedMessages={setSelectedMessages}
+  onReply={(msg) => setReplyTo(msg)}
+/>
+<MessageInput
+  groupId={selectedGroup._id}
+  isGroup={true}
+  replyTo={replyTo}
+  onCancelReply={() => setReplyTo(null)}
+/>
                 </>
-              ) : (
+          ) : (
                 <>
-                  <ChatWindow
-                    conversationId={conversationId}
-                    currentUserId={currentUserId}
-                    searchQuery={searchInChat}
-                    selectedUser={selectedUser}
-                    onUpdateLastMessageStatus={(updateData) => {}}
-                    isSelectionMode={isSelectionMode}
-                    setIsSelectionMode={setIsSelectionMode}
-                    selectedMessages={selectedMessages}
-                    setSelectedMessages={setSelectedMessages}
-                    onReply={(msg) => setReplyTo(msg)}
-                  />
-                  <MessageInput
-                    conversationId={conversationId}
-                    selectedUser={selectedUser}
-                    replyTo={replyTo}
-                    onCancelReply={() => setReplyTo(null)}
-                  />
+                {!selectedUser ? (
+  <div className="flex-1 flex items-center justify-center">
+    <div className="text-center text-gray-400 text-sm">
+      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+      Loading...
+    </div>
+  </div>
+) : !conversationId ? (
+  <div className="flex-1 flex items-center justify-center">
+    <div className="text-center text-gray-400 text-sm">
+      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+      Initializing conversation...
+    </div>
+  </div>
+) : (
+  <>
+    <ChatWindow
+      conversationId={conversationId}
+      currentUserId={currentUserId}
+      searchQuery={searchInChat}
+      selectedUser={selectedUser}
+      onUpdateLastMessageStatus={(updateData) => {}}
+      isSelectionMode={isSelectionMode}
+      setIsSelectionMode={setIsSelectionMode}
+      selectedMessages={selectedMessages}
+      setSelectedMessages={setSelectedMessages}
+      onReply={(msg) => setReplyTo(msg)}
+    />
+    <MessageInput
+      conversationId={conversationId}
+      selectedUser={selectedUser}
+      isGroup={false}
+      replyTo={replyTo}
+      onCancelReply={() => setReplyTo(null)}
+    />
+  </>
+)}
                 </>
               )}
             </>

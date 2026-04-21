@@ -197,8 +197,11 @@ export async function decryptMessage(cipherText, encryptedAesKeyB64, ivB64, priv
     );
 
     return new TextDecoder().decode(decryptedContent);
-  } catch (error) {
-    console.error("Decryption failed", error);
+   } catch (error) {
+    console.error("Decryption failed:", error.name, error.message);
+    if (error.name === "OperationError") {
+      return "[Message cannot be decrypted - Key mismatch]";
+    }
     return "[Encrypted Message]";
   }
 }
