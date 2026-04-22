@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "paths": {
+            "#config": [
+                "./config/index.js"
+            ],
+            "#src/*": [
+                "./src/*.js"
+            ]
+        }
+    }
+}
