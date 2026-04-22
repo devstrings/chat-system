@@ -16,7 +16,7 @@ const allowedKeysByPermission = {
 const getTopLevelPatchedKeys = (patch) => Object.keys(patch || {});
 
 export const getSettings = asyncHandler(async (_req, res) => {
-  const settings = await getPublicSettings();
+  const settings = await appSettingService.getPublicSettings();
   res.json(settings);
 });
 

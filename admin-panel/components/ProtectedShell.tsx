@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { CButton, CContainer, CHeader, CHeaderBrand, CSpinner } from "@coreui/react";
 
@@ -11,7 +12,14 @@ type ProtectedShellProps = {
 };
 
 export default function ProtectedShell({ title, children }: ProtectedShellProps) {
+  const router = useRouter();
   const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [status, router]);
 
   if (status === "loading") {
     return (
@@ -27,7 +35,10 @@ export default function ProtectedShell({ title, children }: ProtectedShellProps)
   if (status === "unauthenticated") {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center">
-        <span>Session expired. Please login again at /login.</span>
+        <div className="d-flex align-items-center gap-2">
+          <CSpinner size="sm" />
+          <span>Redirecting to login...</span>
+        </div>
       </div>
     );
   }
