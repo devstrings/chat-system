@@ -1,5 +1,18 @@
 import { fileService } from "#services";
 import asyncHandler from "express-async-handler";
+import path from "path";
+import fs from "fs";
+
+export const serveStatusFile = asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join(process.cwd(), "uploads", "status", filename);
+  
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: "File not found" });
+  }
+  
+  return res.sendFile(filePath);
+});
 // DOWNLOAD FILE CONTROLLER
 export const downloadFile = asyncHandler(async (req, res) => {
   const filename = req.params.filename;

@@ -6,7 +6,6 @@ import { markStatusAsViewed, formatTime } from "@/actions/statusViewer.actions";
 function ProfileImageWithAuth({ user, size = "w-10 h-10", ring = false }) {
   const [imageSrc, setImageSrc] = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     const loadImage = async () => {
       if (!user?.profileImage) {
@@ -106,13 +105,36 @@ export default function StatusViewer({
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+const [statusImageUrl, setStatusImageUrl] = useState(null);
 
   const progressInterval = useRef(null);
   const statusDuration = 5000;
 
   const currentUserStatuses = statuses[currentUserIndex];
   const currentStatus = currentUserStatuses?.statuses?.[currentStatusIndex];
-
+useEffect(() => {
+  if (!currentStatus || currentStatus.type !== "image") return;
+  
+  const loadImage = async () => {
+    const token = localStorage.getItem("accessToken");
+    const filename = currentStatus.content.split('/').pop();
+    const response = await fetch(`${API_BASE_URL}/api/file/status/${filename}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (response.ok) {
+      const blob = await response.blob();
+      setStatusImageUrl(URL.createObjectURL(blob));
+    }
+  };
+  
+  loadImage();
+  
+  return () => {
+    if (statusImageUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(statusImageUrl);
+    }
+  };
+}, [currentStatus?._id]);
   useEffect(() => {
     //  If no status, clear and return
     if (!currentStatus) {
@@ -386,8 +408,7 @@ export default function StatusViewer({
           ) : currentStatus.type === "image" ? (
             <div className="relative w-full h-full">
               <img
-                src={`${API_BASE_URL}${currentStatus.content}`}
-                alt="status"
+src={statusImageUrl || ""}           alt="status"
                 className="w-full h-full object-contain"
               />
               {currentStatus.caption && (
@@ -401,8 +422,7 @@ export default function StatusViewer({
           ) : currentStatus.type === "video" ? (
             <div className="relative w-full h-full">
               <video
-                src={`${API_BASE_URL}${currentStatus.content}`}
-                className="w-full h-full object-contain"
+src={statusImageUrl || ""}         className="w-full h-full object-contain"
                 autoPlay
                 muted
                 onEnded={() => {

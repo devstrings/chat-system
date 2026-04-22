@@ -79,5 +79,6 @@ router.get("/profile/:filename", verifyToken, userController.serveProfileImage);
  *     tags: [Files]
  */
 router.get("/group/:filename", verifyToken, downloadLimiter, groupController.serveGroupImage);
+router.get("/status/:filename", verifyToken, fileController.serveStatusFile);
 
 export default router;
