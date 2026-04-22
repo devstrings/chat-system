@@ -12,6 +12,7 @@ import Dashboard from "@/pages/Dashboard";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyOTP from "@/pages/VerifyOTP";
+import Verify2FA from "@/pages/Verify2FA";
 import Conversation from "@/pages/Conversation";
 import NotFound from "@/pages/NotFound"; 
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
+        <Route path="/verify-2fa" element={<Verify2FA />} />
 
         {/* Protected Routes */}
         <Route

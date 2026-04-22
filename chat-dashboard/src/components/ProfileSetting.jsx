@@ -14,6 +14,15 @@ import {
   unblockUser,
   acceptFriendRequest,
   rejectFriendRequest,
+  get2FAStatus,
+  startTOTPSetup,
+  verifyTOTPSetup,
+  startEmail2FASetup,
+  verifyEmail2FASetup,
+  disable2FA,
+  listPersonalAccessTokens,
+  createPersonalAccessToken,
+  revokePersonalAccessToken,
 } from "@/actions/profileSettings.actions";
 import { refreshKeyPair } from "@/utils/cryptoUtils";
 import axiosInstance from "@/lib/axiosInstance";
@@ -65,6 +74,20 @@ export default function ProfileSettings({
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [changePasswordError, setChangePasswordError] = useState("");
   const [changePasswordSuccess, setChangePasswordSuccess] = useState("");
+  const [twoFactorStatus, setTwoFactorStatus] = useState({
+    enabled: false,
+    method: null,
+  });
+  const [totpSetup, setTotpSetup] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [securityError, setSecurityError] = useState("");
+  const [securitySuccess, setSecuritySuccess] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [patName, setPatName] = useState("MCP token");
+  const [patExpiryDays, setPatExpiryDays] = useState("");
+  const [patVerificationCode, setPatVerificationCode] = useState("");
+  const [patList, setPatList] = useState([]);
+  const [generatedPat, setGeneratedPat] = useState("");
 
   const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
     currentUser?.profileImage,
@@ -103,6 +126,8 @@ export default function ProfileSettings({
  useEffect(() => {
   loadBlockedUsersHandler();   
   loadPendingRequestsHandler(); 
+  loadSecurityStatusHandler();
+  loadPersonalTokensHandler();
 }, []);
 
   useEffect(() => {
@@ -417,6 +442,131 @@ const handleRefreshE2EEKeys = async () => {
       message: "Failed to refresh E2EE keys.",
       type: "error",
     });
+  }
+};
+
+const loadSecurityStatusHandler = async () => {
+  try {
+    const data = await get2FAStatus();
+    setTwoFactorStatus({
+      enabled: data.enabled,
+      method: data.method,
+    });
+  } catch (err) {
+    console.error("Failed to load 2FA status:", err);
+  }
+};
+
+const loadPersonalTokensHandler = async () => {
+  try {
+    const data = await listPersonalAccessTokens();
+    setPatList(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("Failed to load personal access tokens:", err);
+  }
+};
+
+const handleStartTOTPSetup = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  try {
+    const data = await startTOTPSetup();
+    setTotpSetup(data);
+    setSecuritySuccess("Scan QR with Authenticator app and verify your code.");
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to start TOTP setup");
+  }
+};
+
+const handleVerifyTOTPSetup = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  try {
+    const data = await verifyTOTPSetup(twoFactorCode);
+    setRecoveryCodes(data.recoveryCodes || []);
+    setTwoFactorCode("");
+    setTotpSetup(null);
+    await loadSecurityStatusHandler();
+    setSecuritySuccess(data.message || "TOTP enabled successfully");
+    await loadPersonalTokensHandler();
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to verify TOTP setup");
+  }
+};
+
+const handleEnableEmail2FA = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  try {
+    await startEmail2FASetup();
+    setSecuritySuccess("Email verification code sent. Enter it below to enable 2FA.");
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to start email 2FA");
+  }
+};
+
+const handleVerifyEmail2FA = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  try {
+    const data = await verifyEmail2FASetup(twoFactorCode);
+    setRecoveryCodes(data.recoveryCodes || []);
+    setTwoFactorCode("");
+    await loadSecurityStatusHandler();
+    setSecuritySuccess(data.message || "Email 2FA enabled successfully");
+    await loadPersonalTokensHandler();
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to verify email 2FA");
+  }
+};
+
+const handleDisable2FA = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  try {
+    const data = await disable2FA({ code: twoFactorCode });
+    setTwoFactorCode("");
+    setRecoveryCodes([]);
+    setTotpSetup(null);
+    setGeneratedPat("");
+    setPatList([]);
+    await loadSecurityStatusHandler();
+    setSecuritySuccess(data.message || "2FA disabled");
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to disable 2FA");
+  }
+};
+
+const handleCreatePAT = async () => {
+  setSecurityError("");
+  setSecuritySuccess("");
+  setGeneratedPat("");
+  if (!patVerificationCode) {
+    setSecurityError("2FA code is required to create a personal access token");
+    return;
+  }
+  try {
+    const data = await createPersonalAccessToken({
+      name: patName,
+      expiresInDays: patExpiryDays ? Number(patExpiryDays) : undefined,
+      code: patVerificationCode,
+    });
+    setGeneratedPat(data.token);
+    setSecuritySuccess("Personal access token created. Copy it now; it will only be shown once.");
+    setPatExpiryDays("");
+    setPatVerificationCode("");
+    await loadPersonalTokensHandler();
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to create personal access token");
+  }
+};
+
+const handleRevokePAT = async (tokenId) => {
+  try {
+    await revokePersonalAccessToken(tokenId);
+    await loadPersonalTokensHandler();
+  } catch (err) {
+    setSecurityError(err.response?.data?.message || "Failed to revoke token");
   }
 };
 
@@ -928,6 +1078,207 @@ const handleRefreshE2EEKeys = async () => {
                   )}
                 </button>
               </form>
+            </div>
+          )}
+          {(initialView === "all" || initialView === "settings") && (
+            <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+              <h3 className="text-gray-900 font-semibold mb-3 text-lg">
+                Security: 2FA and Personal Access Tokens
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Personal access token generation is available only when 2FA is enabled.
+              </p>
+              <p className="text-sm text-gray-800 mb-4">
+                2FA Status:{" "}
+                <span className="font-semibold">
+                  {twoFactorStatus.enabled
+                    ? `Enabled (${twoFactorStatus.method?.toUpperCase()})`
+                    : "Disabled"}
+                </span>
+              </p>
+
+              {securityError && (
+                <div className="bg-red-500/20 border border-red-500 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {securityError}
+                </div>
+              )}
+              {securitySuccess && (
+                <div className="bg-green-500/20 border border-green-500 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {securitySuccess}
+                </div>
+              )}
+
+              {!twoFactorStatus.enabled ? (
+                <div className="space-y-3 mb-4">
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={handleStartTOTPSetup}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md"
+                    >
+                      Enable TOTP
+                    </button>
+                    <button
+                      onClick={handleEnableEmail2FA}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md"
+                    >
+                      Enable Email 2FA
+                    </button>
+                  </div>
+
+                  {totpSetup?.qrCodeDataUrl && (
+                    <div className="bg-white rounded-lg p-3 border border-gray-200">
+                      <img src={totpSetup.qrCodeDataUrl} alt="TOTP QR" className="w-40 h-40" />
+                      <p className="text-xs text-gray-600 mt-2 break-all">
+                        Secret: {totpSetup.base32}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={twoFactorCode}
+                      onChange={(e) => setTwoFactorCode(e.target.value)}
+                      placeholder="Enter 2FA code"
+                      className="flex-1 p-2 rounded-lg bg-white border border-gray-300 text-gray-900"
+                    />
+                    {totpSetup ? (
+                      <button
+                        onClick={handleVerifyTOTPSetup}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md"
+                      >
+                        Verify TOTP
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleVerifyEmail2FA}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md"
+                      >
+                        Verify Email
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={twoFactorCode}
+                      onChange={(e) => setTwoFactorCode(e.target.value)}
+                      placeholder="Optional: enter current 2FA code"
+                      className="flex-1 p-2 rounded-lg bg-white border border-gray-300 text-gray-900"
+                    />
+                    <button
+                      onClick={handleDisable2FA}
+                      className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md"
+                    >
+                      Disable 2FA
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {recoveryCodes.length > 0 && (
+                <div className="bg-white rounded-lg p-3 border border-gray-200 mb-4">
+                  <p className="text-sm text-gray-900 font-semibold mb-2">Recovery Codes</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                    {recoveryCodes.map((item) => (
+                      <span key={item} className="bg-gray-100 px-2 py-1 rounded">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-lg p-3 border border-gray-200 mb-4">
+                <p className="text-sm text-gray-900 font-semibold mb-2">
+                  Create Personal Access Token
+                </p>
+                {!twoFactorStatus.enabled ? (
+                  <p className="text-sm text-gray-600">
+                    Enable 2FA first to create personal access tokens.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={patName}
+                      onChange={(e) => setPatName(e.target.value)}
+                      placeholder="Token name"
+                      className="w-full p-2 rounded-lg bg-white border border-gray-300 text-gray-900"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={patExpiryDays}
+                      onChange={(e) => setPatExpiryDays(e.target.value)}
+                      placeholder="Expiry days (optional)"
+                      className="w-full p-2 rounded-lg bg-white border border-gray-300 text-gray-900"
+                    />
+                    <input
+                      type="text"
+                      value={patVerificationCode}
+                      onChange={(e) => setPatVerificationCode(e.target.value)}
+                      placeholder="Enter current 2FA code"
+                      className="w-full p-2 rounded-lg bg-white border border-gray-300 text-gray-900"
+                    />
+                    {twoFactorStatus.method === "email" && (
+                      <button
+                        onClick={handleEnableEmail2FA}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md"
+                      >
+                        Send Email 2FA Code
+                      </button>
+                    )}
+                    <button
+                      onClick={handleCreatePAT}
+                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md"
+                    >
+                      Generate Token
+                    </button>
+                  </div>
+                )}
+                {generatedPat && (
+                  <div className="mt-3 bg-yellow-100 border border-yellow-400 rounded p-2">
+                    <p className="text-xs text-yellow-800 mb-1">
+                      Copy this token now. It will not be shown again.
+                    </p>
+                    <code className="text-xs break-all text-gray-800">{generatedPat}</code>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <p className="text-sm text-gray-900 font-semibold mb-2">Existing Tokens</p>
+                {patList.length === 0 ? (
+                  <p className="text-sm text-gray-600">No personal access tokens found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {patList.map((token) => (
+                      <div
+                        key={token._id}
+                        className="flex items-center justify-between bg-gray-50 rounded p-2"
+                      >
+                        <div>
+                          <p className="text-sm text-gray-900">{token.name}</p>
+                          <p className="text-xs text-gray-600">
+                            {token.tokenPrefix}... {token.lastUsedAt ? "used" : "unused"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRevokePAT(token._id)}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {(initialView === "all" || initialView === "settings") && (

@@ -111,3 +111,79 @@ export const updatePublicKey = asyncHandler(async (req, res) => {
   const result = await authService.updatePublicKeyService(userId, publicKey);
   res.json(result);
 });
+
+export const get2FAStatus = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.get2FAStatusService(userId);
+  res.json(result);
+});
+
+export const startTOTPSetup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.startTOTPSetupService(userId);
+  res.json(result);
+});
+
+export const verifyTOTPSetup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { code } = req.body;
+  const result = await authService.verifyTOTPSetupService(userId, code);
+  res.json(result);
+});
+
+export const startEmail2FASetup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.startEmail2FASetupService(userId);
+  res.json(result);
+});
+
+export const verifyEmail2FASetup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { code } = req.body;
+  const result = await authService.verifyEmail2FASetupService(userId, code);
+  res.json(result);
+});
+
+export const verifyLogin2FA = asyncHandler(async (req, res) => {
+  const { challengeToken, code } = req.body;
+  const result = await authService.verifyLogin2FAService(challengeToken, code);
+  res.json({ message: "Login successful", ...result });
+});
+
+export const sendEmailLogin2FA = asyncHandler(async (req, res) => {
+  const { challengeToken } = req.body;
+  const result = await authService.sendEmailLogin2FAService(challengeToken);
+  res.json(result);
+});
+
+export const disable2FA = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { password, code } = req.body;
+  const result = await authService.disable2FAService(userId, password, code);
+  res.json(result);
+});
+
+export const createPersonalAccessToken = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { name, expiresInDays, code } = req.body;
+  const result = await authService.createPersonalAccessTokenService(
+    userId,
+    name,
+    expiresInDays,
+    code,
+  );
+  res.status(201).json(result);
+});
+
+export const listPersonalAccessTokens = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.listPersonalAccessTokensService(userId);
+  res.json(result);
+});
+
+export const revokePersonalAccessToken = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { tokenId } = req.params;
+  const result = await authService.revokePersonalAccessTokenService(userId, tokenId);
+  res.json(result);
+});

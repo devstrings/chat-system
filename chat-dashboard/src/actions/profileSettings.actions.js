@@ -116,3 +116,59 @@ export const acceptFriendRequest = async (requestId) => {
 export const rejectFriendRequest = async (requestId) => {
   await axiosInstance.delete(`/api/friends/request/${requestId}/reject`);
 };
+
+export const get2FAStatus = async () => {
+  const response = await axiosInstance.get("/api/auth/2fa/status");
+  return response.data;
+};
+
+export const startTOTPSetup = async () => {
+  const response = await axiosInstance.post("/api/auth/2fa/totp/setup/start");
+  return response.data;
+};
+
+export const verifyTOTPSetup = async (code) => {
+  const response = await axiosInstance.post("/api/auth/2fa/totp/setup/verify", {
+    code,
+  });
+  return response.data;
+};
+
+export const startEmail2FASetup = async () => {
+  const response = await axiosInstance.post("/api/auth/2fa/email/setup/start");
+  return response.data;
+};
+
+export const verifyEmail2FASetup = async (code) => {
+  const response = await axiosInstance.post("/api/auth/2fa/email/setup/verify", {
+    code,
+  });
+  return response.data;
+};
+
+export const disable2FA = async ({ password, code }) => {
+  const response = await axiosInstance.post("/api/auth/2fa/disable", {
+    password,
+    code,
+  });
+  return response.data;
+};
+
+export const listPersonalAccessTokens = async () => {
+  const response = await axiosInstance.get("/api/auth/personal-access-tokens");
+  return response.data;
+};
+
+export const createPersonalAccessToken = async ({ name, expiresInDays, code }) => {
+  const response = await axiosInstance.post("/api/auth/personal-access-tokens", {
+    name,
+    expiresInDays: expiresInDays || undefined,
+    code,
+  });
+  return response.data;
+};
+
+export const revokePersonalAccessToken = async (tokenId) => {
+  const response = await axiosInstance.delete(`/api/auth/personal-access-tokens/${tokenId}`);
+  return response.data;
+};

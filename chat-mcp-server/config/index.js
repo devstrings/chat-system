@@ -3,13 +3,15 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const env = (key, defaultValue) => process.env[key] || defaultValue;
-
 const requiredEnvVars = [
   "NODE_ENV",
   "MCP_HTTP_PORT",
 
   "CHAT_API_BASE_URL",
-  "CHAT_API_PERSONAL_ACCESS_TOKEN"
+  "CHAT_API_PERSONAL_ACCESS_TOKEN",
+
+  "BACKEND_BASIC_AUTH_USERNAME",
+  "BACKEND_BASIC_AUTH_PASSWORD",
 
 ];
 
@@ -41,7 +43,10 @@ const config = {
     apiBaseUrl: env("CHAT_API_BASE_URL", `http://localhost:${PORT}/api`),
     personalAccessToken: env("CHAT_API_PERSONAL_ACCESS_TOKEN"),
     timeoutMs: parseInt(env("CHAT_API_TIMEOUT_MS", "10000")),
-    
+    basicAuth: {
+      username: env("BACKEND_BASIC_AUTH_USERNAME"),
+      password: env("BACKEND_BASIC_AUTH_PASSWORD"),
+    }
   }
 };
 

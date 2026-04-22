@@ -57,6 +57,59 @@ publicKey: {
   type: String,
   default: ""
 },
+twoFactorEnabled: {
+  type: Boolean,
+  default: false
+},
+twoFactorMethod: {
+  type: String,
+  enum: ["totp", "email", null],
+  default: null
+},
+totpSecretEncrypted: {
+  type: String,
+  default: null
+},
+totpSecretIv: {
+  type: String,
+  default: null
+},
+totpSecretAuthTag: {
+  type: String,
+  default: null
+},
+totpTempSecretEncrypted: {
+  type: String,
+  default: null
+},
+totpTempSecretIv: {
+  type: String,
+  default: null
+},
+totpTempSecretAuthTag: {
+  type: String,
+  default: null
+},
+email2faOtpHash: {
+  type: String,
+  default: null
+},
+email2faOtpExpiresAt: {
+  type: Date,
+  default: null
+},
+email2faOtpAttempts: {
+  type: Number,
+  default: 0
+},
+twoFactorVerifiedAt: {
+  type: Date,
+  default: null
+},
+recoveryCodes: {
+  type: [String],
+  default: []
+},
 
 role: {
   type: String,

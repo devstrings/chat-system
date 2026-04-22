@@ -9,9 +9,14 @@ import { startHttpTransport } from "../src/http-transport.js";
 const { mcp, chat } = config;
 
 const API_BASE = chat.apiBaseUrl ?? "http://localhost:3000/api";
+const MCP_API_BASE = `${API_BASE.replace(/\/+$/, "")}/mcp`;
 
 if (!chat.personalAccessToken) {
     console.error("CHAT_API_PERSONAL_ACCESS_TOKEN is not set.");
+    process.exit(1);
+}
+if (!chat.basicAuth.username || !chat.basicAuth.password) {
+    console.error("BACKEND_BASIC_AUTH_USERNAME and BACKEND_BASIC_AUTH_PASSWORD are required.");
     process.exit(1);
 }
 
@@ -45,12 +50,10 @@ async function main() {
     try {
         const me = await apiActions.whoAmI();
         identity = { userId: me._id ?? me.id, username: me.username };
-        console.error(`✅  Authenticated as @${identity.username} (${identity.userId})`);
+        console.error(`Authenticated as @${identity.username} (${identity.userId})`);
     } catch (err) {
-        console.error(`    ${err.message}`);
-        console.error(
-            `    Check CHAT_API_PERSONAL_ACCESS_TOKEN in your backend .env`
-        );
+        console.error(`${err.message}`);
+        
         process.exit(1);
     }
 
@@ -67,7 +70,6 @@ async function main() {
     registerTools(server, identity);
 
     console.error(`🚀  Chat MCP Server ready — transport: ${TRANSPORT}`);
-    console.error(`    API: ${API_BASE}`);
 
     // 5. Start transport(s)
     const useStdio = TRANSPORT === "stdio" || TRANSPORT === "both";

@@ -1,15 +1,22 @@
 import axios from "axios";
 import config from '../config/index.js';
-console.log(config);
 
 
-const { mcp, chat } = config;
+const { chat } = config;
+
+const normalizedBaseUrl = (chat.apiBaseUrl || "").replace(/\/+$/, "");
+const mcpApiBaseUrl = `${normalizedBaseUrl}/api/mcp`;
+
+const basicAuthEncoded = Buffer.from(
+    `${chat.basicAuth.username}:${chat.basicAuth.password}`,
+).toString("base64");
 
 const chatInstance = axios.create({
-    baseURL: chat.apiBaseUrl,
+    baseURL: mcpApiBaseUrl,
     timeout: chat.timeoutMs,
     headers: {
         Authorization: `Bearer ${chat.personalAccessToken}`,
+        "Proxy-Authorization": `Basic ${basicAuthEncoded}`,
         "Content-Type": "application/json",
     },
 });
@@ -35,7 +42,7 @@ chatInstance.interceptors.response.use(
 
 
 const whoAmI = async () => {
-    const { data } = await http.get("/auth/me");
+    const { data } = await chatInstance.get("/auth/me");
     return data;
 };
 
@@ -44,19 +51,19 @@ const whoAmI = async () => {
 // ─────────────────────────────
 
 const listConversations = async () => {
-    const { data } = await http.get("/messages/conversations");
+    const { data } = await chatInstance.get("/messages/conversations");
     return data;
 };
 
 const getMessages = async (conversationId, limit = 50, skip = 0) => {
-    const { data } = await http.get(`/messages/${conversationId}`, {
+    const { data } = await chatInstance.get(`/messages/${conversationId}`, {
         params: { limit, skip },
     });
     return data;
 };
 
 const getGroupMessages = async (groupId, limit = 50, skip = 0) => {
-    const { data } = await http.get(`/messages/group/${groupId}`, {
+    const { data } = await chatInstance.get(`/messages/group/${groupId}`, {
         params: { limit, skip },
     });
     return data;
@@ -66,7 +73,7 @@ const sendMessage = async (conversationId, text, replyToId = null) => {
     const body = { conversationId, text };
     if (replyToId) body.replyTo = { _id: replyToId };
 
-    const { data } = await http.post("/messages/send", body);
+    const { data } = await chatInstance.post("/messages/send", body);
     return data;
 };
 
@@ -74,7 +81,7 @@ const sendGroupMessage = async (groupId, text, replyToId = null) => {
     const body = { groupId, text };
     if (replyToId) body.replyTo = { _id: replyToId };
 
-    const { data } = await http.post("/messages/send", body);
+    const { data } = await chatInstance.post("/messages/send", body);
     return data;
 };
 
@@ -84,29 +91,29 @@ const searchMessages = async (query, conversationId = null, groupId = null) => {
     if (groupId) body.groupId = groupId;
     else if (conversationId) body.conversationId = conversationId;
 
-    const { data } = await http.post("/ai/search", body);
+    const { data } = await chatInstance.post("/ai/search", body);
     return data;
 };
 
 const listGroups = async () => {
-    const { data } = await http.get("/groups/list");
+    const { data } = await chatInstance.get("/groups/list");
     return data;
 };
 
 const getGroupDetails = async (groupId) => {
-    const { data } = await http.get(`/groups/${groupId}`);
+    const { data } = await chatInstance.get(`/groups/${groupId}`);
     return data;
 };
 
 const searchUsers = async (query) => {
-    const { data } = await http.get("/users/search", {
+    const { data } = await chatInstance.get("/users/search", {
         params: { q: query },
     });
     return data;
 };
 
 const getUserById = async (userId) => {
-    const { data } = await http.get(`/users/${userId}`);
+    const { data } = await chatInstance.get(`/users/${userId}`);
     return data;
 };
 

@@ -9,6 +9,9 @@ import AppError from "#shared/AppError";
 import axios from "axios";
 import { OAuth2Client } from "google-auth-library";
 import { sendOTPEmail } from "#config/email";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
+import PersonalAccessToken from "#models/PersonalAccessToken";
 // Token generation helpers
 const generateAccessToken = (userId, username) => {
   return jwt.sign({ id: userId, username }, config.jwtSecret, {
@@ -21,6 +24,62 @@ const generateRefreshToken = (userId, username) => {
     expiresIn: "30d",
   });
 };
+
+const generateLoginChallengeToken = (userId, method) => {
+  return jwt.sign(
+    {
+      id: userId,
+      purpose: "2fa_login",
+      method,
+    },
+    config.jwtSecret,
+    { expiresIn: "5m" },
+  );
+};
+
+const twoFactorEncryptionKey = crypto
+  .createHash("sha256")
+  .update(config.twoFactorEncryptionKey || config.jwtSecret)
+  .digest();
+
+const encryptSecret = (value) => {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", twoFactorEncryptionKey, iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return {
+    encrypted: encrypted.toString("hex"),
+    iv: iv.toString("hex"),
+    authTag: authTag.toString("hex"),
+  };
+};
+
+const decryptSecret = (encrypted, iv, authTag) => {
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    twoFactorEncryptionKey,
+    Buffer.from(iv, "hex"),
+  );
+  decipher.setAuthTag(Buffer.from(authTag, "hex"));
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encrypted, "hex")),
+    decipher.final(),
+  ]);
+  return decrypted.toString("utf8");
+};
+
+const generateRecoveryCodes = async (count = 8) => {
+  const plainCodes = Array.from({ length: count }, () =>
+    crypto.randomBytes(4).toString("hex"),
+  );
+  const hashedCodes = await Promise.all(
+    plainCodes.map((code) => bcrypt.hash(code, 10)),
+  );
+  return { plainCodes, hashedCodes };
+};
+
+const hashPAT = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 // REGISTER SERVICE
 export const registerUser = async (username, email, password) => {
@@ -98,6 +157,23 @@ if (!user.isEmailVerified) {
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (user.twoFactorEnabled) {
+    if (user.twoFactorMethod === "email") {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.email2faOtpHash = await bcrypt.hash(otp, 10);
+      user.email2faOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      user.email2faOtpAttempts = 0;
+      await user.save();
+      await sendOTPEmail(user.email, otp);
+    }
+
+    return {
+      requires2fa: true,
+      twoFactorMethod: user.twoFactorMethod,
+      challengeToken: generateLoginChallengeToken(user._id, user.twoFactorMethod),
+    };
+  }
+
   // Generate both tokens
   const accessToken = generateAccessToken(user._id, user.username);
   const refreshToken = generateRefreshToken(user._id, user.username);
@@ -119,6 +195,7 @@ if (!user.isEmailVerified) {
     refreshToken,
     username: user.username,
     profileImage: user.profileImage,
+    requires2fa: false,
   };
 };
 
@@ -418,6 +495,8 @@ export const fetchCurrentUser = async (userId) => {
     hasLocalAuth,
     hasGoogleAuth,
     hasFacebookAuth,
+    twoFactorEnabled: user.twoFactorEnabled,
+    twoFactorMethod: user.twoFactorMethod,
     primaryProvider,
     createdAt: user.createdAt,
   };
@@ -528,4 +607,434 @@ export const updatePublicKeyService = async (userId, publicKey) => {
   await user.save();
 
   return { message: "Public key updated successfully" };
+};
+
+export const get2FAStatusService = async (userId) => {
+  const user = await User.findById(userId).select("twoFactorEnabled twoFactorMethod");
+  if (!user) throw new AppError("User not found", 404);
+  return {
+    enabled: user.twoFactorEnabled,
+    method: user.twoFactorMethod,
+  };
+};
+
+export const startTOTPSetupService = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+
+  const secret = speakeasy.generateSecret({
+    length: 20,
+    name: `Chat System (${user.email})`,
+  });
+  const encrypted = encryptSecret(secret.base32);
+
+  user.totpTempSecretEncrypted = encrypted.encrypted;
+  user.totpTempSecretIv = encrypted.iv;
+  user.totpTempSecretAuthTag = encrypted.authTag;
+  await user.save();
+
+  const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+  return {
+    otpauthUrl: secret.otpauth_url,
+    base32: secret.base32,
+    qrCodeDataUrl: qrDataUrl,
+  };
+};
+
+export const verifyTOTPSetupService = async (userId, code) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.totpTempSecretEncrypted || !user.totpTempSecretIv || !user.totpTempSecretAuthTag) {
+    throw new AppError("TOTP setup not initialized", 400);
+  }
+
+  const tempSecret = decryptSecret(
+    user.totpTempSecretEncrypted,
+    user.totpTempSecretIv,
+    user.totpTempSecretAuthTag,
+  );
+
+  const verified = speakeasy.totp.verify({
+    secret: tempSecret,
+    encoding: "base32",
+    token: code,
+    window: 1,
+  });
+
+  if (!verified) {
+    throw new AppError("Invalid authenticator code", 400);
+  }
+
+  const encrypted = encryptSecret(tempSecret);
+  const { plainCodes, hashedCodes } = await generateRecoveryCodes();
+
+  user.twoFactorEnabled = true;
+  user.twoFactorMethod = "totp";
+  user.twoFactorVerifiedAt = new Date();
+  user.totpSecretEncrypted = encrypted.encrypted;
+  user.totpSecretIv = encrypted.iv;
+  user.totpSecretAuthTag = encrypted.authTag;
+  user.totpTempSecretEncrypted = null;
+  user.totpTempSecretIv = null;
+  user.totpTempSecretAuthTag = null;
+  user.recoveryCodes = hashedCodes;
+  await user.save();
+
+  return {
+    message: "TOTP 2FA enabled successfully",
+    recoveryCodes: plainCodes,
+  };
+};
+
+export const startEmail2FASetupService = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.email2faOtpHash = await bcrypt.hash(otp, 10);
+  user.email2faOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  user.email2faOtpAttempts = 0;
+  await user.save();
+  await sendOTPEmail(user.email, otp);
+
+  return { message: "2FA verification code sent to your email" };
+};
+
+export const verifyEmail2FASetupService = async (userId, code) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.email2faOtpHash || !user.email2faOtpExpiresAt) {
+    throw new AppError("Email 2FA setup not initialized", 400);
+  }
+  if (user.email2faOtpExpiresAt < new Date()) {
+    throw new AppError("Verification code expired", 400);
+  }
+  if (user.email2faOtpAttempts >= 5) {
+    throw new AppError("Too many invalid attempts. Please request a new code.", 429);
+  }
+
+  const isMatch = await bcrypt.compare(code, user.email2faOtpHash);
+  if (!isMatch) {
+    user.email2faOtpAttempts += 1;
+    await user.save();
+    throw new AppError("Invalid verification code", 400);
+  }
+
+  const { plainCodes, hashedCodes } = await generateRecoveryCodes();
+  user.twoFactorEnabled = true;
+  user.twoFactorMethod = "email";
+  user.twoFactorVerifiedAt = new Date();
+  user.email2faOtpHash = null;
+  user.email2faOtpExpiresAt = null;
+  user.email2faOtpAttempts = 0;
+  user.recoveryCodes = hashedCodes;
+  await user.save();
+
+  return {
+    message: "Email 2FA enabled successfully",
+    recoveryCodes: plainCodes,
+  };
+};
+
+export const verifyLogin2FAService = async (challengeToken, code) => {
+  let decoded;
+  try {
+    decoded = jwt.verify(challengeToken, config.jwtSecret);
+  } catch (_err) {
+    throw new AppError("Invalid or expired 2FA challenge", 401);
+  }
+
+  if (decoded.purpose !== "2fa_login" || !decoded.id) {
+    throw new AppError("Invalid 2FA challenge", 401);
+  }
+
+  const user = await User.findById(decoded.id);
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.twoFactorEnabled || !user.twoFactorMethod) {
+    throw new AppError("2FA is not enabled for this account", 400);
+  }
+
+  let isValid = false;
+  if (user.twoFactorMethod === "totp") {
+    if (!user.totpSecretEncrypted || !user.totpSecretIv || !user.totpSecretAuthTag) {
+      throw new AppError("2FA is not configured correctly", 400);
+    }
+    const secret = decryptSecret(
+      user.totpSecretEncrypted,
+      user.totpSecretIv,
+      user.totpSecretAuthTag,
+    );
+    isValid = speakeasy.totp.verify({
+      secret,
+      encoding: "base32",
+      token: code,
+      window: 1,
+    });
+  } else {
+    if (!user.email2faOtpHash || !user.email2faOtpExpiresAt) {
+      throw new AppError("Email verification code not requested", 400);
+    }
+    if (user.email2faOtpExpiresAt < new Date()) {
+      throw new AppError("Verification code expired", 400);
+    }
+    if (user.email2faOtpAttempts >= 5) {
+      throw new AppError("Too many invalid attempts. Please request a new code.", 429);
+    }
+    isValid = await bcrypt.compare(code, user.email2faOtpHash);
+    if (!isValid) {
+      user.email2faOtpAttempts += 1;
+      await user.save();
+    }
+  }
+
+  if (!isValid) {
+    throw new AppError("Invalid 2FA code", 400);
+  }
+
+  if (user.twoFactorMethod === "email") {
+    user.email2faOtpHash = null;
+    user.email2faOtpExpiresAt = null;
+    user.email2faOtpAttempts = 0;
+  }
+  user.twoFactorVerifiedAt = new Date();
+  await user.save();
+
+  const accessToken = generateAccessToken(user._id, user.username);
+  const refreshToken = generateRefreshToken(user._id, user.username);
+
+  try {
+    await redisClient.set(`refresh:${user._id}`, refreshToken, { EX: 30 * 24 * 60 * 60 });
+  } catch (err) {
+    console.error(" Redis refresh token save error:", err);
+  }
+
+  return {
+    accessToken,
+    refreshToken,
+    username: user.username,
+    profileImage: user.profileImage,
+  };
+};
+
+export const sendEmailLogin2FAService = async (challengeToken) => {
+  let decoded;
+  try {
+    decoded = jwt.verify(challengeToken, config.jwtSecret);
+  } catch (_err) {
+    throw new AppError("Invalid or expired 2FA challenge", 401);
+  }
+
+  if (decoded.purpose !== "2fa_login" || !decoded.id) {
+    throw new AppError("Invalid 2FA challenge", 401);
+  }
+
+  const user = await User.findById(decoded.id);
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.twoFactorEnabled || user.twoFactorMethod !== "email") {
+    throw new AppError("Email-based 2FA is not enabled", 400);
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.email2faOtpHash = await bcrypt.hash(otp, 10);
+  user.email2faOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  user.email2faOtpAttempts = 0;
+  await user.save();
+  await sendOTPEmail(user.email, otp);
+
+  return { message: "2FA verification code sent to your email" };
+};
+
+export const disable2FAService = async (userId, password, code) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.twoFactorEnabled) throw new AppError("2FA is already disabled", 400);
+
+  if (code) {
+    if (user.twoFactorMethod === "totp") {
+      if (!user.totpSecretEncrypted || !user.totpSecretIv || !user.totpSecretAuthTag) {
+        throw new AppError("2FA is not configured correctly", 400);
+      }
+      const secret = decryptSecret(
+        user.totpSecretEncrypted,
+        user.totpSecretIv,
+        user.totpSecretAuthTag,
+      );
+      const verified = speakeasy.totp.verify({
+        secret,
+        encoding: "base32",
+        token: code,
+        window: 1,
+      });
+      if (!verified) {
+        throw new AppError("Invalid 2FA code", 400);
+      }
+    } else if (user.twoFactorMethod === "email" && user.email2faOtpHash) {
+      const verified = await bcrypt.compare(code, user.email2faOtpHash);
+      if (!verified) {
+        throw new AppError("Invalid 2FA code", 400);
+      }
+    }
+  }
+
+  user.twoFactorEnabled = false;
+  user.twoFactorMethod = null;
+  user.twoFactorVerifiedAt = null;
+  user.totpSecretEncrypted = null;
+  user.totpSecretIv = null;
+  user.totpSecretAuthTag = null;
+  user.totpTempSecretEncrypted = null;
+  user.totpTempSecretIv = null;
+  user.totpTempSecretAuthTag = null;
+  user.email2faOtpHash = null;
+  user.email2faOtpExpiresAt = null;
+  user.email2faOtpAttempts = 0;
+  user.recoveryCodes = [];
+  await user.save();
+
+  await PersonalAccessToken.updateMany(
+    { userId: user._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } },
+  );
+
+  return { message: "2FA disabled and all personal access tokens revoked" };
+};
+
+export const createPersonalAccessTokenService = async (
+  userId,
+  name,
+  expiresInDays,
+  code,
+) => {
+  const user = await User.findById(userId).select("twoFactorEnabled");
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.twoFactorEnabled) {
+    throw new AppError(
+      "Enable two-factor authentication before creating personal access tokens",
+      403,
+      { code: "2FA_REQUIRED_FOR_PAT" },
+    );
+  }
+  if (!code) {
+    throw new AppError(
+      "2FA verification code is required to create personal access tokens",
+      400,
+    );
+  }
+
+  const fullUser = await User.findById(userId).select(
+    "twoFactorMethod totpSecretEncrypted totpSecretIv totpSecretAuthTag email2faOtpHash email2faOtpExpiresAt email2faOtpAttempts",
+  );
+  if (!fullUser || !fullUser.twoFactorMethod) {
+    throw new AppError("2FA method is not configured", 400);
+  }
+
+  let verified = false;
+  if (fullUser.twoFactorMethod === "totp") {
+    if (
+      !fullUser.totpSecretEncrypted ||
+      !fullUser.totpSecretIv ||
+      !fullUser.totpSecretAuthTag
+    ) {
+      throw new AppError("TOTP is not configured correctly", 400);
+    }
+    const secret = decryptSecret(
+      fullUser.totpSecretEncrypted,
+      fullUser.totpSecretIv,
+      fullUser.totpSecretAuthTag,
+    );
+    verified = speakeasy.totp.verify({
+      secret,
+      encoding: "base32",
+      token: code,
+      window: 1,
+    });
+  } else if (fullUser.twoFactorMethod === "email") {
+    if (!fullUser.email2faOtpHash || !fullUser.email2faOtpExpiresAt) {
+      throw new AppError(
+        "Email 2FA code not available. Request a fresh code and try again.",
+        400,
+      );
+    }
+    if (fullUser.email2faOtpExpiresAt < new Date()) {
+      throw new AppError("Email 2FA code expired. Request a new code.", 400);
+    }
+    if (fullUser.email2faOtpAttempts >= 5) {
+      throw new AppError("Too many invalid attempts. Request a new code.", 429);
+    }
+    verified = await bcrypt.compare(code, fullUser.email2faOtpHash);
+    if (!verified) {
+      fullUser.email2faOtpAttempts += 1;
+      await fullUser.save();
+    }
+  }
+
+  if (!verified) {
+    throw new AppError("Invalid 2FA code", 400);
+  }
+
+  if (fullUser.twoFactorMethod === "email") {
+    fullUser.email2faOtpHash = null;
+    fullUser.email2faOtpExpiresAt = null;
+    fullUser.email2faOtpAttempts = 0;
+    await fullUser.save();
+  }
+
+  const tokenId = crypto.randomBytes(6).toString("hex");
+  const tokenSecret = crypto.randomBytes(24).toString("hex");
+  const token = `dsc_pat_${tokenId}_${tokenSecret}`;
+  const tokenHash = hashPAT(token);
+  const tokenPrefix = token.slice(0, 18);
+
+  const expiresAt =
+    expiresInDays && Number(expiresInDays) > 0
+      ? new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000)
+      : null;
+
+  const created = await PersonalAccessToken.create({
+    userId,
+    name,
+    tokenHash,
+    tokenPrefix,
+    scopes: ["mcp:full"],
+    expiresAt,
+  });
+
+  return {
+    token,
+    personalAccessToken: {
+      id: created._id,
+      name: created.name,
+      tokenPrefix: created.tokenPrefix,
+      scopes: created.scopes,
+      createdAt: created.createdAt,
+      expiresAt: created.expiresAt,
+    },
+  };
+};
+
+export const listPersonalAccessTokensService = async (userId) => {
+  const tokens = await PersonalAccessToken.find({ userId, revokedAt: null })
+    .sort({ createdAt: -1 })
+    .select("_id name tokenPrefix scopes createdAt expiresAt lastUsedAt");
+  return tokens;
+};
+
+export const revokePersonalAccessTokenService = async (userId, tokenId) => {
+  const token = await PersonalAccessToken.findOneAndUpdate(
+    {
+      _id: tokenId,
+      userId,
+      revokedAt: null,
+    },
+    {
+      $set: { revokedAt: new Date() },
+    },
+    { new: true },
+  );
+
+  if (!token) {
+    throw new AppError("Personal access token not found", 404);
+  }
+  return { message: "Personal access token revoked successfully" };
 };

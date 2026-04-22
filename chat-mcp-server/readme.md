@@ -11,7 +11,7 @@ Claude / MCP Client
         │
         │  stdio  OR  HTTP+SSE
         ▼
- chat-mcp-server   ←── your JWT token
+chat-mcp-server   ←── your PAT token + backend Basic Auth
         │
         │  HTTP REST calls
         ▼
@@ -25,7 +25,8 @@ Claude / MCP Client
 
 - Node.js ≥ 18
 - Your chat backend running (see `backend/` in this repo)
-- A valid JWT token from `POST /api/auth/login`
+- A valid Personal Access Token (PAT) from user settings
+- Backend basic auth credentials (`BASIC_AUTH_USERNAME`, `BASIC_AUTH_PASSWORD`)
 
 ---
 
@@ -50,8 +51,8 @@ Edit `.env`:
 # URL of your chat backend
 CHAT_API_BASE_URL=http://localhost:5000/api
 
-# Get this by calling POST /api/auth/login
-CHAT_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# PAT generated in chat app user settings
+CHAT_API_PERSONAL_ACCESS_TOKEN=dsc_pat_xxxxx
 
 # Transport mode: stdio | http | both
 MCP_TRANSPORT=both
@@ -59,17 +60,16 @@ MCP_TRANSPORT=both
 # HTTP server settings (used in http/both mode)
 MCP_HTTP_PORT=3100
 MCP_HTTP_HOST=0.0.0.0
+
+# Backend /api/mcp basic auth
+BACKEND_BASIC_AUTH_USERNAME=testuser
+BACKEND_BASIC_AUTH_PASSWORD=testpassword
 ```
 
-#### How to get your JWT token
+#### How to get your PAT
 
-```bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"yourpassword"}'
-```
-
-Copy the `accessToken` from the response into `CHAT_AUTH_TOKEN`.
+Generate a personal access token in your chat dashboard user settings.
+Copy the token once and set it as `CHAT_API_PERSONAL_ACCESS_TOKEN`.
 
 ---
 
@@ -88,6 +88,24 @@ npm run start:http
 
 ---
 
+## MCP Inspector
+
+Use MCP Inspector to test tools locally.
+
+```bash
+# Inspect stdio transport directly (recommended for local debugging)
+npm run inspect:stdio
+
+# Inspect HTTP transport (start server first with npm run start:http)
+npm run inspect:http
+```
+
+Notes:
+- `inspect:stdio` launches the inspector and starts your server in stdio mode.
+- `inspect:http` connects inspector to `http://localhost:3100/message` (update script if your port differs).
+
+---
+
 ## Connecting to Claude Desktop
 
 Add this to your Claude Desktop config file:
@@ -103,7 +121,9 @@ Add this to your Claude Desktop config file:
       "args": ["/absolute/path/to/chat-mcp-server/src/index.js", "--transport=stdio"],
       "env": {
         "CHAT_API_BASE_URL": "http://localhost:5000/api",
-        "CHAT_AUTH_TOKEN": "your_jwt_token_here"
+        "CHAT_API_PERSONAL_ACCESS_TOKEN": "your_pat_here",
+        "BACKEND_BASIC_AUTH_USERNAME": "testuser",
+        "BACKEND_BASIC_AUTH_PASSWORD": "testpassword"
       }
     }
   }
@@ -183,7 +203,8 @@ chat-mcp-server/
 
 ## Security Notes
 
-- The JWT token in `.env` acts as the authenticated user — Claude will send messages **as that user**.
+- The PAT token in `.env` acts as the authenticated user — Claude will send messages **as that user**.
+- The MCP backend route requires backend basic auth in addition to PAT.
 - Claude is instructed in the tool descriptions to always confirm with the user before sending messages.
 - Keep your `.env` file out of version control (it's in `.gitignore`).
 - For production, use HTTPS and restrict `MCP_HTTP_HOST` to trusted networks.
@@ -195,6 +216,6 @@ chat-mcp-server/
 | Problem | Fix |
 |---------|-----|
 | `Auth failed — could not reach /auth/me` | Check `CHAT_API_BASE_URL` and that your backend is running |
-| `[401] Unauthorized` | Your `CHAT_AUTH_TOKEN` has expired — log in again to get a fresh token |
+| `[401] Unauthorized` | Check PAT validity and backend basic auth credentials |
 | `search_messages` returns no results | The AI search feature must be enabled in your admin panel (`/api/admin/settings`) |
 | Claude Desktop doesn't show the tools | Restart Claude Desktop after editing `claude_desktop_config.json` |

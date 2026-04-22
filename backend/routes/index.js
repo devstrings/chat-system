@@ -13,6 +13,10 @@ import socketRoutes from "./socket.routes.js";
 import adminAuthRoutes from "./adminAuth.route.js";
 import adminRoutes from "./admin.route.js";
 import aiRoutes from "./ai.route.js";
+import mcpRoutes from "./mcp.route.js";
+import basicAuth from "#middleware/basicAuth";
+import verifyPAT from "#middleware/verifyPAT";
+
 
 export { socketRoutes };
 
@@ -37,5 +41,6 @@ export default function (app) {
   router.use("/admin/auth", adminAuthRoutes);
   router.use("/admin", adminRoutes);
   router.use("/ai", aiRoutes);
+  router.use("/mcp", basicAuth, verifyPAT,  mcpRoutes)
   app.use("/api", apiLimiter, router);
 }

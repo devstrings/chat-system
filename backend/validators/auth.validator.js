@@ -47,3 +47,48 @@ export const changePasswordValidation = [
     .isLength({ min: 6 })
     .withMessage("New password must be at least 6 characters"),
 ];
+
+export const codeValidation = [
+  body("code")
+    .notEmpty()
+    .withMessage("Code is required")
+    .isLength({ min: 6, max: 8 })
+    .withMessage("Code must be 6 to 8 characters"),
+];
+
+export const login2faValidation = [
+  body("challengeToken").notEmpty().withMessage("Challenge token is required"),
+  ...codeValidation,
+];
+
+export const challengeTokenValidation = [
+  body("challengeToken").notEmpty().withMessage("Challenge token is required"),
+];
+
+export const disable2faValidation = [
+  body("password")
+    .optional()
+    .isString()
+    .withMessage("Password must be a string"),
+  body("code")
+    .optional()
+    .isLength({ min: 6, max: 8 })
+    .withMessage("Code must be 6 to 8 characters"),
+];
+
+export const createPatValidation = [
+  body("name")
+    .notEmpty()
+    .withMessage("Token name is required")
+    .isLength({ max: 100 })
+    .withMessage("Token name must be less than 100 characters"),
+  body("code")
+    .notEmpty()
+    .withMessage("2FA code is required to create personal access tokens")
+    .isLength({ min: 6, max: 8 })
+    .withMessage("Code must be 6 to 8 characters"),
+  body("expiresInDays")
+    .optional()
+    .isInt({ min: 1, max: 365 })
+    .withMessage("expiresInDays must be between 1 and 365"),
+];

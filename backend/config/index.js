@@ -49,6 +49,7 @@ const config = {
 
   jwtSecret: env("JWT_SECRET", "your_jwt_secret"),
   jwtRefreshSecret: env("JWT_REFRESH_SECRET", "your_jwt_refresh_secret"),
+  twoFactorEncryptionKey: env("TWO_FACTOR_ENCRYPTION_KEY", env("JWT_SECRET", "your_jwt_secret")),
   sessionSecret: env("SESSION_SECRET", "your_session_secret"),
   jwtExpiresIn: env("JWT_EXPIRES_IN", "7d"),
 
@@ -92,6 +93,10 @@ const config = {
   
   resetToken: {
     expiryMinutes: parseInt(env("RESET_TOKEN_EXPIRY", "15")),
+  },
+  basicAuth: {
+    username: env("BASIC_AUTH_USERNAME", "testuser"),
+    password: env("BASIC_AUTH_PASSWORD", "testpassword"),
   },
 };
 

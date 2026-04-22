@@ -17,6 +17,14 @@ export const login = createAsyncThunk(
         },
       );
 
+      if (response.data?.requires2fa) {
+        return {
+          requires2fa: true,
+          challengeToken: response.data.challengeToken,
+          twoFactorMethod: response.data.twoFactorMethod,
+        };
+      }
+
       const { refreshToken, username, profileImage } = response.data;
 
       //  ONLY save refreshToken, username, profileImage
@@ -29,6 +37,29 @@ export const login = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || "Login failed");
+    }
+  },
+);
+
+export const verify2FALogin = createAsyncThunk(
+  "auth/verify2FALogin",
+  async ({ challengeToken, code }, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(
+        `${API_BASE_URL}/api/auth/2fa/login/verify`,
+        { challengeToken, code },
+      );
+      const { refreshToken, username, profileImage } = response.data;
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("username", username);
+      if (profileImage) {
+        localStorage.setItem("profileImage", profileImage);
+      }
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "2FA verification failed",
+      );
     }
   },
 );
@@ -157,6 +188,9 @@ const authSlice = createSlice({
     currentUser: null,
     currentUserId: null,
     token: localStorage.getItem("accessToken") || null,
+    requires2fa: false,
+    twoFactorChallengeToken: null,
+    twoFactorMethod: null,
     loading: false,
     error: null,
     userFetched: false,
@@ -182,17 +216,48 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
+        if (action.payload?.requires2fa) {
+          state.loading = false;
+          state.requires2fa = true;
+          state.twoFactorChallengeToken = action.payload.challengeToken;
+          state.twoFactorMethod = action.payload.twoFactorMethod;
+          state.error = null;
+          state.isAuthenticated = false;
+          return;
+        }
         state.loading = false;
         state.isAuthenticated = true;
         state.token = action.payload.accessToken;
         state.currentUser = action.payload;
         state.currentUserId = action.payload._id || action.payload.id;
+        state.requires2fa = false;
+        state.twoFactorChallengeToken = null;
+        state.twoFactorMethod = null;
         state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.isAuthenticated = false;
+      })
+      .addCase(verify2FALogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verify2FALogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.token = action.payload.accessToken;
+        state.currentUser = action.payload;
+        state.currentUserId = action.payload._id || action.payload.id;
+        state.requires2fa = false;
+        state.twoFactorChallengeToken = null;
+        state.twoFactorMethod = null;
+        state.error = null;
+      })
+      .addCase(verify2FALogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
       // Register
@@ -203,6 +268,9 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state) => {
         state.loading = false;
         state.error = null;
+        state.requires2fa = false;
+        state.twoFactorChallengeToken = null;
+        state.twoFactorMethod = null;
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -271,6 +339,9 @@ const authSlice = createSlice({
           token: null,
           loading: false,
           error: null,
+          requires2fa: false,
+          twoFactorChallengeToken: null,
+          twoFactorMethod: null,
         };
       });
   },

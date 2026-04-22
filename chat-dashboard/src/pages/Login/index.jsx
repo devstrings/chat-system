@@ -15,7 +15,7 @@ export default function Login() {
   const hasCheckedAuth = useRef(false);
 
   const dispatch = useDispatch();
-  const { loading, error } = useSelector(
+  const { loading, error, requires2fa, twoFactorChallengeToken, twoFactorMethod } = useSelector(
     (state) => state.auth,
   );
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -46,11 +46,35 @@ export default function Login() {
 
     const result = await dispatch(login(formData));
 
+    if (login.fulfilled.match(result) && result.payload?.requires2fa) {
+      navigate("/verify-2fa", {
+        replace: true,
+        state: {
+          challengeToken: result.payload.challengeToken || twoFactorChallengeToken,
+          method: result.payload.twoFactorMethod || twoFactorMethod,
+          email: formData.email,
+        },
+      });
+      return;
+    }
+
     if (login.fulfilled.match(result)) {
       hasNavigated.current = true;
       navigate("/dashboard", { replace: true });
     }
   };
+
+  useEffect(() => {
+    if (!requires2fa || !twoFactorChallengeToken) return;
+    navigate("/verify-2fa", {
+      replace: true,
+      state: {
+        challengeToken: twoFactorChallengeToken,
+        method: twoFactorMethod,
+        email: formData.email,
+      },
+    });
+  }, [requires2fa, twoFactorChallengeToken, twoFactorMethod, formData.email, navigate]);
 
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (response) => {
