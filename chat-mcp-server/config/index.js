@@ -26,7 +26,6 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-const PORT = env("PORT", 5000);
 
 const prod_envs = ["production", "staging"];
 
@@ -40,7 +39,7 @@ const config = {
 
   },
   chat: {
-    apiBaseUrl: env("CHAT_API_BASE_URL", `http://localhost:${PORT}/api`),
+    apiBaseUrl: env("CHAT_API_BASE_URL", `http://localhost:5000`),
     personalAccessToken: env("CHAT_API_PERSONAL_ACCESS_TOKEN"),
     timeoutMs: parseInt(env("CHAT_API_TIMEOUT_MS", "10000")),
     basicAuth: {

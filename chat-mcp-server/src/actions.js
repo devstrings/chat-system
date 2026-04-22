@@ -4,8 +4,7 @@ import config from '../config/index.js';
 
 const { chat } = config;
 
-const normalizedBaseUrl = (chat.apiBaseUrl || "").replace(/\/+$/, "");
-const mcpApiBaseUrl = `${normalizedBaseUrl}/api/mcp`;
+const mcpApiBaseUrl = `${chat.apiBaseUrl}/api/mcp`;
 
 const basicAuthEncoded = Buffer.from(
     `${chat.basicAuth.username}:${chat.basicAuth.password}`,
