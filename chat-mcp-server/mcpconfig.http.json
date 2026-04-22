@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "chat-http-sse": {
+            "transport": "sse",
+            "url": "http://127.0.0.1:3100/sse",
+            "headers": {
+                "Authorization": "Bearer dsc_pat_01fff98f232f_9e56af4510491ea53857598e5b6b09b82cbb1094f5f9fbc7"
+            }
+        }
+    }
+}

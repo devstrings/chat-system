@@ -9,14 +9,19 @@ import {
     formatSearchResults,
     formatUser,
 } from "./formatters.js";
-import apiActions from "./actions.js";
 
 /**
  * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} server
- * @param {{ userId: string, username: string }} identity  – current user info
+ * @param {ReturnType<import("./actions.js").createActionClient>} actionClient
  */
-export function registerTools(server, identity) {
-    const { userId, username } = identity;
+export function registerTools(server, actionClient) {
+    let identityPromise = null;
+    const getIdentity = async () => {
+        if (!identityPromise) {
+            identityPromise = actionClient.whoAmI();
+        }
+        return identityPromise;
+    };
 
     // ─────────────────────────────────────────────────────────
     //  TOOL 1 — whoami
@@ -27,6 +32,9 @@ export function registerTools(server, identity) {
         "Call this first if you need the user's ID or username.",
         {},
         async () => {
+            const me = await getIdentity();
+            const username = me.username;
+            const userId = me._id ?? me.id;
             return {
                 content: [
                     {
@@ -45,7 +53,9 @@ export function registerTools(server, identity) {
         "Use conversation IDs from this list when calling other tools.",
         {},
         async () => {
-            const conversations = await apiActions.listConversations();
+            const me = await getIdentity();
+            const userId = me._id ?? me.id;
+            const conversations = await actionClient.listConversations();
             return {
                 content: [
                     {
@@ -81,7 +91,7 @@ export function registerTools(server, identity) {
                 .describe("Number of messages to skip for pagination (default 0)"),
         },
         async ({ conversation_id, limit, skip }) => {
-            const messages = await apiActions.getMessages(conversation_id, limit, skip);
+            const messages = await actionClient.getMessages(conversation_id, limit, skip);
             return {
                 content: [
                     {
@@ -102,7 +112,7 @@ export function registerTools(server, identity) {
         "showing group name, ID, member count, and last message preview.",
         {},
         async () => {
-            const groups = await apiActions.listGroups();
+            const groups = await actionClient.listGroups();
             return {
                 content: [
                     {
@@ -125,7 +135,7 @@ export function registerTools(server, identity) {
                 .describe("The group ID (from list_groups)"),
         },
         async ({ group_id }) => {
-            const group = await apiActions.getGroupDetails(group_id);
+            const group = await actionClient.getGroupDetails(group_id);
             return {
                 content: [
                     {
@@ -161,7 +171,7 @@ export function registerTools(server, identity) {
                 .describe("Number of messages to skip for pagination"),
         },
         async ({ group_id, limit, skip }) => {
-            const messages = await apiActions.getGroupMessages(group_id, limit, skip);
+            const messages = await actionClient.getGroupMessages(group_id, limit, skip);
             return {
                 content: [
                     {
@@ -211,7 +221,7 @@ export function registerTools(server, identity) {
                 };
             }
 
-            const result = await apiActions.searchMessages(
+            const result = await actionClient.searchMessages(
                 query,
                 conversation_id ?? null,
                 group_id ?? null
@@ -248,7 +258,7 @@ export function registerTools(server, identity) {
                 .describe("Optional: ID of a message to reply to"),
         },
         async ({ conversation_id, text, reply_to_message_id }) => {
-            const msg = await apiActions.sendMessage(
+            const msg = await actionClient.sendMessage(
                 conversation_id,
                 text,
                 reply_to_message_id ?? null
@@ -284,7 +294,7 @@ export function registerTools(server, identity) {
                 .describe("Optional: ID of a message to reply to"),
         },
         async ({ group_id, text, reply_to_message_id }) => {
-            const msg = await apiActions.sendGroupMessage(
+            const msg = await actionClient.sendGroupMessage(
                 group_id,
                 text,
                 reply_to_message_id ?? null
@@ -315,7 +325,7 @@ export function registerTools(server, identity) {
                 .describe("Username or email to search for"),
         },
         async ({ query }) => {
-            const users = await api.searchUsers(query);
+            const users = await actionClient.searchUsers(query);
             if (!users?.length) {
                 return {
                     content: [{ type: "text", text: `No users found for "${query}".` }],

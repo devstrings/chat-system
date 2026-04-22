@@ -13,7 +13,6 @@
         "start:stdio": "node src/index.js --transport=stdio",
         "dev": "nodemon src/index.js",
         "inspect:stdio": "npx @modelcontextprotocol/inspector --transport stdio node src/index.js --transport=stdio",
-        "inspect:http": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3100/message",
         "inspect:sse": "npx @modelcontextprotocol/inspector --transport sse --server-url http://127.0.0.1:3100/sse"
     },
     "dependencies": {

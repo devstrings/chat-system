@@ -1,16 +1,17 @@
 import express from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-
 /**
- * @param {import("@modelcontextprotocol/sdk/server/mcp.js").McpServer} mcpServer
- * @param {{ host: string, port: number }} options
+ * @param {{
+ *   host: string,
+ *   port: number,
+ *   createServerForSession: (pat: string) => Promise<import("@modelcontextprotocol/sdk/server/mcp.js").McpServer> | import("@modelcontextprotocol/sdk/server/mcp.js").McpServer
+ * }} options
  */
-export async function startHttpTransport(mcpServer, { host, port }) {
+export async function startHttpTransport({ host, port, createServerForSession }) {
     const app = express();
     app.use(express.json());
 
-    // Track active SSE transports keyed by session ID
-    const transports = new Map();
+    const sessions = new Map();
 
     // ── Health check ──────────────────────────────────────
     app.get("/", (_req, res) => {
@@ -24,23 +25,30 @@ export async function startHttpTransport(mcpServer, { host, port }) {
 
     // ── SSE endpoint — client connects here ───────────────
     app.get("/sse", async (req, res) => {
-        console.log(`[HTTP] SSE connection from ${req.ip}`);
+        const auth = req.header("authorization") || "";
+        const pat = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+        if (!pat || !pat.startsWith("dsc_pat_")) {
+            return res.status(401).json({ error: "Bearer PAT required" });
+        }
 
         const transport = new SSEServerTransport("/message", res);
-        transports.set(transport.sessionId, transport);
-
+        const server = await createServerForSession(pat);
+        sessions.set(transport.sessionId, { transport, server });
+        
         res.on("close", () => {
-            console.log(`[HTTP] SSE client disconnected (session: ${transport.sessionId})`);
-            transports.delete(transport.sessionId);
+            sessions.delete(transport.sessionId);
         });
-
-        await mcpServer.connect(transport);
+        await server.connect(transport);
     });
 
     // ── Message endpoint — client POSTs JSON-RPC here ─────
     app.post("/message", async (req, res) => {
-        const sessionId = req.query.sessionId;
-        const transport = transports.get(sessionId);
+        const sessionId = String(req.query.sessionId || "");
+        if (!sessionId) {
+            return res.status(400).json({ error: "sessionId query parameter is required" });
+        }
+        const session = sessions.get(sessionId);
+        const transport = session?.transport;
 
         if (!transport) {
             return res

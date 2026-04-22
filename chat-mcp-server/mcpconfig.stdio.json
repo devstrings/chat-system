@@ -1,0 +1,16 @@
+{
+    "mcpServers": {
+        "chat-stdio": {
+            "command": "node",
+            "args": [
+                "src/index.js",
+                "--transport=stdio"
+            ],
+            "cwd": "D:/devstrings/chat-system/chat-mcp-server",
+            "env": {
+                "MCP_TRANSPORT": "stdio",
+                "CHAT_API_PERSONAL_ACCESS_TOKEN": "dsc_pat_your_token_here"
+            }
+        }
+    }
+}
