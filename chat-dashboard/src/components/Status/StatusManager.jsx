@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import API_BASE_URL from "@/config/api";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import AlertDialog from "@/components/base/AlertDialog";
+
 import {
   loadMyStatuses,
   handleCreateStatus,
@@ -17,7 +18,7 @@ export default function StatusManager({
 }) {
   const [currentMode, setCurrentMode] = useState(mode);
   const [statusType, setStatusType] = useState("text");
-
+const [statusImageUrls, setStatusImageUrls] = useState({});
   const [textContent, setTextContent] = useState("");
   const [caption, setCaption] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -76,6 +77,27 @@ const onLoadMyStatuses = async () => {
   const result = await loadMyStatuses(currentUser._id);
   setMyStatuses(result.data);
 };
+
+useEffect(() => {
+  const loadImages = async () => {
+    const token = localStorage.getItem("accessToken");
+    const urls = {};
+    for (const status of myStatuses) {
+      if (status.type === "image") {
+        const filename = status.content.split('/').pop();
+        const response = await fetch(`${API_BASE_URL}/api/file/status/${filename}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const blob = await response.blob();
+          urls[status._id] = URL.createObjectURL(blob);
+        }
+      }
+    }
+    setStatusImageUrls(urls);
+  };
+  if (myStatuses.length > 0) loadImages();
+}, [myStatuses]);
 
 useEffect(() => {
   if (mode === "myStatus" && currentUser?._id) {
@@ -224,7 +246,7 @@ const onViewStatusViewers = (statusId) =>
                           </div>
                         ) : status.type === "image" ? (
                           <img
-                            src={`${API_BASE_URL}${status.content}?t=${Date.now()}`}
+src={statusImageUrls[status._id] || ""}
                             alt="status"
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             onError={(e) => {

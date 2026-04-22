@@ -84,7 +84,8 @@ export const handleDeleteStatus = (
     onConfirm: async () => {
       try {
         await axiosInstance.delete(`/api/status/${statusId}`);
-        await loadMyStatuses(currentUserId, setMyStatuses);
+const result = await loadMyStatuses(currentUserId);
+if (result.success) setMyStatuses(result.data);
         setAlertDialog({ isOpen: true, title: "Deleted!", message: "Status deleted successfully", type: "success" });
       } catch (err) {
         console.error("Delete status error:", err);

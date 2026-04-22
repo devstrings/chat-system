@@ -188,32 +188,24 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     console.log(" Setting up sidebar socket listeners");
 
     //  Individual message received
-    const handleSidebarMessage = async (msg) => {
-      const senderId = msg.sender?._id || msg.sender;
-      const receiverId = msg.receiver?._id || msg.receiver;
+   const handleSidebarMessage = async (msg) => {
+  const senderId = msg.sender?._id || msg.sender;
+  const receiverId = msg.receiver?._id || msg.receiver;
 
-      //  FIND OTHER USER
-      let otherUserId;
+  console.log(" Message received:", { senderId, receiverId, currentUserId, msgId: msg._id });
 
-      if (
-        senderId === currentUserId ||
-        senderId?.toString() === currentUserId
-      ) {
-        otherUserId = receiverId;
-      } else {
-        otherUserId = senderId;
-      }
+  let otherUserId;
 
-      //  CONVERT TO STRING
-      if (typeof otherUserId === "object" && otherUserId?._id) {
-        otherUserId = otherUserId._id;
-      }
-      otherUserId = otherUserId?.toString();
+  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
+    otherUserId = receiverId;
+  } else {
+    otherUserId = senderId;
+  }
 
-      if (!otherUserId) {
-        console.error(" Cannot determine otherUserId!");
-        return;
-      }
+  if (!otherUserId) {
+    console.error(" Cannot determine otherUserId!", { senderId, receiverId, currentUserId });
+    return;
+  }
 
       console.log(` Updating Redux for userId: "${otherUserId}"`);
 

@@ -186,13 +186,14 @@ export const uploadVoice = multer({
 //  multer instance for status uploads
 export const uploadStatus = multer({
   storage: statusStorage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for videos
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+   const allowedMimes = [
+  "image/jpeg", "image/jpg", "image/png",
+  "image/gif", "image/webp", "image/avif",
+  "video/mp4", "video/quicktime", "video/x-msvideo"
+];
+    if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error("Only images and videos allowed for status"), false);

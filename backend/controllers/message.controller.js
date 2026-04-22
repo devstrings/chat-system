@@ -35,9 +35,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   let { conversationId, groupId, text, attachments, encryptionData, replyTo } = req.body;
   const currentUserId = req.user.id;
   
-  
-  // Fix: Manually validate conversation for private messages
-  if (!groupId && conversationId && !req.validatedConversation) {
+    if (!groupId && conversationId && !req.validatedConversation) {
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
@@ -90,11 +88,12 @@ export const sendMessage = asyncHandler(async (req, res) => {
       }));
     }
 
-    if (io) {
-      group.members.forEach((member) => {
-        io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
-      });
-    }
+  if (io) {
+  group.members.forEach((member) => {
+    messageObj.receiver = member._id;
+    io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
+  });
+}
 
     return res.json(messageObj);
   }
@@ -132,12 +131,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
       isVoiceMessage: att.isVoiceMessage || false,
     }));
   }
-  if (io) {
-    const otherUserId = conversation.participants.find(
-      (p) => p.toString() !== currentUserId,
-    );
-    io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
-  }
+if (io) {
+  const otherUserId = conversation.participants.find(
+    (p) => p.toString() !== currentUserId,
+  );
+  // Add receiver field to messageObj
+  messageObj.receiver = otherUserId;
+  io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
+}
   res.json(messageObj);
 });
 
