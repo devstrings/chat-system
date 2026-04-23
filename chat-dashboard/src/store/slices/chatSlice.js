@@ -466,10 +466,11 @@ const chatSlice = createSlice({
       state.unreadCounts[userId] = 0;
     },
 
-    incrementUnreadCount: (state, action) => {
-      const userId = action.payload;
-      state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
-    },
+  incrementUnreadCount: (state, action) => {
+  const userId = action.payload;
+  if (state.selectedUserId === userId) return;
+  state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
+},
 
     // AFTER
     updateTyping: (state, action) => {

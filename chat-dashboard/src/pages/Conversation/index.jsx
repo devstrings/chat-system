@@ -224,26 +224,28 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
       );
 
       // Notification
-      if (msg.sender?._id !== currentUserId) {
-        playNotificationSound();
-        const senderIdStr =
-          msg.sender?._id?.toString() || msg.sender?.toString();
-        const selectedIdStr = selectedUserRef.current?._id?.toString();
-        if (selectedIdStr !== senderIdStr) {
-          console.log("Calling showNotification!");
-          showNotification(
-            msg.sender?.username || "New Message",
-            msg.text || "📎 Attachment",
-            {
-              avatar: msg.sender?.profileImage || null,
-              senderId: msg.sender?._id,
-              senderObj: msg.sender,
-              isGroup: false,
-            },
-          );
-        } else {
-          console.log("Chat open — skip notification");
-        }
+     if (msg.sender?._id !== currentUserId) {
+  playNotificationSound();
+  const senderIdStr =
+    msg.sender?._id?.toString() || msg.sender?.toString();
+  const selectedIdStr = selectedUserRef.current?._id?.toString();
+if (selectedIdStr !== senderIdStr) {
+  dispatch(incrementUnreadCount(otherUserId));
+  console.log("Calling showNotification!");
+  showNotification(
+    msg.sender?.username || "New Message",
+    msg.text || "📎 Attachment",
+    {
+      avatar: msg.sender?.profileImage || null,
+      senderId: msg.sender?._id,
+      senderObj: msg.sender,
+      isGroup: false,
+    },
+  );
+} else {
+  dispatch(clearUnreadCount(otherUserId));
+  console.log("Chat open — skip notification");
+}
       } else {
         console.log("Own message — skip");
       }
@@ -635,16 +637,20 @@ const handleConversationDeleted = (userId) => {
               );
 
               // Update unread count
-              const unreadCount = messages.filter(
-                (msg) =>
-                  msg.sender._id !== currentUserId && msg.status !== "read",
-              ).length;
+         const unreadCount = messages.filter(
+  (msg) =>
+    msg.sender._id !== currentUserId && msg.status !== "read",
+).length;
 
-              if (unreadCount > 0) {
-                for (let i = 0; i < unreadCount; i++) {
-                  dispatch(incrementUnreadCount(user._id));
-                }
-              }
+const isCurrentlyOpen = selectedUserRef.current?._id === user._id;
+
+if (unreadCount > 0 && !isCurrentlyOpen) {
+  for (let i = 0; i < unreadCount; i++) {
+    dispatch(incrementUnreadCount(user._id));
+  }
+} else if (isCurrentlyOpen) {
+  dispatch(clearUnreadCount(user._id));
+}
             } else {
               // Empty conversation exists
               dispatch(
@@ -755,7 +761,8 @@ useEffect(() => {
       ).unwrap();
 
       setConversationId(result._id);
-      dispatch(clearUnreadCount(selectedUser._id));
+dispatch(clearUnreadCount(selectedUser._id));
+dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
 
       if (urlConversationId === selectedUser._id) {
         navigate(`/conversation/${result._id}`, { replace: true });
