@@ -14,6 +14,10 @@ class ErrorBoundary extends React.Component {
     console.error(' Error caught:', error, errorInfo);
   }
 
+  handleTryAgain = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -26,10 +30,10 @@ class ErrorBoundary extends React.Component {
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={this.handleTryAgain}
               className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
-              Reload Page
+              Try Again
             </button>
           </div>
         </div>

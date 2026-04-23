@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ChatWindow from "@/pages/Conversation/components/ChatWindow";
 import { useWebRTC } from "@/hooks/useWebRTC";
@@ -11,12 +11,13 @@ import GroupChatWindow from "@/components/Group/GroupChatWindow";
 import StatusManager from "@/components/Status/StatusManager";
 import StatusViewer from "@/components/Status/StatusViewer";
 import NotificationToast from "@/pages/Conversation/components/NotificationToast";
+import useConversationNotifications from "@/pages/Conversation/hooks/useConversationNotifications";
+import useConversationSocketListeners from "@/pages/Conversation/hooks/useConversationSocketListeners";
 import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import { useDispatch, useSelector } from "react-redux";
 import AlertDialog from "@/components/base/AlertDialog";
 import {
   fetchFriendsList,
-  fetchPendingRequests,
 } from "@/store/slices/userSlice";
 import { fetchGroups } from "@/store/slices/groupSlice";
 import {
@@ -24,20 +25,12 @@ import {
   clearUnreadCount,
   addMessage,
   incrementUnreadCount,
-  updateMessageStatus,
-  updateMessage,
-  updateGroupMessageInSidebar,
   decryptAndStoreSharedKey
 } from "@/store/slices/chatSlice";
-import {
-  addGroupMessage,
-  updateGroupMessage,
-} from "@/store/slices/groupSlice";
 import apiActions from "@/store/apiActions";
 import {
   clearChatMessages,
   loadGroupLastMessages,
-  playNotificationSound,
   requestNotificationPermission,
   registerServiceWorker,
 } from "@/actions/dashboard.actions";
@@ -49,22 +42,18 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   //   const [conversationId, setConversationId] = useState(null);
   const { conversationId: urlConversationId } = useParams();
   const [conversationId, setConversationId] = useState(null);
-  const [conversationKey, setConversationKey] = useState(0);
   const socket = useSelector((state) => state.socket.socket);
 
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
-  const [toastNotifications, setToastNotifications] = useState([]);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [replyTo, setReplyTo] = useState(null);
   // Redux state
-  const { currentUser, currentUserId, isAuthenticated } = useSelector(
-    (state) => state.auth,
-  );
+  const { currentUserId } = useSelector((state) => state.auth);
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
-  const { unreadCounts, lastMessages, sharedKeys } = useSelector((state) => state.chat);
+  const { lastMessages, sharedKeys } = useSelector((state) => state.chat);
   const [loading, setLoading] = useState(true);
 
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -115,54 +104,20 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     username: "",
   });
 
-  // Show notification
-  const showNotification = useCallback(
-    (title, body, extra = {}) => {
-      const id = Date.now() + Math.random();
-      setToastNotifications((prev) => {
-        const newList = [...prev, { id, name: title, message: body, ...extra }];
-        console.log("Toast list updated:", newList.length);
-        return newList;
-      });
-
-      if (
-        Notification.permission === "granted" &&
-        document.hidden &&
-        !extra.isFriendRequest
-      ) {
-        const browserNotif = new Notification(title, {
-          body,
-          icon: "/favicon.ico",
-          tag: extra.senderId || extra.groupId || "message",
-          data: extra,
-        });
-
-        browserNotif.onclick = () => {
-          window.focus();
-          browserNotif.close();
-          if (extra.isGroup) {
-            const group = groups.find((g) => g._id === extra.groupId);
-            if (group) {
-              setSelectedGroup(group);
-              setSelectedUser(null);
-              setIsGroupChat(true);
-              setConversationId(null);
-            }
-          } else {
-            const senderId = extra.senderId?._id || extra.senderId;
-            const user =
-              users.find((u) => u._id === senderId) || extra.senderObj;
-            if (user) {
-              setSelectedUser(user);
-              setSelectedGroup(null);
-              setIsGroupChat(false);
-            }
-          }
-        };
-      }
-    },
-    [setToastNotifications],
-  );
+  const {
+    toastNotifications,
+    setToastNotifications,
+    showNotification,
+    handleToastSelect,
+  } = useConversationNotifications({
+    users,
+    groups,
+    setSelectedUser,
+    setSelectedGroup,
+    setIsGroupChat,
+    setConversationId,
+    navigate,
+  });
 
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
@@ -171,251 +126,17 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     type: "info",
   });
 
-  //SOCKET LISTENERS FOR SIDEBAR UPDATES
-  useEffect(() => {
-    if (!socket || !currentUserId) return;
-
-    console.log(" Setting up sidebar socket listeners");
-
-    //  Individual message received
-   const handleSidebarMessage = async (msg) => {
-  const senderId = msg.sender?._id || msg.sender;
-  const receiverId = msg.receiver?._id || msg.receiver;
-
-  console.log(" Message received:", { senderId, receiverId, currentUserId, msgId: msg._id });
-
-  let otherUserId;
-
-  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
-    otherUserId = receiverId;
-  } else {
-    otherUserId = senderId;
-  }
-
-  if (!otherUserId) {
-    return;
-  }
-
-      console.log(` Updating Redux for userId: "${otherUserId}"`);
-
-      // Decrypt message (ensure shared key is available on receiver side)
-      let currentSharedKey = sharedKeys[msg.conversationId];
-      if (msg.encryptionData?.isSharedKey && !currentSharedKey && otherUserId) {
-        try {
-          const conv = await dispatch(
-            fetchConversation({ otherUserId, skipCreate: true }),
-          ).unwrap();
-          if (conv?.sharedEncryptedKeys) {
-            const keyResult = await dispatch(
-              decryptAndStoreSharedKey({
-                conversationId: conv._id,
-                sharedEncryptedKeys: conv.sharedEncryptedKeys,
-                currentUserId,
-              }),
-            ).unwrap();
-            currentSharedKey = keyResult?.sharedKey || currentSharedKey;
-          }
-        } catch (err) {
-          console.warn("Failed to preload shared key in Conversation listener", err);
-        }
-      }
-      msg.text = await decryptMessageHelper(msg, currentUserId, currentSharedKey);
-
-      //  UPDATE REDUX
-      dispatch(
-        addMessage({
-          conversationId: msg.conversationId,
-          message: msg,
-          userId: otherUserId,
-          isGroup: false,
-        }),
-      );
-
-      // Notification
-     if (msg.sender?._id !== currentUserId) {
-  playNotificationSound();
-  const senderIdStr =
-    msg.sender?._id?.toString() || msg.sender?.toString();
-  const selectedIdStr = selectedUserRef.current?._id?.toString();
-if (selectedIdStr !== senderIdStr) {
-  dispatch(incrementUnreadCount(otherUserId));
-  showNotification(
-    msg.sender?.username || "New Message",
-    msg.text || "📎 Attachment",
-    {
-      avatar: msg.sender?.profileImage || null,
-      senderId: msg.sender?._id,
-      senderObj: msg.sender,
-      isGroup: false,
-    },
-  );
-} else {
-  dispatch(clearUnreadCount(otherUserId));
-}
-      } else {
-      }
-    };
-
-    //  Group message received
-    const handleSidebarGroupMessage = async (msg) => {
-      console.log(" [SIDEBAR] Group message:", msg._id);
-
-      // Group messages haven't migrated to shared keys yet, but decryptMessageHelper handles legacy too
-msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
-      // Update group messages in groupSlice
-      dispatch(
-        addGroupMessage({
-          groupId: msg.groupId,
-          message: msg,
-        }),
-      );
-
-      // Also update lastMessages for sidebar
-      dispatch(
-        addMessage({
-          conversationId: msg.groupId,
-          message: msg,
-          userId: msg.groupId,
-          isGroup: true,
-        }),
-      );
-      if (msg.sender?._id !== currentUserId) {
-        const isCurrentGroupOpen = selectedUserRef.current?._id === msg.groupId;
-        if (!isCurrentGroupOpen) {
-          playNotificationSound();
-          showNotification(
-            msg.sender?.username || "Unknown",
-            msg.text || "📎 Attachment",
-            {
-              avatar: msg.sender?.profileImage || null,
-              groupName: msg.groupName || "Group",
-              groupId: msg.groupId,
-              isGroup: true,
-            },
-          );
-        }
-      }
-    };
-
-    //  Status update
-    const handleSidebarStatus = (data) => {
-
-      dispatch(
-        updateMessageStatus({
-          conversationId: data.conversationId,
-          messageId: data.messageId,
-          status: data.status,
-        }),
-      );
-    };
-
-    //  Message edited (individual)
-    const handleSidebarEdit = (data) => {
-
-      dispatch(
-        updateMessage({
-          conversationId: data.conversationId,
-          messageId: data.messageId,
-          text: data.text,
-          editedAt: data.editedAt,
-        }),
-      );
-    };
-
-    //   Group message edited
-    const handleSidebarGroupEdit = (data) => {
-
-      // Update in groupSlice (chat window)
-      dispatch(
-        updateGroupMessage({
-          groupId: data.groupId,
-          messageId: data.messageId,
-          text: data.text,
-          editedAt: data.editedAt,
-        }),
-      );
-
-      //  Update in chatSlice (sidebar lastMessage)
-      dispatch(
-        updateGroupMessageInSidebar({
-          groupId: data.groupId,
-          messageId: data.messageId,
-          text: data.text,
-          editedAt: data.editedAt,
-        }),
-      );
-    };
-    const handleFriendRequest = (data) => {
-      dispatch(fetchPendingRequests());
-      playNotificationSound();
-      showNotification(`${data.senderName} `, "Sent you a friend request!", {
-        isFriendRequest: true,
-      });
-    };
-    const handleFriendRequestAccepted = async () => {
-      await Promise.all([
-        dispatch(fetchFriendsList()),
-        dispatch(fetchPendingRequests()),
-      ]);
-      showNotification("Friend request accepted", "Your friends list is updated.");
-    };
-    socket.on("friendRequestReceived", handleFriendRequest);
-    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
-    socket.on("receiveMessage", handleSidebarMessage);
-    socket.on("receiveGroupMessage", handleSidebarGroupMessage);
-    socket.on("messageStatusUpdate", handleSidebarStatus);
-    socket.on("messageEdited", handleSidebarEdit);
-    socket.on("groupMessageEdited", handleSidebarGroupEdit);
-
-    //  Call record - sidebar update
-    const handleCallRecord = async ({ callMessage, otherUserId }) => {
-      console.log(" Call record received:", callMessage);
-      console.log(" otherUserId:", otherUserId);
-      console.log(" currentUserId:", currentUserId);
-
-      let convId = lastMessagesRef.current[otherUserId]?.conversationId;
-
-      if (!convId) {
-        try {
-          apiActions.getConversation(otherUserId, true).then((data) => {
-            convId = data._id;
-          });
-        } catch (err) {
-          console.log(" API fetch failed:", err);
-          return;
-        }
-      }
-
-      if (!convId) return;
-
-      dispatch(
-        addMessage({
-          conversationId: convId,
-          message: {
-            ...callMessage,
-            conversationId: convId,
-            _updated: Date.now(),
-          },
-          userId: otherUserId,
-          isGroup: false,
-        }),
-      );
-    };
-
-    socket.on("call:record", handleCallRecord);
-
-    return () => {
-      console.log(" Cleaning up sidebar socket listeners");
-      socket.off("receiveMessage", handleSidebarMessage);
-      socket.off("receiveGroupMessage", handleSidebarGroupMessage);
-      socket.off("messageStatusUpdate", handleSidebarStatus);
-      socket.off("messageEdited", handleSidebarEdit);
-      socket.off("groupMessageEdited", handleSidebarGroupEdit);
-      socket.off("call:record", handleCallRecord);
-      socket.off("friendRequestReceived", handleFriendRequest);
-      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
-    };
-  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); 
+  useConversationSocketListeners({
+    socket,
+    currentUserId,
+    dispatch,
+    sharedKeys,
+    showNotification,
+    isGroupChat,
+    selectedGroupId: selectedGroup?._id,
+    selectedUserRef,
+    lastMessagesRef,
+  });
 
   useEffect(() => {
     selectedUserRef.current = selectedUser;
@@ -446,29 +167,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
   const { imageSrc: selectedUserImage } = useAuthImage(
     selectedUser?.profileImage,
   );
-
-const handleConversationDeleted = (userId) => {
-    console.log(" [DASHBOARD] Handling conversation deletion for user:", userId);
-
-    const conversationIdToRemove = lastMessages[userId]?.conversationId;
-    console.log(" Conversation ID to remove:", conversationIdToRemove);
-
-    dispatch({
-      type: "chat/deleteConversation/fulfilled",
-      payload: {
-        conversationId: conversationIdToRemove,
-        otherUserId: userId,
-      },
-    });
-
-    if (selectedUser?._id === userId) {
-      setSelectedUser(null);
-      setConversationId(null);
-      setIsGroupChat(false);
-    }
-
-    console.log(" Conversation fully deleted from all states");
-  };
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -712,7 +410,7 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
   };
 
   getConversation();
-}, [selectedUser?._id, conversationKey, socket, dispatch, navigate, urlConversationId]);
+}, [selectedUser?._id, socket, dispatch, navigate, urlConversationId]);
   useEffect(() => {
     if (!socket) return;
 
@@ -739,8 +437,6 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
 
   const handleClearChat = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-
       if (!conversationId) {
         console.error(" No conversationId!");
         return;
@@ -1163,7 +859,6 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
       currentUserId={currentUserId}
       searchQuery={searchInChat}
       selectedUser={selectedUser}
-      onUpdateLastMessageStatus={(updateData) => {}}
       isSelectionMode={isSelectionMode}
       setIsSelectionMode={setIsSelectionMode}
       selectedMessages={selectedMessages}
@@ -1390,30 +1085,7 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
         onClose={(id) => {
           setToastNotifications((prev) => prev.filter((n) => n.id !== id));
         }}
-        onSelect={(notif) => {
-          console.log("=== NOTIFICATION CLICKED ===", notif);
-          if (notif.isGroup) {
-            const group = groups.find((g) => g._id === notif.groupId);
-            if (group) {
-              setSelectedGroup(group);
-              setSelectedUser(null);
-              setIsGroupChat(true);
-              setConversationId(null);
-              navigate(`/conversation/${group._id}`);
-            }
-          } else {
-            const senderId = notif.senderId?._id || notif.senderId;
-            const user =
-              users.find((u) => u._id === senderId) || notif.senderObj;
-            console.log("User found:", user, "senderId:", senderId);
-            if (user) {
-              setSelectedUser(user);
-              setSelectedGroup(null);
-              setIsGroupChat(false);
-              navigate(`/conversation/${user._id}`);
-            }
-          }
-        }}
+        onSelect={handleToastSelect}
       />
     </>
   );

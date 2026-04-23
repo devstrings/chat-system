@@ -468,7 +468,7 @@ const chatSlice = createSlice({
           state.lastMessages[`group_${groupId}`].text = text;
           state.lastMessages[`group_${groupId}`].isEdited = true;
           state.lastMessages[`group_${groupId}`].editedAt = editedAt;
-          state.lastMessages[`group_${groupId}`]._updated = D;
+          state.lastMessages[`group_${groupId}`]._updated = Date.now();
         }
       }
     },

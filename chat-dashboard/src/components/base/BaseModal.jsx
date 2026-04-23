@@ -1,6 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
 
-import SpinWheelBackground from '@/components/category/skill-games/spinWheel/SpinWheelBackground';
 import { cn } from '@/lib/utils';
 
 const BaseModal = ({

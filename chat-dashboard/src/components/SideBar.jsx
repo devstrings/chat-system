@@ -13,6 +13,7 @@ import {
   formatLastMessageText,
 } from "@/actions/sidebar.actions";
 import {
+  fetchFriendsList,
   fetchPendingRequests,
   fetchBlockedUsers,
   acceptFriendRequest,
@@ -20,7 +21,7 @@ import {
   unblockUser,
 } from "@/store/slices/userSlice";
 import { setUser } from "@/store/slices/authSlice";
-import { updateGroup } from "@/store/slices/groupSlice";
+import { fetchGroups, updateGroup } from "@/store/slices/groupSlice";
 import {
   archiveConversation,
   pinConversation,
@@ -352,7 +353,8 @@ export default function Sidebar({
       });
       setTimeout(() => {
         setShowRequestsModal(false);
-        window.location.reload();
+        dispatch(fetchFriendsList());
+        dispatch(fetchPendingRequests());
       }, 1000);
     } catch (err) {
       setAlertDialog({
@@ -855,7 +857,7 @@ export default function Sidebar({
                         lastMessageSender={lastMsg?.sender || null}
                         lastMessageStatus={lastMsg?.status || "sent"}
                         onGroupUpdate={(updatedGroup) => dispatch(updateGroup(updatedGroup))}
-                        onGroupDeleted={() => window.location.reload()}
+                        onGroupDeleted={() => dispatch(fetchGroups())}
                       />
                     );
                   }
@@ -878,7 +880,7 @@ export default function Sidebar({
                       lastMessageSender={lastMsg?.sender || null}
                       lastMessageStatus={lastMsg?.status || "sent"}
                       currentUserId={currentUserId}
-                      onRelationshipChange={() => window.location.reload()}
+                      onRelationshipChange={() => dispatch(fetchFriendsList())}
                       isPinned={isPinned}
                       conversationId={conversationId}
                       onPinConversation={handlePinConversation}

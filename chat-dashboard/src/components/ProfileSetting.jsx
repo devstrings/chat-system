@@ -303,11 +303,7 @@ const handleRemoveImage = async () => {
     setHasPassword(true);
 
     await checkLocalAuthHandler();
-
-    setTimeout(() => {
-      setPasswordSuccess("Password set successfully! Refreshing...");
-      window.location.reload();
-    }, 1000);
+    setPasswordSuccess("Password set successfully!");
   } catch (err) {
     console.error("Set Password Error:", err.response?.data);
     setPasswordError(err.response?.data?.message || "Failed to set password");
@@ -394,7 +390,7 @@ const handleAcceptRequest = async (requestId) => {
       message: "Friend request accepted!",
       type: "success",
     });
-    setTimeout(() => window.location.reload(), 1500);
+    await Promise.all([loadPendingRequestsHandler(), loadBlockedUsersHandler()]);
   } catch (err) {
     console.error("Accept failed:", err);
     setAlertDialog({

@@ -20,7 +20,6 @@ export const useWebRTC = () => {
   const [receiverOnline, setReceiverOnline] = useState(false);
   const [iceServersConfig, setIceServersConfig] = useState(defaultIceServers);
 
-  console.log("Ice servers config:", iceServersConfig);
   const peerConnection = useRef(null);
   const remoteUserIdRef = useRef(null);
   const iceCandidateQueue = useRef([]);

@@ -46,9 +46,6 @@ export const clearGroupChat = async (group, setConfirmDialog, setAlertDialog) =>
           message: "All group messages have been deleted successfully.",
           type: "success",
         });
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
       } catch (err) {
         setAlertDialog({
           isOpen: true,
@@ -83,9 +80,6 @@ export const leaveGroup = async (group, setConfirmDialog, setAlertDialog) => {
           message: `You have left ${group.name}`,
           type: "info",
         });
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
       } catch (err) {
         setAlertDialog({
           isOpen: true,

@@ -75,18 +75,18 @@ const socketMiddleware = (store) => {
         store.dispatch(setConnected(true));
       });
 
-    socket.on("disconnect", (reason) => {
-  console.warn(" Socket disconnected:", reason);
-  store.dispatch(setConnected(false));
+      socket.on("disconnect", (reason) => {
+        console.warn(" Socket disconnected:", reason);
+        store.dispatch(setConnected(false));
 
-  if (reason === "io server disconnect") {
-    const freshToken = localStorage.getItem("accessToken");
-    if (freshToken && socket) {
-      socket.auth = { token: freshToken };
-      socket.connect();
-    }
-  }
-});
+        if (reason === "io server disconnect") {
+          const freshToken = localStorage.getItem("accessToken");
+          if (freshToken && socket) {
+            socket.auth = { token: freshToken };
+            socket.connect();
+          }
+        }
+      });
 
       socket.on("connect_error", (err) => {
         console.error(" Socket connection error:", err.message);
@@ -213,8 +213,8 @@ const socketMiddleware = (store) => {
                 _updated: newLast
                   ? new Date(newLast.createdAt).getTime()
                   : new Date(
-                      state.chat.lastMessages[otherUserId]?.time,
-                    ).getTime(),
+                    state.chat.lastMessages[otherUserId]?.time,
+                  ).getTime(),
               },
               userId: otherUserId,
               isGroup: false,

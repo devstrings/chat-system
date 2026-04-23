@@ -223,6 +223,10 @@ export default function MessageInput({
       }
     } catch (err) {
       console.error("Encryption failed before sending:", err);
+      alert("Message encryption failed. Please try again.");
+      setSending(false);
+      focusComposer();
+      return;
     }
 
     try {
