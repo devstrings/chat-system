@@ -116,6 +116,8 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
   });
 
   const memoizedItems = useMemo(() => {
+      console.log("Groups list:", groups.map(g => ({id: g._id, name: g.name})));
+  console.log("Users list:", users.map(u => ({id: u._id, name: u.username})));
     // If searching, show ALL friends matching search
     if (searchQuery.trim()) {
       // Search in ALL friends, not just those with conversations
@@ -219,21 +221,15 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
       }
 
       // Try multiple sources for timestamp
-      const getTimestamp = (item) => {
-        const lastMsg = lastMessages[item._id];
-
-        // Priority 1: _updated timestamp (most reliable)
-        if (lastMsg?._updated) return lastMsg._updated;
-
-        // Priority 2: message createdAt time
-        if (lastMsg?.time) return new Date(lastMsg.time).getTime();
-
-        // Priority 3: Group/Conversation updatedAt
-        if (item.updatedAt) return new Date(item.updatedAt).getTime();
-
-        // Fallback: 0 (push to bottom)
-        return 0;
-      };
+    const getTimestamp = (item) => {
+const lastMsg = item.isGroup 
+  ? lastMessages[`group_${item._id}`] 
+  : lastMessages[item._id];  if (lastMsg?._updated) return lastMsg._updated;
+  if (lastMsg?.time) return new Date(lastMsg.time).getTime();
+  if (item.isGroup && item.updatedAt) return new Date(item.updatedAt).getTime();
+  if (item.updatedAt) return new Date(item.updatedAt).getTime();
+  return 0;
+};
 
       const timestampA = getTimestamp(a);
       const timestampB = getTimestamp(b);
@@ -885,7 +881,8 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
               <div className="py-2">
                 {memoizedItems.map((item) => {
                   if (item.isGroup) {
-                    const lastMsg = lastMessages[item._id];
+const lastMsg = lastMessages[`group_${item._id}`];
+  console.log("Sidebar group render:", item._id, "key:", `group_${item._id}`, "found:", lastMsg);
                     const formattedText = formatLastMessageText(lastMsg);
                     return (
                       <GroupItem
@@ -919,6 +916,8 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
                   } else {
                     const lastMsg = lastMessages[item._id];
                     const formattedText = formatLastMessageText(lastMsg);
+                    console.log("Group lastMsg:", item._id, lastMsg); // debug ke liye
+
                     const conversationId = lastMsg?.conversationId;
                     const isPinned =
                       conversationId && pinnedConversations.has(conversationId);

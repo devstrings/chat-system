@@ -102,8 +102,8 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   const hasInitialized = useRef(false);
   const lastMessagesRef = useRef({});
   const hasRestored = useRef(false);
-  const hasLoadedMessages = useRef(false);
-
+const hasLoadedUserMessages = useRef(false);
+const hasLoadedGroupMessages = useRef(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [savedSelectedGroupId] = useState(
     () => localStorage.getItem("selectedGroupId") || null,
@@ -254,8 +254,7 @@ if (selectedIdStr !== senderIdStr) {
       console.log(" [SIDEBAR] Group message:", msg._id);
 
       // Group messages haven't migrated to shared keys yet, but decryptMessageHelper handles legacy too
-      msg.text = await decryptMessageHelper(msg, currentUserId, null);
-
+msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
       // Update group messages in groupSlice
       dispatch(
         addGroupMessage({
@@ -541,202 +540,128 @@ const handleConversationDeleted = (userId) => {
     }
   }, [urlConversationId, users, groups, loading, lastMessages]);
 
-  useEffect(() => {
-    if (!currentUserId || (users.length === 0 && groups.length === 0)) return;
-    if (hasLoadedMessages.current) return;
-    hasLoadedMessages.current = true;
+// USERS MESSAGES LOAD
+useEffect(() => {
+  if (!currentUserId || users.length === 0) return;
+  if (hasLoadedUserMessages.current) return;
+  hasLoadedUserMessages.current = true;
 
-    const loadLastMessages = async () => {
+  const loadUserMessages = async () => {
+    for (const user of users) {
       try {
-        // Load messages for all friends
-        for (const user of users) {
+        const convRes = await apiActions.getConversation(user._id, true);
+        if (!convRes) continue;
+        if (convRes?.deletedBy?.some((d) => d.userId?.toString() === currentUserId?.toString())) continue;
+
+        let activeSharedKey = sharedKeys[convRes._id];
+        if (convRes.sharedEncryptedKeys && !activeSharedKey) {
           try {
-            const convRes = await apiActions.getConversation(user._id, true);
-
-            if (!convRes) {
-              console.log(` Conversation with ${user._id} not found, skipping`);
-              continue;
-            }
-
-            // Skip if conversation was deleted
-         if (convRes?.deletedBy?.some((d) => d.userId?.toString() === currentUserId?.toString())) {
-  console.log(` Conversation with ${user._id} deleted, skipping`);
-  continue;
-}
-
-            // Decrypt and store shared key if present
-            let activeSharedKey = sharedKeys[convRes._id];
-            if (convRes.sharedEncryptedKeys && !activeSharedKey) {
-               try {
-                 const result = await dispatch(decryptAndStoreSharedKey({
-                    conversationId: convRes._id,
-                    sharedEncryptedKeys: convRes.sharedEncryptedKeys,
-                    currentUserId
-                 })).unwrap();
-                 activeSharedKey = result.sharedKey;
-               } catch (err) {
-                 console.error("Failed to decrypt key for conversation:", convRes._id, err);
-               }
-            }
-
-            const msgRes =
-              await apiActions.getPaginatedConversationMessagesById(
-                convRes._id,
-                1,
-                20,
-              );
-
-            const messagesRaw = msgRes;
-            const messages = await Promise.all(messagesRaw.map(async msg => {
-               // Use the local activeSharedKey which contains the newly decrypted key
-               msg.text = await decryptMessageHelper(msg, currentUserId, activeSharedKey);
-               return msg;
-            }));
-            const visibleMessages = messages.filter(
-              (msg) => !msg.deletedFor?.includes(currentUserId),
-            );
-
-            if (visibleMessages.length > 0) {
-              const lastMsg = visibleMessages[visibleMessages.length - 1];
-              console.log(" lastMsg:", {
-                id: lastMsg._id,
-                text: lastMsg.text,
-                isCallRecord: lastMsg.isCallRecord,
-                callStatus: lastMsg.callStatus,
-              });
-
-              const messageTimestamp = new Date(lastMsg.createdAt).getTime();
-
-              let processedMsg = { ...lastMsg };
-              if (lastMsg.isCallRecord) {
-                const icon = lastMsg.callType === "video" ? "📹" : "📞";
-                processedMsg.text =
-                  lastMsg.callStatus === "missed"
-                    ? `${icon} Missed Call`
-                    : lastMsg.callStatus === "rejected"
-                      ? `${icon} Call Declined`
-                      : lastMsg.callStatus === "cancelled"
-                        ? `${icon} Cancelled`
-                        : lastMsg.callDuration > 0
-                          ? `${icon} ${lastMsg.callDuration}s`
-                          : `${icon} Call`;
-              }
-
-              dispatch(
-                addMessage({
-                  conversationId: convRes._id,
-                  message: {
-                    ...processedMsg,
-                    _loadedTimestamp: messageTimestamp,
-                  },
-                  userId: user._id,
-                  isGroup: false,
-                }),
-              );
-
-              // Update unread count
-         const unreadCount = messages.filter(
-  (msg) =>
-    msg.sender._id !== currentUserId && msg.status !== "read",
-).length;
-
-const isCurrentlyOpen = selectedUserRef.current?._id === user._id;
-
-if (unreadCount > 0 && !isCurrentlyOpen) {
-  for (let i = 0; i < unreadCount; i++) {
-    dispatch(incrementUnreadCount(user._id));
-  }
-} else if (isCurrentlyOpen) {
-  dispatch(clearUnreadCount(user._id));
-}
-         } else {
-  dispatch(addMessage({
-    conversationId: convRes._id,
-    message: {
-      _id: `conv-placeholder-${convRes._id}`,
-      text: "",
-      createdAt: new Date().toISOString(),
-      sender: currentUserId,
-      status: "sent",
-      attachments: [],
-      isPlaceholder: true,  
-    },
-    userId: user._id,
-    isGroup: false,
-  }));
-}
-          } catch (userErr) {
-            if (userErr.response?.status === 404) {
-              continue;
-            }
-            console.error(
-              `Error loading messages for user ${user._id}:`,
-              userErr,
-            );
+            const result = await dispatch(decryptAndStoreSharedKey({
+              conversationId: convRes._id,
+              sharedEncryptedKeys: convRes.sharedEncryptedKeys,
+              currentUserId
+            })).unwrap();
+            activeSharedKey = result.sharedKey;
+          } catch (err) {
+            console.error("Failed to decrypt key:", err);
           }
         }
 
-        //  Load messages for all groups
-        for (const group of groups) {
-          try {
-            const result = await loadGroupLastMessages(
-              group._id,
-              currentUserId,
-            );
-            const messages = result.messages;
+        const msgRes = await apiActions.getPaginatedConversationMessagesById(convRes._id, 1, 20);
+        const messages = await Promise.all(msgRes.map(async msg => {
+          msg.text = await decryptMessageHelper(msg, currentUserId, activeSharedKey);
+          return msg;
+        }));
+        const visibleMessages = messages.filter(msg => !msg.deletedFor?.includes(currentUserId));
 
-            if (messages.length > 0) {
-              const lastMsg = messages[messages.length - 1];
-              console.log(" lastMsg:", {
-                id: lastMsg._id,
-                text: lastMsg.text,
-                isCallRecord: lastMsg.isCallRecord,
-                callStatus: lastMsg.callStatus,
-              });
-
-              const messageTimestamp = new Date(lastMsg.createdAt).getTime();
-
-              let processedMsg = { ...lastMsg };
-              if (lastMsg.isCallRecord) {
-                const icon = lastMsg.callType === "video" ? "📹" : "📞";
-                processedMsg.text =
-                  lastMsg.callStatus === "missed"
-                    ? `${icon} Missed Call`
-                    : lastMsg.callStatus === "rejected"
-                      ? `${icon} Call Declined`
-                      : lastMsg.callStatus === "cancelled"
-                        ? `${icon} Cancelled`
-                        : lastMsg.callDuration > 0
-                          ? `${icon} ${lastMsg.callDuration}s`
-                          : `${icon} Call`;
-              }
-
-              dispatch(
-                addMessage({
-                  conversationId: group._id,
-                  message: {
-                    ...processedMsg,
-                    _loadedTimestamp: messageTimestamp,
-                  },
-                  isGroup: true,
-                }),
-              );
-            }
-          } catch (err) {
-            console.error(
-              `Error loading messages for group ${group._id}:`,
-              err,
-            );
+        if (visibleMessages.length > 0) {
+          const lastMsg = visibleMessages[visibleMessages.length - 1];
+          const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+          let processedMsg = { ...lastMsg };
+          if (lastMsg.isCallRecord) {
+            const icon = lastMsg.callType === "video" ? "📹" : "📞";
+            processedMsg.text = lastMsg.callStatus === "missed" ? `${icon} Missed Call`
+              : lastMsg.callStatus === "rejected" ? `${icon} Call Declined`
+              : lastMsg.callStatus === "cancelled" ? `${icon} Cancelled`
+              : lastMsg.callDuration > 0 ? `${icon} ${lastMsg.callDuration}s` : `${icon} Call`;
           }
+          dispatch(addMessage({
+            conversationId: convRes._id,
+            message: { ...processedMsg, _loadedTimestamp: messageTimestamp },
+            userId: user._id,
+            isGroup: false,
+          }));
+
+          const unreadCount = messages.filter(msg => msg.sender._id !== currentUserId && msg.status !== "read").length;
+          const isCurrentlyOpen = selectedUserRef.current?._id === user._id;
+          if (unreadCount > 0 && !isCurrentlyOpen) {
+            for (let i = 0; i < unreadCount; i++) dispatch(incrementUnreadCount(user._id));
+          } else if (isCurrentlyOpen) {
+            dispatch(clearUnreadCount(user._id));
+          }
+        } else {
+          dispatch(addMessage({
+            conversationId: convRes._id,
+            message: { _id: `conv-placeholder-${convRes._id}`, text: "", createdAt: new Date().toISOString(), sender: currentUserId, status: "sent", attachments: [], isPlaceholder: true },
+            userId: user._id,
+            isGroup: false,
+          }));
+        }
+      } catch (userErr) {
+        if (userErr.response?.status === 404) continue;
+        console.error(`Error loading messages for user ${user._id}:`, userErr);
+      }
+    }
+  };
+  loadUserMessages();
+}, [currentUserId, users, dispatch]);
+
+// GROUPS MESSAGES LOAD
+useEffect(() => {
+  if (!currentUserId || groups.length === 0) return;
+  if (hasLoadedGroupMessages.current) return;
+  hasLoadedGroupMessages.current = true;
+
+  const loadGroupMessages = async () => {
+    for (const group of groups) {
+      try {
+        console.log("Group load:", group._id, "targetKey will be:", `group_${group._id}`);
+        const result = await loadGroupLastMessages(group._id, currentUserId);
+        const messages = result.messages;
+        console.log("Group messages count:", messages.length);
+
+        if (messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+          const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+          let processedMsg = { ...lastMsg };
+          if (lastMsg.isCallRecord) {
+            const icon = lastMsg.callType === "video" ? "📹" : "📞";
+            processedMsg.text = lastMsg.callStatus === "missed" ? `${icon} Missed Call`
+              : lastMsg.callStatus === "rejected" ? `${icon} Call Declined`
+              : lastMsg.callStatus === "cancelled" ? `${icon} Cancelled`
+              : lastMsg.callDuration > 0 ? `${icon} ${lastMsg.callDuration}s` : `${icon} Call`;
+          }
+          dispatch(addMessage({
+            conversationId: group._id,
+            message: { ...processedMsg, _loadedTimestamp: messageTimestamp },
+            userId: group._id,
+            isGroup: true,
+          }));
+        } else {
+          dispatch(addMessage({
+            conversationId: group._id,
+            message: { _id: `group-placeholder-${group._id}`, text: "", createdAt: group.createdAt || new Date().toISOString(), sender: currentUserId, status: "sent", attachments: [], isPlaceholder: true },
+            userId: group._id,
+            isGroup: true,
+          }));
         }
       } catch (err) {
-        console.error("Error loading last messages:", err);
+        console.error(`Error loading messages for group ${group._id}:`, err);
       }
-    };
-
-    loadLastMessages();
-  }, [currentUserId, users, groups, dispatch]);
-
+    }
+  };
+  loadGroupMessages();
+}, [currentUserId, groups, dispatch]);
   useEffect(() => {
     if (!socket || !currentUserId) return;
     socket.emit("joinUserRoom", currentUserId);

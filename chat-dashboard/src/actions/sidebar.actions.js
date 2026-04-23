@@ -23,7 +23,8 @@ export const sendFriendRequest = async (userId) => {
 //  Format last message text (pure logic, API nahi)
 export const formatLastMessageText = (message) => {
   if (!message) return "";
-  if (message.text === "" && !message.attachments?.length) return "";
+  if (message.isPlaceholder) return "";
+  if (!message.text && !message.attachments?.length && !message.isCallRecord) return "";
   
   // Call record
   if (message.isCallRecord) {

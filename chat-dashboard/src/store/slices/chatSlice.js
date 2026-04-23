@@ -347,11 +347,15 @@ const chatSlice = createSlice({
         new Date(message.createdAt).getTime() ||
         Date.now();
 
-      const targetKey = isGroup ? conversationId : userId;
+const targetKey = isGroup ? `group_${conversationId}` : userId;
+// Group entry ko individual message se overwrite mat karo
+if (!isGroup && state.lastMessages[targetKey]?.isGroup === true) {
+  return;
+}
 
-      state.lastMessages[targetKey] = {
-        text: isGroup ? messageText : messageText || "",
-        time: message.createdAt || new Date().toISOString(),
+state.lastMessages[targetKey] = {
+  text: messageText || "",
+          time: message.createdAt || new Date().toISOString(),
         sender: senderId,
         status: message.status || "sent",
         conversationId: conversationId,
@@ -435,12 +439,12 @@ const chatSlice = createSlice({
       const { groupId, messageId, text, editedAt } = action.payload;
 
       // Update in lastMessages for sidebar
-      if (state.lastMessages[groupId]) {
-        if (state.lastMessages[groupId].lastMessageId === messageId) {
-          state.lastMessages[groupId].text = text;
-          state.lastMessages[groupId].isEdited = true;
-          state.lastMessages[groupId].editedAt = editedAt;
-          state.lastMessages[groupId]._updated = Date.now(); // Trigger re-sort
+  if (state.lastMessages[`group_${groupId}`]) {
+  if (state.lastMessages[`group_${groupId}`].lastMessageId === messageId) {
+    state.lastMessages[`group_${groupId}`].text = text;
+    state.lastMessages[`group_${groupId}`].isEdited = true;
+    state.lastMessages[`group_${groupId}`].editedAt = editedAt;
+    state.lastMessages[`group_${groupId}`]._updated = D
         }
       }
     },

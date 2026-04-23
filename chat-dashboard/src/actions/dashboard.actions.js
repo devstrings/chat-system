@@ -121,6 +121,7 @@ export const loadGroupLastMessages = async (groupId, currentUserId) => {
       msg.text = await decryptMessageHelper(msg, currentUserId);
       return msg;
   }));
+  console.log("Group messages loaded:", messagesRaw.length, "last:", messages[messages.length-1]?.text);
   const visibleMessages = messages.filter(
     (msg) => !msg.deletedFor?.includes(currentUserId)
   );
