@@ -807,7 +807,14 @@ export default function Sidebar({
                 {searchDirectoryResults.map((person) => (
                   <div
                     key={person._id}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between"
+                    onClick={() => {
+                      if (!person.isFriend) return;
+                      onSelectUser(person);
+                      onCloseMobileSidebar();
+                    }}
+                    className={`bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between ${
+                      person.isFriend ? "cursor-pointer hover:bg-gray-100 transition-colors" : ""
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <ProfileImageWithAuth
@@ -821,14 +828,21 @@ export default function Sidebar({
                         <p className="text-xs text-gray-500 truncate">{person.email}</p>
                       </div>
                     </div>
-                    {!person.isFriend && (
+                    {!person.isFriend ? (
                       <button
-                        onClick={() => handleSendRequest(person._id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendRequest(person._id);
+                        }}
                         disabled={person.requestSent}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md disabled:opacity-60"
                       >
                         {person.requestSent ? "Sent" : "Send Request"}
                       </button>
+                    ) : (
+                      <span className="px-3 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
+                        Message
+                      </span>
                     )}
                   </div>
                 ))}
