@@ -112,6 +112,34 @@ export const updatePublicKey = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+export const upsertKeyBackup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { publicKey, privateKey } = req.body;
+  const result = await authService.upsertKeyBackupService(
+    userId,
+    publicKey,
+    privateKey,
+  );
+  res.json(result);
+});
+
+export const getKeyBackup = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const result = await authService.getKeyBackupService(userId);
+  res.json(result);
+});
+
+export const rotateEncryptionKeys = asyncHandler(async (req, res) => {
+  const userId = req.user.id || req.user.userId;
+  const { publicKey, conversationKeys } = req.body;
+  const result = await authService.rotateEncryptionKeysService(
+    userId,
+    publicKey,
+    conversationKeys,
+  );
+  res.json(result);
+});
+
 export const get2FAStatus = asyncHandler(async (req, res) => {
   const userId = req.user.id || req.user.userId;
   const result = await authService.get2FAStatusService(userId);

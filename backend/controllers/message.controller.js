@@ -67,7 +67,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
     await message.populate("sender", "username email profileImage");
     await message.populate({
       path: "attachments",
-      select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+      select:
+        "fileName fileType originalFileType sizeInKilobytes serverFileName duration isVoiceMessage isEncrypted encryptionData",
     });
 
     group.lastMessage = text || " Attachment";
@@ -80,11 +81,13 @@ export const sendMessage = asyncHandler(async (req, res) => {
       messageObj.attachments = messageObj.attachments.map((att) => ({
         url: `/api/file/get/${att.serverFileName}`,
         filename: att.fileName,
-        fileType: att.fileType,
+        fileType: att.originalFileType || att.fileType,
         fileSize: att.sizeInKilobytes * 1024,
         attachmentId: att._id,
         duration: att.duration || 0,
         isVoiceMessage: att.isVoiceMessage || false,
+        isEncrypted: att.isEncrypted || false,
+        encryptionData: att.encryptionData || { iv: "", algorithm: "" },
       }));
     }
 
@@ -100,6 +103,17 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   // --- INDIVIDUAL MESSAGE ---
   const conversation = req.validatedConversation;
+  const otherUserId = conversation.participants
+    .find((p) => p.toString() !== currentUserId.toString())
+    ?.toString();
+  const friendship = await messageService.checkFriendship(
+    currentUserId.toString(),
+    otherUserId,
+  );
+  if (!friendship) {
+    return res.status(403).json({ message: "Not friends" });
+  }
+
   const message = await Message.create({
     conversationId,
     sender: currentUserId,
@@ -113,7 +127,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
   await message.populate("sender", "username email profileImage");
   await message.populate({
     path: "attachments",
-    select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+    select:
+      "fileName fileType originalFileType sizeInKilobytes serverFileName duration isVoiceMessage isEncrypted encryptionData",
   });
   conversation.lastMessage = text || "📎 Attachment";
   conversation.lastMessageTime = new Date();
@@ -124,17 +139,16 @@ export const sendMessage = asyncHandler(async (req, res) => {
     messageObj.attachments = messageObj.attachments.map((att) => ({
       url: `/api/file/get/${att.serverFileName}`,
       filename: att.fileName,
-      fileType: att.fileType,
+      fileType: att.originalFileType || att.fileType,
       fileSize: att.sizeInKilobytes * 1024,
       attachmentId: att._id,
       duration: att.duration || 0,
       isVoiceMessage: att.isVoiceMessage || false,
+      isEncrypted: att.isEncrypted || false,
+      encryptionData: att.encryptionData || { iv: "", algorithm: "" },
     }));
   }
 if (io) {
-  const otherUserId = conversation.participants.find(
-    (p) => p.toString() !== currentUserId,
-  );
   // Add receiver field to messageObj
   messageObj.receiver = otherUserId;
   io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);

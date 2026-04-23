@@ -301,3 +301,43 @@ export async function hexToKey(hex) {
     ["encrypt", "decrypt"]
   );
 }
+
+const arrayBufferToBase64 = (buffer) =>
+  btoa(String.fromCharCode(...new Uint8Array(buffer)));
+
+const base64ToUint8Array = (base64) =>
+  new Uint8Array(atob(base64).split("").map((c) => c.charCodeAt(0)));
+
+export async function encryptAttachmentFile(file, sharedKey) {
+  if (!sharedKey) return null;
+  const aesKey = await hexToKey(sharedKey);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const fileBuffer = await file.arrayBuffer();
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    fileBuffer,
+  );
+
+  return {
+    encryptedBlob: new Blob([encrypted], { type: "application/octet-stream" }),
+    encryptionData: {
+      iv: arrayBufferToBase64(iv.buffer),
+      algorithm: "AES-GCM",
+    },
+    originalFileType: file.type,
+  };
+}
+
+export async function decryptAttachmentBlob(blob, ivB64, sharedKey) {
+  if (!ivB64 || !sharedKey) return blob;
+  const aesKey = await hexToKey(sharedKey);
+  const iv = base64ToUint8Array(ivB64);
+  const encryptedBuffer = await blob.arrayBuffer();
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    encryptedBuffer,
+  );
+  return new Blob([decrypted]);
+}

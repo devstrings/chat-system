@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import UserItem from "@/components/UserItem";
 import GroupItem from "@/components/Group/GroupItem";
 import AlertDialog from "@/components/base/AlertDialog";
@@ -50,6 +50,7 @@ export default function Sidebar({
   currentUserForStatus = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchDirectoryResults, setSearchDirectoryResults] = useState([]);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [searchUserQuery, setSearchUserQuery] = useState("");
   const [allUsers, setAllUsers] = useState([]);
@@ -78,6 +79,36 @@ export default function Sidebar({
   const profileMenuRef = useRef(null);
   const fileInputRef = useRef(null);
   const { friends: users } = useSelector((state) => state.user);
+  useEffect(() => {
+    dispatch(fetchPendingRequests());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchDirectoryResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchUsers(searchQuery.trim());
+        const friendIds = new Set(users.map((u) => u._id));
+        const normalized = results
+          .filter((u) => u._id !== currentUserId)
+          .map((u) => ({
+            ...u,
+            isFriend: friendIds.has(u._id),
+            requestSent: false,
+          }));
+        setSearchDirectoryResults(normalized);
+      } catch (error) {
+        console.error("Sidebar search failed:", error);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, users, currentUserId]);
+
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
 
@@ -301,9 +332,12 @@ export default function Sidebar({
       });
 
       setAllUsers(allUsers.filter((u) => u._id !== userId));
+      setSearchDirectoryResults((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, requestSent: true } : u)),
+      );
       setTimeout(() => {
         setShowAddFriendModal(false);
-        setSearchUsers("");
+        setSearchUserQuery("");
         setAllUsers([]);
       }, 1000);
     } catch (err) {
@@ -826,8 +860,14 @@ export default function Sidebar({
             ) : (
               //  MAIN VIEW
               <>
-                {memoizedItems.length}{" "}
-                {memoizedItems.length === 1 ? "contact" : "contacts"}
+                {(searchQuery.trim()
+                  ? searchDirectoryResults.length
+                  : memoizedItems.length)}{" "}
+                {(searchQuery.trim()
+                  ? searchDirectoryResults.length
+                  : memoizedItems.length) === 1
+                  ? "contact"
+                  : "contacts"}
                 {searchQuery && ` found`} • {onlineCount} online
                 {totalUnread > 0 && (
                   <span className="text-red-400 ml-2">
@@ -840,7 +880,78 @@ export default function Sidebar({
         </div>
         {activeTab === "chats" ? (
           <div className="flex-1 overflow-y-auto">
-            {memoizedItems.length === 0 ? (
+            {searchQuery.trim() ? (
+              <div className="py-2">
+                {searchDirectoryResults.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 text-gray-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      No users found for "{searchQuery}"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 px-2">
+                    {searchDirectoryResults.map((person) => (
+                      <div
+                        key={person._id}
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <ProfileImageWithAuth
+                            imageUrl={person.profileImage}
+                            username={person.username}
+                            size="w-10 h-10"
+                            textSize="text-sm"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {person.username}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {person.email}
+                            </p>
+                            <p
+                              className={`text-[11px] mt-0.5 ${
+                                person.isFriend ? "text-green-600" : "text-gray-500"
+                              }`}
+                            >
+                              {person.isFriend
+                                ? "Friend"
+                                : person.requestSent
+                                  ? "Request sent"
+                                  : "Not friend"}
+                            </p>
+                          </div>
+                        </div>
+                        {!person.isFriend && (
+                          <button
+                            onClick={() => handleSendRequest(person._id)}
+                            disabled={person.requestSent}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {person.requestSent ? "Sent" : "Send Request"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : memoizedItems.length === 0 ? (
               <div className="text-center py-12 px-4">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
                   {searchQuery ? (

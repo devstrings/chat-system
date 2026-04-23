@@ -5,13 +5,22 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
   const result = await friendService.processSendFriendRequest(senderId, receiverId);
-  const io = req.app.get("io");
+  const io = req.app.get("webSocket");
   if (io) {
-    const receiverSocket = [...io.sockets.sockets.values()].find(
-      (s) => s.user && s.user.id === receiverId
-    );
-    if (receiverSocket) {
-      receiverSocket.emit("friendRequestReceived", {
+    if (result?.autoAccepted) {
+      const acceptedPayload = {
+        userId: senderId,
+        otherUserId: receiverId,
+        message: result.message,
+      };
+      io.to(senderId.toString()).emit("friendRequestAccepted", acceptedPayload);
+      io.to(receiverId.toString()).emit("friendRequestAccepted", {
+        userId: receiverId,
+        otherUserId: senderId,
+        message: result.message,
+      });
+    } else {
+      io.to(receiverId.toString()).emit("friendRequestReceived", {
         senderId: req.user.id,
         senderName: req.user.username,
       });
@@ -25,6 +34,19 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
 export const acceptFriendRequest = asyncHandler(async (req, res) => {
   const friendRequest = req.validatedFriendRequest;
   const result = await friendService.processAcceptFriendRequest(friendRequest);
+  const io = req.app.get("webSocket");
+  if (io) {
+    const senderId = friendRequest.sender?.toString();
+    const receiverId = friendRequest.receiver?.toString();
+    const payload = {
+      senderId,
+      receiverId,
+      requestId: friendRequest._id?.toString(),
+      message: result.message,
+    };
+    io.to(senderId).emit("friendRequestAccepted", payload);
+    io.to(receiverId).emit("friendRequestAccepted", payload);
+  }
   res.json(result);
 });
 

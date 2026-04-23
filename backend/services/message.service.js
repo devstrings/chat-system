@@ -163,7 +163,7 @@ export const fetchMessages = async (
     .populate({
       path: "attachments",
       select:
-        "fileName fileType sizeInKilobytes serverFileName status duration isVoiceMessage",
+        "fileName fileType originalFileType sizeInKilobytes serverFileName status duration isVoiceMessage isEncrypted encryptionData",
     })
     .sort({ createdAt: 1 })
     .skip(skip)
@@ -188,11 +188,13 @@ export const transformMessages = (messages, currentUserId) => {
       messageObj.attachments = messageObj.attachments.map((att) => ({
         url: `/api/file/get/${att.serverFileName}`,
         filename: att.fileName,
-        fileType: att.fileType,
+        fileType: att.originalFileType || att.fileType,
         fileSize: att.sizeInKilobytes * 1024,
         attachmentId: att._id,
         duration: att.duration || 0,
         isVoiceMessage: att.isVoiceMessage || false,
+        isEncrypted: att.isEncrypted || false,
+        encryptionData: att.encryptionData || { iv: "", algorithm: "" },
       }));
     }
 
@@ -572,7 +574,7 @@ export const fetchGroupMessages = async (groupId, limit, skip) => {
     .populate({
       path: "attachments",
       select:
-        "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+        "fileName fileType originalFileType sizeInKilobytes serverFileName duration isVoiceMessage isEncrypted encryptionData",
     })
     .sort({ createdAt: 1 })
     .skip(skip)
@@ -590,11 +592,13 @@ export const transformGroupMessages = (messages) => {
       messageObj.attachments = messageObj.attachments.map((att) => ({
         url: `/api/file/get/${att.serverFileName}`,
         filename: att.fileName,
-        fileType: att.fileType,
+        fileType: att.originalFileType || att.fileType,
         fileSize: att.sizeInKilobytes * 1024,
         attachmentId: att._id,
         duration: att.duration || 0,
         isVoiceMessage: att.isVoiceMessage || false,
+        isEncrypted: att.isEncrypted || false,
+        encryptionData: att.encryptionData || { iv: "", algorithm: "" },
       }));
     }
 

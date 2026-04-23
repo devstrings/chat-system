@@ -34,6 +34,18 @@ export const uploadFile = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "No file uploaded" });
   }
   await fileService.verifyUserAccess(conversationId, userId);
-  const result = await fileService.processFileUpload(req.file, conversationId, userId, req.body.isVoiceMessage);
+  const encryptionMeta = {
+    isEncrypted: req.body.isEncrypted === "true",
+    iv: req.body.encryptionIv || "",
+    algorithm: req.body.encryptionAlgorithm || "",
+    originalFileType: req.body.originalFileType || "",
+  };
+  const result = await fileService.processFileUpload(
+    req.file,
+    conversationId,
+    userId,
+    req.body.isVoiceMessage,
+    encryptionMeta,
+  );
   res.json(result);
 });

@@ -207,8 +207,27 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
 
       console.log(` Updating Redux for userId: "${otherUserId}"`);
 
-      // Decrypt message
-      const currentSharedKey = sharedKeys[msg.conversationId];
+      // Decrypt message (ensure shared key is available on receiver side)
+      let currentSharedKey = sharedKeys[msg.conversationId];
+      if (msg.encryptionData?.isSharedKey && !currentSharedKey && otherUserId) {
+        try {
+          const conv = await dispatch(
+            fetchConversation({ otherUserId, skipCreate: true }),
+          ).unwrap();
+          if (conv?.sharedEncryptedKeys) {
+            const keyResult = await dispatch(
+              decryptAndStoreSharedKey({
+                conversationId: conv._id,
+                sharedEncryptedKeys: conv.sharedEncryptedKeys,
+                currentUserId,
+              }),
+            ).unwrap();
+            currentSharedKey = keyResult?.sharedKey || currentSharedKey;
+          }
+        } catch (err) {
+          console.warn("Failed to preload shared key in Conversation listener", err);
+        }
+      }
       msg.text = await decryptMessageHelper(msg, currentUserId, currentSharedKey);
 
       //  UPDATE REDUX
@@ -342,7 +361,15 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
         isFriendRequest: true,
       });
     };
+    const handleFriendRequestAccepted = async () => {
+      await Promise.all([
+        dispatch(fetchFriendsList()),
+        dispatch(fetchPendingRequests()),
+      ]);
+      showNotification("Friend request accepted", "Your friends list is updated.");
+    };
     socket.on("friendRequestReceived", handleFriendRequest);
+    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
     socket.on("receiveMessage", handleSidebarMessage);
     socket.on("receiveGroupMessage", handleSidebarGroupMessage);
     socket.on("messageStatusUpdate", handleSidebarStatus);
@@ -395,6 +422,7 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
       socket.off("groupMessageEdited", handleSidebarGroupEdit);
       socket.off("call:record", handleCallRecord);
       socket.off("friendRequestReceived", handleFriendRequest);
+      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
     };
   }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); 
 

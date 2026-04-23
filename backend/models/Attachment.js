@@ -47,7 +47,25 @@ const attachmentSchema = new mongoose.Schema({
   isVoiceMessage: {
     type: Boolean,
     default: false
-  }
+  },
+  isEncrypted: {
+    type: Boolean,
+    default: false,
+  },
+  encryptionData: {
+    iv: {
+      type: String,
+      default: "",
+    },
+    algorithm: {
+      type: String,
+      default: "",
+    },
+  },
+  originalFileType: {
+    type: String,
+    default: "",
+  },
 }, {
   timestamps: true
 });
