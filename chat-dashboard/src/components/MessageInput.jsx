@@ -32,6 +32,7 @@ export default function MessageInput({
   const [uploading, setUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef(null);
+  const messageInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
@@ -50,6 +51,11 @@ export default function MessageInput({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartXRef = useRef(0);
   const emojis = getEmojisList();
+  const focusComposer = () => {
+    requestAnimationFrame(() => {
+      messageInputRef.current?.focus();
+    });
+  };
   //  Handle typing for both group and individual
   const handleTyping = (value) => {
     setText(value);
@@ -243,9 +249,11 @@ export default function MessageInput({
 
       setText("");
       onCancelReply();
+      focusComposer();
     } catch (err) {
       console.error("Failed to send message:", err);
       alert("Message failed to send. Please check your connection.");
+      focusComposer();
     } finally {
       setSending(false);
     }
@@ -566,6 +574,7 @@ export default function MessageInput({
 
             <div className="flex-1 relative">
               <textarea
+                ref={messageInputRef}
                 value={text}
                 onChange={(e) => handleTyping(e.target.value)}
                 onKeyDown={(e) => {
@@ -640,6 +649,7 @@ export default function MessageInput({
             {text.trim() ? (
               <button
                 onClick={() => handleSendMessage()}
+                onMouseDown={(e) => e.preventDefault()}
                 disabled={sending || uploading}
                 className="p-2 md:p-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-medium transition-all shadow-lg hover:shadow-blue-500 hover:shadow-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0 transform hover:scale-105 active:scale-95"
                 title="Send message"

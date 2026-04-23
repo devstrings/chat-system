@@ -657,7 +657,35 @@ export default function Sidebar({
               className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
               title={showArchived ? "Back to Chats" : "Archived Chats"}
             >
-              Archive
+              {showArchived ? (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                  />
+                </svg>
+              )}
               {!showArchived && archivedCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-600 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
                   {archivedCount}
@@ -669,7 +697,19 @@ export default function Sidebar({
               className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
               title="Blocked Users"
             >
-              Blocked
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                />
+              </svg>
               {blockedUsers.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gray-600 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
                   {blockedUsers.length}
@@ -681,7 +721,19 @@ export default function Sidebar({
               className="p-2 hover:bg-white/10 rounded-lg transition-colors text-yellow-400 hover:text-yellow-300 relative flex-shrink-0"
               title="Friend Requests"
             >
-              Requests
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
               {pendingRequests.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-semibold">
                   {pendingRequests.length}
@@ -689,18 +741,17 @@ export default function Sidebar({
               )}
             </button>
             <button
-              onClick={() => setShowAddFriendModal(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-blue-400 hover:text-blue-300 flex-shrink-0"
-              title="Add Friend"
-            >
-              Add
-            </button>
-            <button
               onClick={() => setShowCreateGroup(true)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors text-green-400 hover:text-green-300 flex-shrink-0"
               title="Create Group"
             >
-              Group
+              <svg
+                className="w-3.5 h-3.5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+              </svg>
             </button>
           </div>
 

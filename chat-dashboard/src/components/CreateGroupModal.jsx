@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Button from "@/components/base/Button";
 import FriendListItem from "@/components/FriendListItem";
 import AlertDialog from "@/components/base/AlertDialog";
+import BaseModal from "@/components/base/BaseModal";
 import { handleCreate } from "@/actions/createGroupDialog.actions";
 export default function CreateGroupDialog({
   friends = [],
@@ -49,18 +50,8 @@ const onCreate = () =>
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <BaseModal isOpen={true} onClose={onClose} cssClass="max-w-md p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -222,7 +213,7 @@ onClick={onCreate}
             </button>
           </div>
         </div>
-      </div>
+      </BaseModal>
 
       <AlertDialog
         isOpen={alertDialog.isOpen}
