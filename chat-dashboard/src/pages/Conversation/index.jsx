@@ -244,10 +244,8 @@ if (selectedIdStr !== senderIdStr) {
   );
 } else {
   dispatch(clearUnreadCount(otherUserId));
-  console.log("Chat open — skip notification");
 }
       } else {
-        console.log("Own message — skip");
       }
     };
 
@@ -651,24 +649,22 @@ if (unreadCount > 0 && !isCurrentlyOpen) {
 } else if (isCurrentlyOpen) {
   dispatch(clearUnreadCount(user._id));
 }
-            } else {
-              // Empty conversation exists
-              dispatch(
-                addMessage({
-                  conversationId: convRes._id,
-                  message: {
-                    _id: `temp-${Date.now()}`,
-                    text: "",
-                    createdAt: new Date().toISOString(),
-                    sender: currentUserId,
-                    status: "sent",
-                    attachments: [],
-                  },
-                  userId: user._id,
-                  isGroup: false,
-                }),
-              );
-            }
+         } else {
+  dispatch(addMessage({
+    conversationId: convRes._id,
+    message: {
+      _id: `conv-placeholder-${convRes._id}`,
+      text: "",
+      createdAt: new Date().toISOString(),
+      sender: currentUserId,
+      status: "sent",
+      attachments: [],
+      isPlaceholder: true,  
+    },
+    userId: user._id,
+    isGroup: false,
+  }));
+}
           } catch (userErr) {
             if (userErr.response?.status === 404) {
               continue;

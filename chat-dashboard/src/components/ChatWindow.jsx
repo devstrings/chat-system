@@ -159,11 +159,13 @@ useEffect(() => {
 
 const filteredMessages = searchQuery
   ? messages.filter((msg) => {
+    if (msg.isPlaceholder) return false; 
       //  Skip deleted messages
       if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
       return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
     })
   : messages.filter((msg) => {
+     if (msg.isPlaceholder) return false;
       // Skip deleted messages
       if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
       return true;

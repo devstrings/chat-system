@@ -179,7 +179,7 @@ export const clearChat = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const currentUserId = req.user.id;
   const result = await messageService.processClearChat(conversationId, currentUserId);
-  const io = req.app.get("io");
+const io = req.app.get("webSocket");
   if (io) {
     // NAYA
     const userSocket = [...io.sockets.sockets.values()].find(
