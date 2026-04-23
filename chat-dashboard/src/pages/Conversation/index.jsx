@@ -109,7 +109,6 @@ const hasLoadedGroupMessages = useRef(false);
     () => localStorage.getItem("selectedGroupId") || null,
   );
 const [isGroupChat, setIsGroupChat] = useState(() => {
-  // Agar selectedGroupId nahi hai to group chat false hona chahiye
   const savedGroupId = localStorage.getItem("selectedGroupId");
   const savedIsGroupChat = localStorage.getItem("isGroupChat") === "true";
   return savedGroupId && savedIsGroupChat;
@@ -203,7 +202,6 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
   }
 
   if (!otherUserId) {
-    console.error(" Cannot determine otherUserId!", { senderId, receiverId, currentUserId });
     return;
   }
 
@@ -231,7 +229,6 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
   const selectedIdStr = selectedUserRef.current?._id?.toString();
 if (selectedIdStr !== senderIdStr) {
   dispatch(incrementUnreadCount(otherUserId));
-  console.log("Calling showNotification!");
   showNotification(
     msg.sender?.username || "New Message",
     msg.text || "📎 Attachment",
@@ -292,7 +289,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //  Status update
     const handleSidebarStatus = (data) => {
-      console.log("[SIDEBAR] Status update:", data.messageId);
 
       dispatch(
         updateMessageStatus({
@@ -305,7 +301,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //  Message edited (individual)
     const handleSidebarEdit = (data) => {
-      console.log(" [SIDEBAR] Message edited:", data.messageId);
 
       dispatch(
         updateMessage({
@@ -319,7 +314,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //   Group message edited
     const handleSidebarGroupEdit = (data) => {
-      console.log(" [SIDEBAR] Group message edited:", data);
 
       // Update in groupSlice (chat window)
       dispatch(
@@ -843,10 +837,7 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
                         )}
                       </div>
 
-                      {/* {!isGroupChat &&
-                        onlineUsers.includes(selectedUser._id) && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                        )} */}
+                  
                     </div>
 
                     {/* NAME & STATUS */}
@@ -1084,11 +1075,13 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                    {searchInChat && (
-                      <button
-                        onClick={() => setSearchInChat("")}
-                        className="absolute right-3 top-3 text-black hover:text-gray-700 transition-colors"
-                      >
+      <button
+  onClick={() => {
+    setSearchInChat("");
+    setShowSearchBox(false);
+  }}
+  className="absolute right-3 top-3 text-black hover:text-gray-700 transition-colors"
+>
                         <svg
                           className="w-4 h-4"
                           fill="none"
@@ -1103,7 +1096,7 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
                           />
                         </svg>
                       </button>
-                    )}
+                    
                   </div>
                 )}
               </div>

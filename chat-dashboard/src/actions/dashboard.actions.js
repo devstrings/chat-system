@@ -12,13 +12,17 @@ export const loadAllStatuses = async () => {
 
 //  Load pinned conversations
 export const loadPinnedConversations = async () => {
-  const response = await axiosInstance.get(`${API_BASE_URL}/api/messages/pinned`);
+  const response = await axiosInstance.get(
+    `${API_BASE_URL}/api/messages/pinned`,
+  );
   return response.data.map((conv) => conv._id);
 };
 
 //  Load archived conversations
 export const loadArchivedConversations = async () => {
-  const response = await axiosInstance.get(`${API_BASE_URL}/api/messages/archived`);
+  const response = await axiosInstance.get(
+    `${API_BASE_URL}/api/messages/archived`,
+  );
   return response.data.map((conv) => conv._id);
 };
 
@@ -27,7 +31,7 @@ export const archiveConversation = async (conversationId, isGroup) => {
   const endpoint = isGroup
     ? `${API_BASE_URL}/api/groups/${conversationId}/archive`
     : `${API_BASE_URL}/api/messages/conversation/${conversationId}/archive`;
-  
+
   await axiosInstance.post(endpoint, {});
 };
 
@@ -36,7 +40,7 @@ export const unarchiveConversation = async (conversationId, isGroup) => {
   const endpoint = isGroup
     ? `${API_BASE_URL}/api/groups/${conversationId}/unarchive`
     : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unarchive`;
-  
+
   await axiosInstance.delete(endpoint, {});
 };
 
@@ -45,7 +49,7 @@ export const pinConversation = async (conversationId, isGroup) => {
   const endpoint = isGroup
     ? `${API_BASE_URL}/api/groups/${conversationId}/pin`
     : `${API_BASE_URL}/api/messages/conversation/${conversationId}/pin`;
-  
+
   await axiosInstance.post(endpoint, {});
 };
 
@@ -54,7 +58,7 @@ export const unpinConversation = async (conversationId, isGroup) => {
   const endpoint = isGroup
     ? `${API_BASE_URL}/api/groups/${conversationId}/unpin`
     : `${API_BASE_URL}/api/messages/conversation/${conversationId}/unpin`;
-  
+
   await axiosInstance.delete(endpoint, {});
 };
 
@@ -62,7 +66,7 @@ export const unpinConversation = async (conversationId, isGroup) => {
 export const clearChatMessages = async (conversationId) => {
   await axiosInstance.patch(
     `${API_BASE_URL}/api/messages/conversation/${conversationId}/clear`,
-    {}
+    {},
   );
 };
 
@@ -75,33 +79,38 @@ export const removeProfilePicture = async () => {
 export const loadUserLastMessages = async (userId, currentUserId) => {
   try {
     const convRes = await apiActions.getConversation(userId, true);
-    if (!convRes || convRes?.deletedBy?.some((d) => d.userId === currentUserId)) {
+    if (
+      !convRes ||
+      convRes?.deletedBy?.some((d) => d.userId === currentUserId)
+    ) {
       return null;
     }
-    
+
     const conversationId = convRes?._id;
     if (!conversationId) return null;
-    
+
     const messagesRaw = await apiActions.getPaginatedConversationMessagesById(
       conversationId,
       1,
-      20
+      20,
     );
 
-    const messages = await Promise.all(messagesRaw.map(async msg => {
+    const messages = await Promise.all(
+      messagesRaw.map(async (msg) => {
         msg.text = await decryptMessageHelper(msg, currentUserId);
         return msg;
-    }));
-    
-    const visibleMessages = messages.filter(
-      (msg) => !msg.deletedFor?.includes(currentUserId)
+      }),
     );
-    
+
+    const visibleMessages = messages.filter(
+      (msg) => !msg.deletedFor?.includes(currentUserId),
+    );
+
     return {
       conversationId,
       messages: visibleMessages,
       unreadCount: messages.filter(
-        (msg) => msg.sender._id !== currentUserId && msg.status !== "read"
+        (msg) => msg.sender._id !== currentUserId && msg.status !== "read",
       ).length,
     };
   } catch (err) {
@@ -113,19 +122,20 @@ export const loadUserLastMessages = async (userId, currentUserId) => {
 // Load last messages for a group
 export const loadGroupLastMessages = async (groupId, currentUserId) => {
   const response = await axiosInstance.get(
-    `${API_BASE_URL}/api/messages/group/${groupId}`
+    `${API_BASE_URL}/api/messages/group/${groupId}`,
   );
-  
+
   const messagesRaw = response.data;
-  const messages = await Promise.all(messagesRaw.map(async msg => {
+  const messages = await Promise.all(
+    messagesRaw.map(async (msg) => {
       msg.text = await decryptMessageHelper(msg, currentUserId);
       return msg;
-  }));
-  console.log("Group messages loaded:", messagesRaw.length, "last:", messages[messages.length-1]?.text);
-  const visibleMessages = messages.filter(
-    (msg) => !msg.deletedFor?.includes(currentUserId)
+    }),
   );
-  
+  const visibleMessages = messages.filter(
+    (msg) => !msg.deletedFor?.includes(currentUserId),
+  );
+
   return {
     conversationId: groupId,
     messages: visibleMessages,
@@ -190,7 +200,7 @@ export const registerServiceWorker = () => {
 export const processCallRecordMessage = (callMessage) => {
   const icon = callMessage.callType === "video" ? "📹" : "📞";
   let text = "";
-  
+
   if (callMessage.callStatus === "missed") {
     text = `${icon} Missed Call`;
   } else if (callMessage.callStatus === "rejected") {
@@ -202,6 +212,6 @@ export const processCallRecordMessage = (callMessage) => {
   } else {
     text = `${icon} Call`;
   }
-  
+
   return { ...callMessage, text };
 };

@@ -11,7 +11,7 @@ import {
   isValidFileSize,
   getEmojisList,
   formatRecordingTime,
-  setupMediaRecorder
+  setupMediaRecorder,
 } from "@/actions/messageInput.actions";
 export default function MessageInput({
   conversationId,
@@ -19,12 +19,14 @@ export default function MessageInput({
   isGroup = false,
   selectedUser = null,
   replyTo = null,
-  onCancelReply = () => { },
+  onCancelReply = () => {},
 }) {
   const dispatch = useDispatch();
   const { sharedKeys } = useSelector((state) => state.chat);
   const currentUserId = useSelector((state) => state.auth.currentUserId);
-  const selectedGroup = useSelector((state) => state.group.groups.find((g) => g._id === groupId));
+  const selectedGroup = useSelector((state) =>
+    state.group.groups.find((g) => g._id === groupId),
+  );
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -35,48 +37,123 @@ export default function MessageInput({
   const connected = useSelector((state) => state.socket.connected);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const recordingTimeRef = useRef(0);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const mediaRecorderRef = useRef(null);
   const recordingIntervalRef = useRef(null);
   const audioChunksRef = useRef([]);
-
- const emojis = getEmojisList();
+  const isHoldingRef = useRef(false);
+  const holdTimerRef = useRef(null);
+  const micButtonRef = useRef(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartXRef = useRef(0);
+  const emojis = getEmojisList();
   //  Handle typing for both group and individual
-const handleTyping = (value) => {
-  setText(value);
-  if (!socket) return;
-  
-  if (isGroup && groupId) {
-    emitGroupTyping(socket, groupId, true);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      emitGroupTyping(socket, groupId, false);
-    }, 2000);
-  } else if (conversationId) {
-    emitTyping(socket, conversationId, true);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      emitTyping(socket, conversationId, false);
-    }, 2000);
-  }
-};
-  // Cleanup on unmount
-useEffect(() => {
-  return () => {
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-      if (mediaRecorder.stream) {
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-      }
+  const handleTyping = (value) => {
+    setText(value);
+    if (!socket) return;
+
+    if (isGroup && groupId) {
+      emitGroupTyping(socket, groupId, true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        emitGroupTyping(socket, groupId, false);
+      }, 2000);
+    } else if (conversationId) {
+      emitTyping(socket, conversationId, true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        emitTyping(socket, conversationId, false);
+      }, 2000);
     }
-    
-    //  Using action
-    stopAllTyping(socket, isGroup, groupId, conversationId);
   };
-}, [socket, conversationId, groupId, isGroup, mediaRecorder]);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isRecordingRef.current) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const offset = clientX - touchStartXRef.current;
+      if (offset < 0) setSwipeOffset(offset);
+      if (offset < -80) {
+        const recorder = mediaRecorderRef.current;
+        if (recorder && recorder.state !== "inactive") {
+          recorder.onstop = null;
+          recorder.stop();
+          if (recorder.stream) {
+            recorder.stream.getTracks().forEach((track) => track.stop());
+          }
+        }
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        clearInterval(recordingIntervalRef.current);
+        setRecordingTime(0);
+        setMediaRecorder(null);
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+        isHoldingRef.current = false;
+        setSwipeOffset(0);
+      }
+    };
+
+    const handleMouseUp = () => {
+      clearTimeout(holdTimerRef.current);
+      isHoldingRef.current = false;
+      setSwipeOffset(0);
+      if (!isRecordingRef.current) return;
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      clearTimeout(holdTimerRef.current);
+      isHoldingRef.current = false;
+      setSwipeOffset(0);
+      if (!isRecordingRef.current) return;
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchmove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (recordingIntervalRef.current)
+        clearInterval(recordingIntervalRef.current);
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+        if (mediaRecorder.stream) {
+          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        }
+      }
+
+      //  Using action
+      stopAllTyping(socket, isGroup, groupId, conversationId);
+    };
+  }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
   useEffect(() => {
     if (!isRecording) return;
 
@@ -90,77 +167,89 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, [isRecording]);
-const handleSendMessage = async (attachments = []) => {
-  if (!socket || (!text.trim() && attachments.length === 0) || sending) return;
-  
-  if (!isGroup && !conversationId) {
-    alert("Conversation not ready yet. Please wait a moment.");
-    return;
-  }
-  if (isGroup && !groupId) {
-    alert("Group not found.");
-    return;
-  }
+  const handleSendMessage = async (attachments = []) => {
+    if (!socket || (!text.trim() && attachments.length === 0) || sending)
+      return;
 
-  setSending(true);
-  
-  stopAllTyping(socket, isGroup, groupId, conversationId);
-
-  let cipherText = text.trim();
-  let encryptionData = null;
-
-  try {
-    const textToEncrypt = text.trim() || (attachments.length > 0 ? "📎 Attachment" : "");
-    if (textToEncrypt) {
-      const publicKeysObj = {};
-      publicKeysObj[currentUserId] = localStorage.getItem(`chat_pk_${currentUserId}`);
-
-      if (!isGroup && selectedUser && selectedUser.publicKey) {
-        publicKeysObj[selectedUser._id] = selectedUser.publicKey;
-      } else if (isGroup && selectedGroup && selectedGroup.members) {
-        selectedGroup.members.forEach(member => {
-          if (member.publicKey) {
-            publicKeysObj[member._id] = member.publicKey;
-          }
-        });
-      }
-
-      const sharedKey = sharedKeys[conversationId];
-      const encrypted = await encryptMessage(textToEncrypt, publicKeysObj, sharedKey);
-      cipherText = encrypted.cipherText;
-      encryptionData = encrypted.encryptionData;
+    if (!isGroup && !conversationId) {
+      alert("Conversation not ready yet. Please wait a moment.");
+      return;
     }
-  } catch (err) {
-    console.error("Encryption failed before sending:", err);
-  }
-  
-  try {
-    await dispatch(sendMessage({
-      conversationId: !isGroup ? conversationId : undefined,
-      groupId: isGroup ? groupId : undefined,
-      isGroup,
-      text: cipherText,
-      attachments,
-      encryptionData,
-      replyTo: replyTo ? {
-        _id: replyTo._id,
-        text: replyTo.text,
-        sender: {
-          _id: replyTo.sender?._id || replyTo.sender,
-          username: replyTo.sender?.username || "Unknown",
-        },
-      } : null,
-    })).unwrap();
+    if (isGroup && !groupId) {
+      alert("Group not found.");
+      return;
+    }
 
-    setText("");
-    onCancelReply();
-  } catch (err) {
-    console.error("Failed to send message:", err);
-    alert("Message failed to send. Please check your connection.");
-  } finally {
-    setSending(false);
-  }
-};
+    setSending(true);
+
+    stopAllTyping(socket, isGroup, groupId, conversationId);
+
+    let cipherText = text.trim();
+    let encryptionData = null;
+
+    try {
+      const textToEncrypt =
+        text.trim() || (attachments.length > 0 ? "📎 Attachment" : "");
+      if (textToEncrypt) {
+        const publicKeysObj = {};
+        publicKeysObj[currentUserId] = localStorage.getItem(
+          `chat_pk_${currentUserId}`,
+        );
+
+        if (!isGroup && selectedUser && selectedUser.publicKey) {
+          publicKeysObj[selectedUser._id] = selectedUser.publicKey;
+        } else if (isGroup && selectedGroup && selectedGroup.members) {
+          selectedGroup.members.forEach((member) => {
+            if (member.publicKey) {
+              publicKeysObj[member._id] = member.publicKey;
+            }
+          });
+        }
+
+        const sharedKey = sharedKeys[conversationId];
+        const encrypted = await encryptMessage(
+          textToEncrypt,
+          publicKeysObj,
+          sharedKey,
+        );
+        cipherText = encrypted.cipherText;
+        encryptionData = encrypted.encryptionData;
+      }
+    } catch (err) {
+      console.error("Encryption failed before sending:", err);
+    }
+
+    try {
+      await dispatch(
+        sendMessage({
+          conversationId: !isGroup ? conversationId : undefined,
+          groupId: isGroup ? groupId : undefined,
+          isGroup,
+          text: cipherText,
+          attachments,
+          encryptionData,
+          replyTo: replyTo
+            ? {
+                _id: replyTo._id,
+                text: replyTo.text,
+                sender: {
+                  _id: replyTo.sender?._id || replyTo.sender,
+                  username: replyTo.sender?.username || "Unknown",
+                },
+              }
+            : null,
+        }),
+      ).unwrap();
+
+      setText("");
+      onCancelReply();
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      alert("Message failed to send. Please check your connection.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleEmojiClick = (emoji) => {
     handleTyping(text + emoji);
@@ -168,82 +257,94 @@ const handleSendMessage = async (attachments = []) => {
   };
 
   //  File upload with group support
- const handleFileSelect = async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  
-  //  Using action for validation
-  if (!isValidFileSize(file, 10)) {
-    alert("File too large! Maximum size is 10MB");
-    e.target.value = "";
-    return;
-  }
-  
-  if (!conversationId && !groupId) {
-    alert(isGroup ? "Please select a group first" : "Please select a conversation first");
-    e.target.value = "";
-    return;
-  }
-  
-  setUploading(true);
-  
-  try {
-    //  Using action for upload
-    const uploadId = isGroup ? groupId : conversationId;
-    const uploadedFile = await uploadFile(file, uploadId, isGroup);
-    handleSendMessage([uploadedFile]);
-  } catch (error) {
-    console.error("Upload error:", error);
-    alert(`Upload failed!\n\n${error.response?.data?.message || error.message}`);
-  } finally {
-    setUploading(false);
-    e.target.value = "";
-  }
-};
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-const startRecording = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    
-    const { recorder } = setupMediaRecorder(
-      stream,
-      (chunks) => { audioChunksRef.current = chunks; },
-      async (audioBlob) => {
-        await handleVoiceUpload(audioBlob, recordingTimeRef.current);
-      }
-    );
-    
-    recorder.start();
-    setMediaRecorder(recorder);
-    setIsRecording(true);
-    setRecordingTime(0);
-    recordingTimeRef.current = 0;
-    
-    stopAllTyping(socket, isGroup, groupId, conversationId);
-  } catch (err) {
-    console.error("Microphone error:", err);
-    alert("Please allow microphone access to record voice messages");
-  }
-};
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      clearInterval(recordingIntervalRef.current);
+    //  Using action for validation
+    if (!isValidFileSize(file, 10)) {
+      alert("File too large! Maximum size is 10MB");
+      e.target.value = "";
+      return;
+    }
+
+    if (!conversationId && !groupId) {
+      alert(
+        isGroup
+          ? "Please select a group first"
+          : "Please select a conversation first",
+      );
+      e.target.value = "";
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      //  Using action for upload
+      const uploadId = isGroup ? groupId : conversationId;
+      const uploadedFile = await uploadFile(file, uploadId, isGroup);
+      handleSendMessage([uploadedFile]);
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert(
+        `Upload failed!\n\n${error.response?.data?.message || error.message}`,
+      );
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
   };
 
-  const cancelRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.onstop = null;
-      mediaRecorder.stop();
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      if (mediaRecorder.stream) {
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      const { recorder } = setupMediaRecorder(
+        stream,
+        (chunks) => {
+          audioChunksRef.current = chunks;
+        },
+        async (audioBlob) => {
+          await handleVoiceUpload(audioBlob, recordingTimeRef.current);
+        },
+      );
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setRecordingTime(0);
+      recordingTimeRef.current = 0;
+
+      stopAllTyping(socket, isGroup, groupId, conversationId);
+    } catch (err) {
+      console.error("Microphone error:", err);
+      alert("Please allow microphone access to record voice messages");
+    }
+  };
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      clearInterval(recordingIntervalRef.current);
+    }
+  };
+  const cancelRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = null;
+      recorder.stop();
+      if (recorder.stream) {
+        recorder.stream.getTracks().forEach((track) => track.stop());
       }
     }
 
     setIsRecording(false);
+    isRecordingRef.current = false;
     clearInterval(recordingIntervalRef.current);
     setRecordingTime(0);
     setMediaRecorder(null);
@@ -251,24 +352,29 @@ const startRecording = async () => {
   };
 
   //  Voice message upload with group support
- const handleVoiceUpload = async (audioBlob, duration) => {
-  setUploading(true);
-  try {
-    //  Using action for voice upload
-    const uploadId = isGroup ? groupId : conversationId;
-    const voiceMessage = await uploadVoiceMessage(audioBlob, duration, uploadId, isGroup);
-    handleSendMessage([voiceMessage]);
-  } catch (error) {
-    console.error("Voice upload error:", error);
-    alert(`Voice upload failed!\n\n${error.response?.data?.message || error.message}`);
-  } finally {
-    setUploading(false);
-    setRecordingTime(0);
-    setMediaRecorder(null);
-  }
-};
-
- 
+  const handleVoiceUpload = async (audioBlob, duration) => {
+    setUploading(true);
+    try {
+      //  Using action for voice upload
+      const uploadId = isGroup ? groupId : conversationId;
+      const voiceMessage = await uploadVoiceMessage(
+        audioBlob,
+        duration,
+        uploadId,
+        isGroup,
+      );
+      handleSendMessage([voiceMessage]);
+    } catch (error) {
+      console.error("Voice upload error:", error);
+      alert(
+        `Voice upload failed!\n\n${error.response?.data?.message || error.message}`,
+      );
+    } finally {
+      setUploading(false);
+      setRecordingTime(0);
+      setMediaRecorder(null);
+    }
+  };
 
   return (
     <div className="bg-white border-t border-gray-200 p-3 md:p-4">
@@ -340,7 +446,24 @@ const startRecording = async () => {
                   </svg>
                 </button>
 
-                <div className="flex-1 flex items-center gap-2 md:gap-3 bg-red-500 bg-opacity-20 border-2 border-red-500 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3">
+                <div
+                  className="flex-1 flex items-center gap-2 md:gap-3 bg-red-500 bg-opacity-20 border-2 border-red-500 rounded-xl md:rounded-2xl px-3 md:px-4 py-2 md:py-3"
+                  onMouseDown={(e) => {
+                    touchStartXRef.current = e.clientX;
+                  }}
+                  onMouseMove={(e) => {
+                    const offset = e.clientX - touchStartXRef.current;
+                    if (offset < -60) cancelRecording();
+                  }}
+                  onTouchStart={(e) => {
+                    touchStartXRef.current = e.touches[0].clientX;
+                  }}
+                  onTouchMove={(e) => {
+                    const offset =
+                      e.touches[0].clientX - touchStartXRef.current;
+                    if (offset < -60) cancelRecording();
+                  }}
+                >
                   <div className="w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded-full animate-pulse"></div>
                   <span className="text-red-500 font-mono font-semibold text-sm md:text-base">
                     {formatRecordingTime(recordingTime)}
@@ -381,8 +504,9 @@ const startRecording = async () => {
               </div>
 
               <div className="max-w-4xl mx-auto mt-2 px-1">
-                <p className="text-xs text-red-400">
-                  Recording... Click send to finish
+                <p className="text-xs text-red-400 flex items-center gap-1">
+                  Recording... Release to send &nbsp;|&nbsp; ← Swipe left to
+                  cancel
                 </p>
               </div>
             </div>
@@ -393,10 +517,11 @@ const startRecording = async () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className={`p-2 md:p-3 hover:bg-gray-100 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${uploading
+                className={`p-2 md:p-3 hover:bg-gray-100 hover:bg-opacity-50 rounded-xl transition-colors flex-shrink-0 ${
+                  uploading
                     ? "text-blue-400 cursor-wait"
                     : "text-gray-400 hover:text-blue-400"
-                  }`}
+                }`}
                 title={uploading ? "Uploading..." : "Attach file"}
               >
                 {uploading ? (
@@ -551,14 +676,39 @@ const startRecording = async () => {
               </button>
             ) : (
               <button
-                onClick={startRecording}
+                ref={micButtonRef}
                 disabled={uploading}
-                className="p-2 md:p-3 bg-gradient-to-r from-[#2563EB] to-[#9333EA] hover:from-blue-700 hover:to-blue-600 text-white rounded-xl transition-all shadow-lg hover:shadow-blue-500 flex-shrink-0 transform hover:scale-105 active:scale-95 disabled:opacity-50"
-                title="Record voice message"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  isHoldingRef.current = true;
+                  touchStartXRef.current = e.clientX;
+                  setSwipeOffset(0);
+                  holdTimerRef.current = setTimeout(() => {
+                    if (isHoldingRef.current) startRecording();
+                  }, 200);
+                }}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  isHoldingRef.current = true;
+                  touchStartXRef.current = e.touches[0].clientX;
+                  setSwipeOffset(0);
+                  holdTimerRef.current = setTimeout(() => {
+                    if (isHoldingRef.current) startRecording();
+                  }, 200);
+                }}
+                className={`p-2 md:p-3 bg-gradient-to-r from-[#2563EB] to-[#9333EA] text-white rounded-xl transition-all shadow-lg flex-shrink-0 disabled:opacity-50 select-none
+                ${isRecording ? "scale-125 shadow-red-500 from-red-500 to-red-600" : "hover:scale-105 active:scale-95"}`}
+                title="Hold to record, release to send, swipe left to cancel"
+                style={{
+                  transform:
+                    isRecording && swipeOffset < 0
+                      ? `translateX(${swipeOffset * 0.3}px) scale(1.25)`
+                      : "",
+                }}
               >
                 <svg
                   className="w-5 h-5 md:w-6 md:h-6"
-                  fill="none"
+                  fill={isRecording ? "white" : "none"}
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >

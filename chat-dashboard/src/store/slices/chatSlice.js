@@ -8,10 +8,14 @@ import API_BASE_URL from "@/config/api";
 // Decrypt and Store Shared Key
 export const decryptAndStoreSharedKey = createAsyncThunk(
   "chat/decryptAndStoreSharedKey",
-  async ({ conversationId, sharedEncryptedKeys, currentUserId }, { rejectWithValue }) => {
+  async (
+    { conversationId, sharedEncryptedKeys, currentUserId },
+    { rejectWithValue },
+  ) => {
     try {
       const encryptedKey = sharedEncryptedKeys[currentUserId];
-      if (!encryptedKey) return rejectWithValue("No encrypted key for current user");
+      if (!encryptedKey)
+        return rejectWithValue("No encrypted key for current user");
 
       const privateKey = localStorage.getItem(`chat_sk_${currentUserId}`);
       if (!privateKey) return rejectWithValue("No private key found");
@@ -21,35 +25,43 @@ export const decryptAndStoreSharedKey = createAsyncThunk(
     } catch (error) {
       return rejectWithValue("Failed to decrypt shared key");
     }
-  }
+  },
 );
 
 // Fetch Conversation
 export const fetchConversation = createAsyncThunk(
   "chat/fetchConversation",
-  async ({ otherUserId, skipCreate = false }, { dispatch, getState, rejectWithValue }) => {
+  async (
+    { otherUserId, skipCreate = false },
+    { dispatch, getState, rejectWithValue },
+  ) => {
     try {
       const response = await axiosInstance.post(
         `${API_BASE_URL}/api/messages/conversation`,
         { otherUserId, skipCreate },
       );
-      
+
       const conversation = response.data;
       const { currentUserId } = getState().auth;
 
-     if (conversation.sharedEncryptedKeys && currentUserId) {
-  try {
-    await dispatch(decryptAndStoreSharedKey({
-      conversationId: conversation._id,
-      sharedEncryptedKeys: conversation.sharedEncryptedKeys,
-      currentUserId
-    })).unwrap();
-  } catch (err) {
-    console.warn("Key decryption failed, continuing without shared key:", err);
-  }
-}
+      if (conversation.sharedEncryptedKeys && currentUserId) {
+        try {
+          await dispatch(
+            decryptAndStoreSharedKey({
+              conversationId: conversation._id,
+              sharedEncryptedKeys: conversation.sharedEncryptedKeys,
+              currentUserId,
+            }),
+          ).unwrap();
+        } catch (err) {
+          console.warn(
+            "Key decryption failed, continuing without shared key:",
+            err,
+          );
+        }
+      }
 
-return conversation;
+      return conversation;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }
@@ -77,7 +89,7 @@ export const fetchMessages = createAsyncThunk(
         filteredMessages.map(async (msg) => {
           msg.text = await decryptMessageHelper(msg, currentUserId, sharedKey);
           return msg;
-        })
+        }),
       );
 
       return { conversationId, messages: decryptedMessages };
@@ -90,7 +102,18 @@ export const fetchMessages = createAsyncThunk(
 // Send Message (unified for individual and group)
 export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
-  async ({ conversationId, groupId, isGroup = false, text, attachments, encryptionData, replyTo }, { rejectWithValue }) => {
+  async (
+    {
+      conversationId,
+      groupId,
+      isGroup = false,
+      text,
+      attachments,
+      encryptionData,
+      replyTo,
+    },
+    { rejectWithValue },
+  ) => {
     try {
       const body = {
         text,
@@ -347,15 +370,14 @@ const chatSlice = createSlice({
         new Date(message.createdAt).getTime() ||
         Date.now();
 
-const targetKey = isGroup ? `group_${conversationId}` : userId;
-// Group entry ko individual message se overwrite mat karo
-if (!isGroup && state.lastMessages[targetKey]?.isGroup === true) {
-  return;
-}
+      const targetKey = isGroup ? `group_${conversationId}` : userId;
+      if (!isGroup && state.lastMessages[targetKey]?.isGroup === true) {
+        return;
+      }
 
-state.lastMessages[targetKey] = {
-  text: messageText || "",
-          time: message.createdAt || new Date().toISOString(),
+      state.lastMessages[targetKey] = {
+        text: messageText || "",
+        time: message.createdAt || new Date().toISOString(),
         sender: senderId,
         status: message.status || "sent",
         conversationId: conversationId,
@@ -439,12 +461,14 @@ state.lastMessages[targetKey] = {
       const { groupId, messageId, text, editedAt } = action.payload;
 
       // Update in lastMessages for sidebar
-  if (state.lastMessages[`group_${groupId}`]) {
-  if (state.lastMessages[`group_${groupId}`].lastMessageId === messageId) {
-    state.lastMessages[`group_${groupId}`].text = text;
-    state.lastMessages[`group_${groupId}`].isEdited = true;
-    state.lastMessages[`group_${groupId}`].editedAt = editedAt;
-    state.lastMessages[`group_${groupId}`]._updated = D
+      if (state.lastMessages[`group_${groupId}`]) {
+        if (
+          state.lastMessages[`group_${groupId}`].lastMessageId === messageId
+        ) {
+          state.lastMessages[`group_${groupId}`].text = text;
+          state.lastMessages[`group_${groupId}`].isEdited = true;
+          state.lastMessages[`group_${groupId}`].editedAt = editedAt;
+          state.lastMessages[`group_${groupId}`]._updated = D;
         }
       }
     },
@@ -470,13 +494,12 @@ state.lastMessages[targetKey] = {
       state.unreadCounts[userId] = 0;
     },
 
-  incrementUnreadCount: (state, action) => {
-  const userId = action.payload;
-  if (state.selectedUserId === userId) return;
-  state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
-},
+    incrementUnreadCount: (state, action) => {
+      const userId = action.payload;
+      if (state.selectedUserId === userId) return;
+      state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
+    },
 
-    // AFTER
     updateTyping: (state, action) => {
       const { conversationId, userId, isTyping } = action.payload;
       if (!state.typingUsers[conversationId]) {
@@ -517,7 +540,6 @@ state.lastMessages[targetKey] = {
           state.conversations[conversationId] = { messages: [], loading: true };
         } else {
           state.conversations[conversationId].loading = true;
-          // state.conversations[conversationId].messages = [];
         }
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
@@ -564,20 +586,20 @@ state.lastMessages[targetKey] = {
       })
 
       // Delete Conversation
-.addCase(deleteConversation.fulfilled, (state, action) => {
-  const { conversationId, otherUserId } = action.payload;
-  delete state.conversations[conversationId];
-  delete state.lastMessages[otherUserId];
-  delete state.unreadCounts[otherUserId];
-  delete state.sharedKeys[conversationId]; 
-  
-  state.pinnedConversations = state.pinnedConversations.filter(
-    (id) => id !== conversationId,
-  );
-  state.archivedConversations = state.archivedConversations.filter(
-    (id) => id !== conversationId,
-  );
-})
+      .addCase(deleteConversation.fulfilled, (state, action) => {
+        const { conversationId, otherUserId } = action.payload;
+        delete state.conversations[conversationId];
+        delete state.lastMessages[otherUserId];
+        delete state.unreadCounts[otherUserId];
+        delete state.sharedKeys[conversationId];
+
+        state.pinnedConversations = state.pinnedConversations.filter(
+          (id) => id !== conversationId,
+        );
+        state.archivedConversations = state.archivedConversations.filter(
+          (id) => id !== conversationId,
+        );
+      })
       // Pin Conversation
 
       .addCase(pinConversation.fulfilled, (state, action) => {

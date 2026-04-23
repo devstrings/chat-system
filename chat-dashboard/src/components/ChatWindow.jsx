@@ -23,10 +23,10 @@ export default function ChatWindow({
   searchQuery = "",
   selectedUser = null,
   isSelectionMode = false,
-  setIsSelectionMode = () => { },
+  setIsSelectionMode = () => {},
   selectedMessages = new Set(),
-  setSelectedMessages = () => { },
-  onReply = () => { },
+  setSelectedMessages = () => {},
+  onReply = () => {},
 }) {
   const dispatch = useDispatch();
   const messages = useSelector(
@@ -56,44 +56,52 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  const hasFetched = useRef(null); 
+  const hasFetched = useRef(null);
 
-useEffect(() => {
-  if (!conversationId || !currentUserId) return;
-  
-  if (hasFetched.current === conversationId) return;
-  
-  hasFetched.current = conversationId;
-  dispatch(fetchMessages({ conversationId, currentUserId }));
-}, [dispatch, conversationId, currentUserId]);
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
+
+    if (hasFetched.current === conversationId) return;
+
+    hasFetched.current = conversationId;
+    dispatch(fetchMessages({ conversationId, currentUserId }));
+  }, [dispatch, conversationId, currentUserId]);
 
   // CHAT CLEARED SOCKET LISTENER
-useEffect(() => {
-  if (!socket || !conversationId) return;
-  const handleChatCleared = (data) => {
-    console.log("chatCleared received:", data);
+  useEffect(() => {
+    if (!socket || !conversationId) return;
+    const handleChatCleared = (data) => {
+      console.log("chatCleared received:", data);
 
-    if (
-      data.conversationId === conversationId &&
-      data.clearedFor === currentUserId
-    ) {
-      console.log("Clearing chat window");
-      dispatch(clearMessages(conversationId));
-      
-      //  reset selection mode if active
-      if (isSelectionMode) {
-        setIsSelectionMode(false);
-        setSelectedMessages(new Set());
+      if (
+        data.conversationId === conversationId &&
+        data.clearedFor === currentUserId
+      ) {
+        console.log("Clearing chat window");
+        dispatch(clearMessages(conversationId));
+
+        //  reset selection mode if active
+        if (isSelectionMode) {
+          setIsSelectionMode(false);
+          setSelectedMessages(new Set());
+        }
       }
-    }
-  };
+    };
 
-  socket.on("chatCleared", handleChatCleared);
+    socket.on("chatCleared", handleChatCleared);
 
-  return () => {
-    socket.off("chatCleared", handleChatCleared);
-  };
-}, [socket, conversationId, currentUserId, dispatch, isSelectionMode, setIsSelectionMode, setSelectedMessages]);
+    return () => {
+      socket.off("chatCleared", handleChatCleared);
+    };
+  }, [
+    socket,
+    conversationId,
+    currentUserId,
+    dispatch,
+    isSelectionMode,
+    setIsSelectionMode,
+    setSelectedMessages,
+  ]);
 
   useEffect(() => {
     if (!socket) return;
@@ -111,7 +119,6 @@ useEffect(() => {
         }),
       );
     };
-    
 
     const handleTyping = ({ userId, isTyping, conversationId }) => {
       if (conversationId !== conversationIdRef.current) return;
@@ -136,8 +143,6 @@ useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
 
- 
-
   const handleBulkDelete = () => {
     if (selectedMessages.size === 0) {
       return;
@@ -148,28 +153,31 @@ useEffect(() => {
       count: selectedMessages.size,
     });
   };
-   const onConfirmBulkDelete = () => confirmBulkDelete(
-    selectedMessages,
-    conversationId,
-    dispatch,
-    setIsSelectionMode,
-    setSelectedMessages,
-    setDeleteDialog
-  );
+  const onConfirmBulkDelete = () =>
+    confirmBulkDelete(
+      selectedMessages,
+      conversationId,
+      dispatch,
+      setIsSelectionMode,
+      setSelectedMessages,
+      setDeleteDialog,
+    );
 
-const filteredMessages = searchQuery
-  ? messages.filter((msg) => {
-    if (msg.isPlaceholder) return false; 
-      //  Skip deleted messages
-      if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
-      return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
-    })
-  : messages.filter((msg) => {
-     if (msg.isPlaceholder) return false;
-      // Skip deleted messages
-      if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
-      return true;
-    });
+  const filteredMessages = searchQuery
+    ? messages.filter((msg) => {
+        if (msg.isPlaceholder) return false;
+        //  Skip deleted messages
+        if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
+          return false;
+        return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
+      })
+    : messages.filter((msg) => {
+        if (msg.isPlaceholder) return false;
+        // Skip deleted messages
+        if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
+          return false;
+        return true;
+      });
 
   if (loading) {
     return (
@@ -250,8 +258,6 @@ const filteredMessages = searchQuery
     return groups;
   }, {});
 
- 
-
   return (
     <>
       <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
@@ -259,7 +265,13 @@ const filteredMessages = searchQuery
           <div className="bg-white border-b border-gray-300 shadow-sm px-2 md:px-6 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3 md:gap-4">
               <Button
-onClick={() => toggleSelectionMode(isSelectionMode, setIsSelectionMode, setSelectedMessages)}
+                onClick={() =>
+                  toggleSelectionMode(
+                    isSelectionMode,
+                    setIsSelectionMode,
+                    setSelectedMessages,
+                  )
+                }
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 <svg
@@ -284,14 +296,16 @@ onClick={() => toggleSelectionMode(isSelectionMode, setIsSelectionMode, setSelec
             <div className="flex items-center gap-2">
               {selectedMessages.size < filteredMessages.length ? (
                 <Button
-onClick={() => selectAllMessages(setSelectedMessages, messages)}
+                  onClick={() =>
+                    selectAllMessages(setSelectedMessages, messages)
+                  }
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   All
                 </Button>
               ) : (
                 <Button
-onClick={() => deselectAllMessages(setSelectedMessages)}
+                  onClick={() => deselectAllMessages(setSelectedMessages)}
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
                   None
@@ -326,8 +340,6 @@ onClick={() => deselectAllMessages(setSelectedMessages)}
           className="flex-1 overflow-y-auto px-3 md:px-6 py-4"
           style={{ minHeight: 0 }}
         >
-          
-
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date}>
               <div className="flex items-center justify-center my-4">
@@ -374,10 +386,11 @@ onClick={() => deselectAllMessages(setSelectedMessages)}
                       className={`flex items-center justify-center my-2`}
                     >
                       <div
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${isMissed || isRejected
-                          ? "bg-red-50 border-red-200"
-                          : "bg-green-50 border-green-200"
-                          }`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm border ${
+                          isMissed || isRejected
+                            ? "bg-red-50 border-red-200"
+                            : "bg-green-50 border-green-200"
+                        }`}
                       >
                         <span>{getCallIcon()}</span>
                         <span className={`font-medium ${getCallColor()}`}>
@@ -403,7 +416,9 @@ onClick={() => deselectAllMessages(setSelectedMessages)}
                     currentUserId={currentUserId}
                     isSelectionMode={isSelectionMode}
                     isSelected={selectedMessages.has(msg._id)}
-onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messageId)}
+                    onToggleSelect={(messageId) =>
+                      toggleMessageSelection(setSelectedMessages, messageId)
+                    }
                     onEnterSelectionMode={() => setIsSelectionMode(true)}
                     onReply={onReply}
                   />
@@ -446,7 +461,7 @@ onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messa
       <ConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false })}
-onConfirm={onConfirmBulkDelete}
+        onConfirm={onConfirmBulkDelete}
         title="Delete Messages?"
         message={`Delete ${deleteDialog.count} message(s) for you? This action cannot be undone.`}
         confirmText="Delete"

@@ -51,7 +51,8 @@ export default function Sidebar({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddFriend, setShowAddFriend] = useState(false);
-const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, setAllUsers] = useState([]);
+  const [searchUserQuery, setSearchUserQuery] = useState("");
+  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const socket = useSelector((state) => state.socket.socket);
   const connected = useSelector((state) => state.socket.connected);
@@ -116,8 +117,14 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
   });
 
   const memoizedItems = useMemo(() => {
-      console.log("Groups list:", groups.map(g => ({id: g._id, name: g.name})));
-  console.log("Users list:", users.map(u => ({id: u._id, name: u.username})));
+    console.log(
+      "Groups list:",
+      groups.map((g) => ({ id: g._id, name: g.name })),
+    );
+    console.log(
+      "Users list:",
+      users.map((u) => ({ id: u._id, name: u.username })),
+    );
     // If searching, show ALL friends matching search
     if (searchQuery.trim()) {
       // Search in ALL friends, not just those with conversations
@@ -221,15 +228,17 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
       }
 
       // Try multiple sources for timestamp
-    const getTimestamp = (item) => {
-const lastMsg = item.isGroup 
-  ? lastMessages[`group_${item._id}`] 
-  : lastMessages[item._id];  if (lastMsg?._updated) return lastMsg._updated;
-  if (lastMsg?.time) return new Date(lastMsg.time).getTime();
-  if (item.isGroup && item.updatedAt) return new Date(item.updatedAt).getTime();
-  if (item.updatedAt) return new Date(item.updatedAt).getTime();
-  return 0;
-};
+      const getTimestamp = (item) => {
+        const lastMsg = item.isGroup
+          ? lastMessages[`group_${item._id}`]
+          : lastMessages[item._id];
+        if (lastMsg?._updated) return lastMsg._updated;
+        if (lastMsg?.time) return new Date(lastMsg.time).getTime();
+        if (item.isGroup && item.updatedAt)
+          return new Date(item.updatedAt).getTime();
+        if (item.updatedAt) return new Date(item.updatedAt).getTime();
+        return 0;
+      };
 
       const timestampA = getTimestamp(a);
       const timestampB = getTimestamp(b);
@@ -261,24 +270,24 @@ const lastMsg = item.isGroup
     return convId && archivedConversations.has(convId);
   }).length;
 
- const handleSearchUsers = async () => {
-  if (!searchUserQuery.trim()) return;
-  setLoading(true);
-  try {
-    const data = await searchUsers(searchUserQuery);
-    setAllUsers(data);
-  } catch (err) {
-    console.error("Search error:", err);
-    setAlertDialog({
-      isOpen: true,
-      title: "Search Failed",
-      message: "Failed to search users. Please try again.",
-      type: "error",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleSearchUsers = async () => {
+    if (!searchUserQuery.trim()) return;
+    setLoading(true);
+    try {
+      const data = await searchUsers(searchUserQuery);
+      setAllUsers(data);
+    } catch (err) {
+      console.error("Search error:", err);
+      setAlertDialog({
+        isOpen: true,
+        title: "Search Failed",
+        message: "Failed to search users. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSendRequest = async (userId) => {
     try {
@@ -881,8 +890,7 @@ const lastMsg = item.isGroup
               <div className="py-2">
                 {memoizedItems.map((item) => {
                   if (item.isGroup) {
-const lastMsg = lastMessages[`group_${item._id}`];
-  console.log("Sidebar group render:", item._id, "key:", `group_${item._id}`, "found:", lastMsg);
+                    const lastMsg = lastMessages[`group_${item._id}`];
                     const formattedText = formatLastMessageText(lastMsg);
                     return (
                       <GroupItem
@@ -916,7 +924,6 @@ const lastMsg = lastMessages[`group_${item._id}`];
                   } else {
                     const lastMsg = lastMessages[item._id];
                     const formattedText = formatLastMessageText(lastMsg);
-                    console.log("Group lastMsg:", item._id, lastMsg); // debug ke liye
 
                     const conversationId = lastMsg?.conversationId;
                     const isPinned =
@@ -930,7 +937,6 @@ const lastMsg = lastMessages[`group_${item._id}`];
                         user={item}
                         selected={item._id === selectedUserId}
                         onClick={() => onSelectUser(item)}
-                        // AFTER
                         isOnline={onlineUsers.includes(item._id)}
                         unreadCount={unreadCounts[item._id] || 0}
                         lastMessage={formattedText}
@@ -961,7 +967,7 @@ const lastMsg = lastMessages[`group_${item._id}`];
               onCreateStatus={onOpenStatusManager}
               onViewMyStatus={onViewMyStatus}
               currentUserForStatus={currentUserForStatus}
-               socket={socket}
+              socket={socket}
             />
           </div>
         )}
@@ -972,7 +978,6 @@ const lastMsg = lastMessages[`group_${item._id}`];
           friends={users}
           currentUserId={currentUserId}
           onClose={() => setShowCreateGroup(false)}
-          // AFTER
           onSuccess={(newGroup) => {
             setShowCreateGroup(false);
             onSelectUser({ ...newGroup, isGroup: true });
@@ -1005,20 +1010,20 @@ const lastMsg = lastMessages[`group_${item._id}`];
         onClose={() => setShowNotificationModal(false)}
         notifications={notifications}
       />
-    <AddFriendModal
-  isOpen={showAddFriendModal}
-  onClose={() => {
-    setShowAddFriendModal(false);
-    setAllUsers([]);
-    setSearchUserQuery("");
-  }}
-  searchUsers={searchUserQuery}
-  setSearchUsers={setSearchUserQuery}
-  allUsers={allUsers}
-  loading={loading}
-  onSearch={handleSearchUsers}
-  onSendRequest={handleSendRequest}
-/>
+      <AddFriendModal
+        isOpen={showAddFriendModal}
+        onClose={() => {
+          setShowAddFriendModal(false);
+          setAllUsers([]);
+          setSearchUserQuery("");
+        }}
+        searchUsers={searchUserQuery}
+        setSearchUsers={setSearchUserQuery}
+        allUsers={allUsers}
+        loading={loading}
+        onSearch={handleSearchUsers}
+        onSendRequest={handleSendRequest}
+      />
     </>
   );
 }
