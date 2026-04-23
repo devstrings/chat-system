@@ -4,7 +4,6 @@ import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import {
   fetchMessages,
   updateMessageStatus,
-  bulkDeleteMessages,
   clearMessages,
 } from "@/store/slices/chatSlice";
 

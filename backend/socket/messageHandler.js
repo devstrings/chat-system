@@ -248,15 +248,7 @@ export function handleMessage(io, socket) {
           return;
         }
 
-        const messageAge = Date.now() - new Date(message.createdAt).getTime();
-        // const fiveMinutes = 5 * 60 * 1000;
-
-        if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
-          socket.emit("errorMessage", {
-            message: "Cannot delete for everyone after 5 minutes",
-          });
-          return;
-        }
+        // No time limit for sender deleting for everyone.
 
         message.deletedForEveryone = true;
         message.isDeleted = true;
@@ -502,15 +494,7 @@ export function handleMessage(io, socket) {
         return;
       }
 
-      // Check 5 minute time limit
-      const messageAge = Date.now() - new Date(message.createdAt).getTime();
-      // const fiveMinutes = 5 * 60 * 1000;
-      if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
-        socket.emit("errorMessage", {
-          message: "Cannot delete for everyone after 5 minutes",
-        });
-        return;
-      }
+      // No time limit for sender deleting for everyone.
 
       // Mark as deleted for everyone
       message.deletedForEveryone = true;

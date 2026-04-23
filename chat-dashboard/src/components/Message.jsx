@@ -160,10 +160,7 @@ const onDeleteForEveryone = () =>
   handleDeleteForEveryone(message, socket, setShowDeleteModal, setShowOptions);
 
   const canDeleteForEveryone = () => {
-    if (!isOwn) return false;
-    const messageAge = Date.now() - new Date(message.createdAt).getTime();
-    const fiveMinutes = 5 * 60 * 1000;
-    return messageAge <= fiveMinutes;
+    return !!isOwn;
   };
   //  toggleAudio function
   const toggleAudio = (index, audioUrl) => {

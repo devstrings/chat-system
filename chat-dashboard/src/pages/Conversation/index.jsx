@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import API_BASE_URL from "@/config/api";
 import { useNavigate, useParams } from "react-router-dom";
 import ChatWindow from "@/components/ChatWindow";
 import { useWebRTC } from "@/hooks/useWebRTC";
@@ -13,10 +12,8 @@ import StatusManager from "@/components/Status/StatusManager";
 import StatusViewer from "@/components/Status/StatusViewer";
 import NotificationToast from "@/components/NotificationToast";
 import { decryptMessageHelper } from "@/utils/cryptoUtils";
-import { setUser } from "@/store/slices/authSlice";
 import { useDispatch, useSelector } from "react-redux";
 import AlertDialog from "@/components/base/AlertDialog";
-import { logout } from "@/store/slices/authSlice";
 import {
   fetchFriendsList,
   fetchPendingRequests,
@@ -27,7 +24,6 @@ import {
   clearUnreadCount,
   addMessage,
   incrementUnreadCount,
-  deleteConversation,
   updateMessageStatus,
   updateMessage,
   updateGroupMessageInSidebar,
@@ -35,20 +31,15 @@ import {
 } from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
-  updateGroup,
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
 import apiActions from "@/store/apiActions";
 import {
   clearChatMessages,
-  loadUserLastMessages,
   loadGroupLastMessages,
-  formatAttachmentText,
   playNotificationSound,
-  shouldShowBrowserNotification,
   requestNotificationPermission,
   registerServiceWorker,
-  processCallRecordMessage,
 } from "@/actions/dashboard.actions";
 export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   const [selectedUser, setSelectedUser] = useState(null);

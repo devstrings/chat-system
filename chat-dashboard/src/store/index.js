@@ -10,6 +10,7 @@ import chatReducer from "./slices/chatSlice";
 import userReducer from "./slices/userSlice";
 import groupReducer from "./slices/groupSlice";
 import socketReducer from "./slices/socketSlice";
+import profileSettingsReducer from "./slices/profileSettingsSlice";
 
 //  IMPORT MIDDLEWARE
 import socketMiddleware from "./middleware/socketMiddleware";
@@ -22,6 +23,7 @@ export const store = configureStore({
     user: userReducer,
     group: groupReducer,
     socket: socketReducer,
+    profileSettings: profileSettingsReducer,
   },
 
   middleware: (getDefaultMiddleware) =>
