@@ -64,7 +64,6 @@ export const handleCreateStatus = async (
       type: "success",
     });
 
-    if (onStatusCreated) onStatusCreated(response.data.status);
   } catch (err) {
     console.error("Create status error:", err);
     setAlertDialog({ isOpen: true, title: "Error", message: "Failed to create status", type: "error" });

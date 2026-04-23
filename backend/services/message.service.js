@@ -5,6 +5,8 @@ import Friendship from "#models/Friendship";
 import Group from "#models/Group";
 import User from "#models/User";
 import AppError from "#shared/AppError";
+import mongoose from "mongoose";
+
 import { encryptWithPublicKey, generateSymmetricKey } from "../utils/crypto.js";
 //  CHECK FRIENDSHIP SERVICE
 export const checkFriendship = async (currentUserId, otherUserId) => {
@@ -27,12 +29,18 @@ export const checkFriendship = async (currentUserId, otherUserId) => {
 
 // FIND EXISTING CONVERSATION SERVICE
 export const findExistingConversation = async (currentUserId, otherUserId) => {
-  const conversation = await Conversation.findOne({
+  const activeConversation = await Conversation.findOne({
     participants: { $all: [currentUserId, otherUserId] },
-  });
+    "deletedBy.userId": { $ne: new mongoose.Types.ObjectId(currentUserId) },
+  }).sort({ createdAt: -1 }); 
 
-  return conversation;
+  if (activeConversation) return activeConversation;
+
+  return await Conversation.findOne({
+    participants: { $all: [currentUserId, otherUserId] },
+  }).sort({ createdAt: -1 }); 
 };
+
 
 // CREATE NEW CONVERSATION SERVICE
 export const createNewConversation = async (currentUserId, otherUserId) => {
@@ -50,15 +58,23 @@ export const processGetOrCreateConversation = async (
   otherUserId,
   skipCreate,
 ) => {
-  // Find existing conversation
   let conversation = await findExistingConversation(currentUserId, otherUserId);
 
-  //  If skipCreate flag is set, don't create new conversation
   if (!conversation && skipCreate) {
     return null;
   }
 
-  // Create new if doesn't exist (only when NOT skipping)
+  if (conversation) {
+    const isDeletedByCurrentUser = conversation.deletedBy?.some(
+      (d) => d.userId?.toString() === currentUserId?.toString()
+    );
+    if (isDeletedByCurrentUser) {
+      if (skipCreate) return null;
+      conversation = await createNewConversation(currentUserId, otherUserId);
+      return conversation;
+    }
+  }
+
   if (!conversation) {
     conversation = await createNewConversation(currentUserId, otherUserId);
   }

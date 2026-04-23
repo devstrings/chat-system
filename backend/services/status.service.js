@@ -111,7 +111,7 @@ export const fetchActiveStatuses = async (friendIds) => {
   })
     .populate("userId", "username profileImage")
     .populate("viewedBy.userId", "username")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: 1 });
 
   return statuses;
 };

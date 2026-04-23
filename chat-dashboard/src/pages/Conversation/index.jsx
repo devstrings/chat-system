@@ -58,6 +58,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   //   const [conversationId, setConversationId] = useState(null);
   const { conversationId: urlConversationId } = useParams();
   const [conversationId, setConversationId] = useState(null);
+  const [conversationKey, setConversationKey] = useState(0);
   const socket = useSelector((state) => state.socket.socket);
 
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
@@ -65,7 +66,6 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  //   const { conversationId: urlConversationId } = useParams();
   const [replyTo, setReplyTo] = useState(null);
   // Redux state
   const { currentUser, currentUserId, isAuthenticated } = useSelector(
@@ -435,36 +435,24 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     selectedUser?.profileImage,
   );
 
-  const handleConversationDeleted = (userId) => {
-    console.log(
-      " [DASHBOARD] Handling conversation deletion for user:",
-      userId,
-    );
+const handleConversationDeleted = (userId) => {
+    console.log(" [DASHBOARD] Handling conversation deletion for user:", userId);
 
     const conversationIdToRemove = lastMessages[userId]?.conversationId;
     console.log(" Conversation ID to remove:", conversationIdToRemove);
 
-    //  Use Redux deleteConversation action
-    if (conversationIdToRemove) {
-      dispatch(
-        deleteConversation({
-          conversationId: conversationIdToRemove,
-          otherUserId: userId,
-        }),
-      );
-    }
+    dispatch({
+      type: "chat/deleteConversation/fulfilled",
+      payload: {
+        conversationId: conversationIdToRemove,
+        otherUserId: userId,
+      },
+    });
 
-    // Clear selection if this was the selected user
     if (selectedUser?._id === userId) {
-      console.log(" Clearing selected user");
       setSelectedUser(null);
       setConversationId(null);
       setIsGroupChat(false);
-    }
-
-    // Remove from pinned/archived sets (local state)
-    if (conversationIdToRemove) {
-      console.log(" Removed from pinned/archived");
     }
 
     console.log(" Conversation fully deleted from all states");
@@ -571,10 +559,10 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
             }
 
             // Skip if conversation was deleted
-            if (convRes?.deletedBy?.some((d) => d.userId === currentUserId)) {
-              console.log(` Conversation with ${user._id} deleted, skipping`);
-              continue;
-            }
+         if (convRes?.deletedBy?.some((d) => d.userId?.toString() === currentUserId?.toString())) {
+  console.log(` Conversation with ${user._id} deleted, skipping`);
+  continue;
+}
 
             // Decrypt and store shared key if present
             let activeSharedKey = sharedKeys[convRes._id];
@@ -752,39 +740,38 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     socket.emit("joinUserRoom", currentUserId);
   }, [socket, currentUserId]);
   // Get conversation
- useEffect(() => {
+useEffect(() => {
   if (!selectedUser || !selectedUser._id) {
     setConversationId(null);
     return;
   }
 
+  setConversationId(null);
 
   const getConversation = async () => {
-      try {
-          console.log("🔍 Fetching for user:", selectedUser._id);
-        const result = await dispatch(
-          fetchConversation({ otherUserId: selectedUser._id }),
-        ).unwrap();
-         console.log("✅ conversationId set:", result._id); 
+    try {
+      const result = await dispatch(
+        fetchConversation({ otherUserId: selectedUser._id }),
+      ).unwrap();
 
-        setConversationId(result._id);
-        dispatch(clearUnreadCount(selectedUser._id));
+      setConversationId(result._id);
+      dispatch(clearUnreadCount(selectedUser._id));
 
-        // Sync URL if it's currently a userId
-        if (urlConversationId === selectedUser._id) {
-          navigate(`/conversation/${result._id}`, { replace: true });
-        }
-
-        if (socket) {
-          socket.emit("markAsRead", { conversationId: result._id });
-        }
-      } catch (err) {
-        console.error("Get conversation error:", err);
+      if (urlConversationId === selectedUser._id) {
+        navigate(`/conversation/${result._id}`, { replace: true });
       }
-    };
 
-    getConversation();
-}, [selectedUser?._id, socket, dispatch, navigate, urlConversationId]);
+      if (socket) {
+        socket.emit("markAsRead", { conversationId: result._id });
+      }
+   } catch (err) {
+  console.error("Get conversation error:", err);
+  setConversationId(null);
+}
+  };
+
+  getConversation();
+}, [selectedUser?._id, conversationKey, socket, dispatch, navigate, urlConversationId]);
   useEffect(() => {
     if (!socket) return;
 

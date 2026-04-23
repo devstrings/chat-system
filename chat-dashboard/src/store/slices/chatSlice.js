@@ -37,15 +37,19 @@ export const fetchConversation = createAsyncThunk(
       const conversation = response.data;
       const { currentUserId } = getState().auth;
 
-      if (conversation.sharedEncryptedKeys && currentUserId) {
-        await dispatch(decryptAndStoreSharedKey({
-          conversationId: conversation._id,
-          sharedEncryptedKeys: conversation.sharedEncryptedKeys,
-          currentUserId
-        })).unwrap();
-      }
+     if (conversation.sharedEncryptedKeys && currentUserId) {
+  try {
+    await dispatch(decryptAndStoreSharedKey({
+      conversationId: conversation._id,
+      sharedEncryptedKeys: conversation.sharedEncryptedKeys,
+      currentUserId
+    })).unwrap();
+  } catch (err) {
+    console.warn("Key decryption failed, continuing without shared key:", err);
+  }
+}
 
-      return conversation;
+return conversation;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message);
     }
@@ -555,20 +559,20 @@ const chatSlice = createSlice({
       })
 
       // Delete Conversation
-      .addCase(deleteConversation.fulfilled, (state, action) => {
-        const { conversationId, otherUserId } = action.payload;
-        delete state.conversations[conversationId];
-        delete state.lastMessages[otherUserId];
-        delete state.unreadCounts[otherUserId];
-
-        state.pinnedConversations = state.pinnedConversations.filter(
-          (id) => id !== conversationId,
-        );
-        state.archivedConversations = state.archivedConversations.filter(
-          (id) => id !== conversationId,
-        );
-      })
-
+.addCase(deleteConversation.fulfilled, (state, action) => {
+  const { conversationId, otherUserId } = action.payload;
+  delete state.conversations[conversationId];
+  delete state.lastMessages[otherUserId];
+  delete state.unreadCounts[otherUserId];
+  delete state.sharedKeys[conversationId]; 
+  
+  state.pinnedConversations = state.pinnedConversations.filter(
+    (id) => id !== conversationId,
+  );
+  state.archivedConversations = state.archivedConversations.filter(
+    (id) => id !== conversationId,
+  );
+})
       // Pin Conversation
 
       .addCase(pinConversation.fulfilled, (state, action) => {

@@ -49,6 +49,7 @@ export const validateFriendship = async (req, res, next) => {
 
  
 
+
     if (!otherUserId) {
       return sendError(res, 400, "Other user ID is required");
     }

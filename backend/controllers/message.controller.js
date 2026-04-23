@@ -226,6 +226,13 @@ export const deleteConversation = asyncHandler(async (req, res) => {
         deletedBy: currentUserId,
         otherUserId: result.userId,
       });
+      
+      userSocket.emit("chatCleared", {
+        conversationId: result.conversationId.toString(),
+        clearedFor: currentUserId,
+        clearedBy: currentUserId,
+        action: "conversationDeleted"
+      });
     }
   }
   res.json(result);

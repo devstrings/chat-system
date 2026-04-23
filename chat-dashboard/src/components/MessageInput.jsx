@@ -92,6 +92,16 @@ useEffect(() => {
   }, [isRecording]);
 const handleSendMessage = async (attachments = []) => {
   if (!socket || (!text.trim() && attachments.length === 0) || sending) return;
+  
+  if (!isGroup && !conversationId) {
+    alert("Conversation not ready yet. Please wait a moment.");
+    return;
+  }
+  if (isGroup && !groupId) {
+    alert("Group not found.");
+    return;
+  }
+
   setSending(true);
   
   stopAllTyping(socket, isGroup, groupId, conversationId);

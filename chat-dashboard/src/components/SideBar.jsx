@@ -962,6 +962,7 @@ const [searchUserQuery, setSearchUserQuery] = useState("");  const [allUsers, se
               onCreateStatus={onOpenStatusManager}
               onViewMyStatus={onViewMyStatus}
               currentUserForStatus={currentUserForStatus}
+               socket={socket}
             />
           </div>
         )}

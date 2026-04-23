@@ -10,6 +10,7 @@ import {
 export default function Message({
   message,
   isOwn,
+   currentUserId, 
   isSelectionMode,
   isSelected,
   onToggleSelect,
@@ -151,7 +152,7 @@ export default function Message({
   const isDeletedForEveryone =
     message.deletedForEveryone || message.isDeletedForEveryone;
   const isDeletedForMe =
-    message.deletedFor?.includes(message.sender._id) || message.isDeletedForMe;
+  message.deletedFor?.includes(currentUserId) || message.isDeletedForMe;
 const onDeleteForMe = () =>
   handleDeleteForMe(message, socket, setShowDeleteModal, setShowOptions);
 

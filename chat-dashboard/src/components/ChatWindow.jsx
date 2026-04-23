@@ -56,42 +56,44 @@ export default function ChatWindow({
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  const hasFetched = useRef(false);
+  const hasFetched = useRef(null); 
 
-  useEffect(() => {
-    if (!conversationId || !currentUserId) return;
-    hasFetched.current = false;
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!conversationId || !currentUserId) return;
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-    dispatch(fetchMessages({ conversationId, currentUserId }));
-  }, [dispatch, conversationId, currentUserId]);
+useEffect(() => {
+  if (!conversationId || !currentUserId) return;
+  
+  if (hasFetched.current === conversationId) return;
+  
+  hasFetched.current = conversationId;
+  dispatch(fetchMessages({ conversationId, currentUserId }));
+}, [dispatch, conversationId, currentUserId]);
 
   // CHAT CLEARED SOCKET LISTENER
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-    const handleChatCleared = (data) => {
-      console.log("chatCleared received:", data);
+useEffect(() => {
+  if (!socket || !conversationId) return;
+  const handleChatCleared = (data) => {
+    console.log("chatCleared received:", data);
 
-
-      if (
-        data.conversationId === conversationId &&
-        data.clearedFor === currentUserId
-      ) {
-        console.log("Clearing chat window");
-        dispatch(clearMessages(conversationId));
+    if (
+      data.conversationId === conversationId &&
+      data.clearedFor === currentUserId
+    ) {
+      console.log("Clearing chat window");
+      dispatch(clearMessages(conversationId));
+      
+      //  reset selection mode if active
+      if (isSelectionMode) {
+        setIsSelectionMode(false);
+        setSelectedMessages(new Set());
       }
-    };
+    }
+  };
 
-    socket.on("chatCleared", handleChatCleared);
+  socket.on("chatCleared", handleChatCleared);
 
-    return () => {
-      socket.off("chatCleared", handleChatCleared);
-    };
-  }, [socket, conversationId, currentUserId, dispatch]);
+  return () => {
+    socket.off("chatCleared", handleChatCleared);
+  };
+}, [socket, conversationId, currentUserId, dispatch, isSelectionMode, setIsSelectionMode, setSelectedMessages]);
 
   useEffect(() => {
     if (!socket) return;
@@ -146,15 +148,26 @@ export default function ChatWindow({
       count: selectedMessages.size,
     });
   };
+   const onConfirmBulkDelete = () => confirmBulkDelete(
+    selectedMessages,
+    conversationId,
+    dispatch,
+    setIsSelectionMode,
+    setSelectedMessages,
+    setDeleteDialog
+  );
 
- const onConfirmBulkDelete = () =>
-    confirmBulkDelete(selectedMessages, conversationId, dispatch, setIsSelectionMode, setSelectedMessages, setDeleteDialog);
-
-  const filteredMessages = searchQuery
-    ? messages.filter((msg) =>
-      msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-    : messages;
+const filteredMessages = searchQuery
+  ? messages.filter((msg) => {
+      //  Skip deleted messages
+      if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
+      return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
+    })
+  : messages.filter((msg) => {
+      // Skip deleted messages
+      if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true) return false;
+      return true;
+    });
 
   if (loading) {
     return (
@@ -311,29 +324,7 @@ onClick={() => deselectAllMessages(setSelectedMessages)}
           className="flex-1 overflow-y-auto px-3 md:px-6 py-4"
           style={{ minHeight: 0 }}
         >
-          {/* {!isSelectionMode && messages.length > 0 && (
-            <div className="flex justify-center mb-4 sticky top-0 z-10">
-              <Button
-                onClick={toggleSelectionMode}
-                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-2.5 md:px-4 py-1.5 md:py-2 rounded-full shadow-lg transition-colors flex items-center gap-1.5 text-[11px] md:text-sm"
-              >
-                <svg
-                  className="w-3.5 h-3.5 md:w-4 md:h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-                Select Messages
-              </button>
-            </div>
-          )} */}
+          
 
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date}>
@@ -407,6 +398,7 @@ onClick={() => deselectAllMessages(setSelectedMessages)}
                       msg.sender._id === currentUserId ||
                       msg.sender === currentUserId
                     }
+                    currentUserId={currentUserId}
                     isSelectionMode={isSelectionMode}
                     isSelected={selectedMessages.has(msg._id)}
 onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messageId)}

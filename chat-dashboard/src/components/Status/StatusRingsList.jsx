@@ -97,6 +97,7 @@ export default function StatusRingsList({
   onCreateStatus,
   onViewMyStatus,
   currentUserForStatus,
+   socket,
 }) {
   const [statusUpdates, setStatusUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +114,15 @@ useEffect(() => {
 }, []);
 
 
-
+useEffect(() => {
+  if (!socket) return;
+  socket.on("newStatus", () => { onLoadStatuses(); });
+  socket.on("statusDeleted", () => { onLoadStatuses(); });
+  return () => {
+    socket.off("newStatus");
+    socket.off("statusDeleted");
+  };
+}, [socket]);
   const hasUnseenStatus = (userStatuses) => {
     if (!userStatuses?.statuses) return false;
     return userStatuses.statuses.some(
