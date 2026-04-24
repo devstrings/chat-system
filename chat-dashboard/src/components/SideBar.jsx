@@ -1,30 +1,45 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import UserItem from "@/components/UserItem";
 import GroupItem from "@/components/Group/GroupItem";
 import AlertDialog from "@/components/base/AlertDialog";
+import ProfileSetting from "@/components/ProfileSetting";
+import StatusManager from "@/components/Status/StatusManager";
+import StatusViewer from "@/components/Status/StatusViewer";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { useDispatch, useSelector } from "react-redux";
 import {
   searchUsers,
   sendFriendRequest,
   formatLastMessageText,
-  formatTime,
 } from "@/actions/sidebar.actions";
 import {
+  fetchFriendsList,
   fetchPendingRequests,
   fetchBlockedUsers,
   acceptFriendRequest,
   rejectFriendRequest,
   unblockUser,
 } from "@/store/slices/userSlice";
-
+import { setUser } from "@/store/slices/authSlice";
+import { fetchGroups, updateGroup } from "@/store/slices/groupSlice";
+import {
+  archiveConversation,
+  pinConversation,
+  deleteConversation,
+  setSelectedUserId,
+} from "@/store/slices/chatSlice";
+import {
+  loadAllStatuses,
+  loadPinnedConversations,
+  loadArchivedConversations,
+} from "@/actions/dashboard.actions";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import NotificationModal from "@/components/NotificationModal";
 import BlockedUsersModal from "@/components/BlockedUsersModal";
 import FriendRequestModal from "@/components/FriendRequestModal";
 import AddFriendModal from "@/components/AddFriendModal";
-
 import StatusRingsList from "@/components/Status/StatusRingsList";
+
 export default function Sidebar({
   selectedUserId,
   onSelectUser,
@@ -32,83 +47,33 @@ export default function Sidebar({
   currentUserId = "",
   onLogout,
   isMobileSidebarOpen = false,
-  profileImageUrl,
+  lastMessages: middlewareLastMessages = {},
   onCloseMobileSidebar = () => {},
-  onOpenProfileSettings = (view = "all") => {},
-  pinnedConversations = new Set(),
-  onPinConversation = () => {},
-  archivedConversations = new Set(),
-  onArchiveConversation = () => {},
-  showArchived = false,
-  onToggleArchived = () => {},
-  onGroupUpdate = () => {},
-  onConversationDeleted = () => {},
-  onOpenStatusManager = () => {},
-  allStatuses = [],
-  onOpenStatusViewer = () => {},
-  onViewMyStatus = () => {},
-  currentUserForStatus = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [searchDirectoryResults, setSearchDirectoryResults] = useState([]);
   const [searchUserQuery, setSearchUserQuery] = useState("");
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const socket = useSelector((state) => state.socket.socket);
-  const connected = useSelector((state) => state.socket.connected);
-  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
-  const [showRequests, setShowRequests] = useState(false);
-  const dispatch = useDispatch();
-  const { pendingRequests, blockedUsers } = useSelector((state) => state.user);
-  const [showBlocked, setShowBlocked] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
-
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications] = useState([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeTab, setActiveTab] = useState("chats");
-  const { currentUser } = useSelector((state) => state.auth);
-  const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
-    currentUser?.profileImage,
-  );
-
-  const profileMenuRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const { friends: users } = useSelector((state) => state.user);
-  const { groups } = useSelector((state) => state.group);
-  const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
-
-  function ProfileImageWithAuth({
-    imageUrl,
-    username,
-    size = "w-8 h-8",
-    textSize = "text-sm",
-  }) {
-    const { imageSrc, loading } = useAuthImage(imageUrl);
-
-    return (
-      <div className={`${size} rounded-full overflow-hidden`}>
-        {loading ? (
-          <div className="w-full h-full bg-gray-300 animate-pulse" />
-        ) : imageSrc ? (
-          <img
-            src={imageSrc}
-            alt={username}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className={`w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white ${textSize} font-bold`}
-          >
-            {username?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const [showArchived, setShowArchived] = useState(false);
+  const [pinnedConversations, setPinnedConversations] = useState(new Set());
+  const [archivedConversations, setArchivedConversations] = useState(new Set());
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [profileSettingsView, setProfileSettingsView] = useState("all");
+  const [sharedCoverPhoto, setSharedCoverPhoto] = useState(null);
+  const [allStatuses, setAllStatuses] = useState([]);
+  const [showStatusManager, setShowStatusManager] = useState(false);
+  const [statusManagerMode, setStatusManagerMode] = useState("create");
+  const [showStatusViewer, setShowStatusViewer] = useState(false);
+  const [statusViewerIndex, setStatusViewerIndex] = useState(0);
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
@@ -116,18 +81,103 @@ export default function Sidebar({
     type: "success",
   });
 
+  const dispatch = useDispatch();
+  const socket = useSelector((state) => state.socket.socket);
+  const onlineUsers = useSelector((state) => state.socket.onlineUsers);
+  const { pendingRequests, blockedUsers, friends: users } = useSelector(
+    (state) => state.user,
+  );
+  const { currentUser } = useSelector((state) => state.auth);
+  const { groups } = useSelector((state) => state.group);
+  const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
+  const effectiveLastMessages = lastMessages || middlewareLastMessages;
+  const { imageSrc: profilePreview, loading: imageLoading } = useAuthImage(
+    currentUser?.profileImage,
+  );
+
+  useEffect(() => {
+    dispatch(fetchPendingRequests());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchDirectoryResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchUsers(searchQuery.trim());
+        const friendIds = new Set(users.map((u) => u._id));
+        const normalized = results
+          .filter((u) => u._id !== currentUserId)
+          .map((u) => ({
+            ...u,
+            isFriend: friendIds.has(u._id),
+            requestSent: false,
+          }));
+        setSearchDirectoryResults(normalized);
+      } catch (error) {
+        console.error("Sidebar search failed:", error);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, users, currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const load = async () => {
+      try {
+        const pinnedIdsArray = await loadPinnedConversations();
+        setPinnedConversations(new Set(pinnedIdsArray));
+      } catch (err) {
+        console.error("Failed to load pinned conversations:", err);
+      }
+    };
+    load();
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const load = async () => {
+      try {
+        const archivedIdsArray = await loadArchivedConversations();
+        setArchivedConversations(new Set(archivedIdsArray));
+      } catch (err) {
+        console.error("Failed to load archived conversations:", err);
+      }
+    };
+    load();
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (!groups || groups.length === 0) return;
+    const archivedGroupIds = groups
+      .filter((g) => g.archivedBy?.some((a) => a.userId === currentUserId))
+      .map((g) => g._id);
+    setArchivedConversations((prev) => {
+      const next = new Set(prev);
+      archivedGroupIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [groups, currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const load = async () => {
+      try {
+        const data = await loadAllStatuses();
+        setAllStatuses(data);
+      } catch (err) {
+        console.error("Load statuses error:", err);
+      }
+    };
+    load();
+  }, [currentUserId]);
+
   const memoizedItems = useMemo(() => {
-    console.log(
-      "Groups list:",
-      groups.map((g) => ({ id: g._id, name: g.name })),
-    );
-    console.log(
-      "Users list:",
-      users.map((u) => ({ id: u._id, name: u.username })),
-    );
-    // If searching, show ALL friends matching search
     if (searchQuery.trim()) {
-      // Search in ALL friends, not just those with conversations
       const allFilteredUsers = users
         .filter(
           (user) =>
@@ -141,49 +191,32 @@ export default function Sidebar({
           const matchesSearch = group.name
             .toLowerCase()
             .includes(searchQuery.toLowerCase());
-
           const isArchived = group.archivedBy?.some(
             (a) => a.userId === currentUserId,
           );
-
-          if (showArchived) {
-            return matchesSearch && isArchived;
-          } else {
-            return matchesSearch && !isArchived;
-          }
+          return showArchived
+            ? matchesSearch && isArchived
+            : matchesSearch && !isArchived;
         })
         .map((group) => ({ ...group, isGroup: true }));
 
-      // Combine and sort by last message time
-      const allItems = [...filteredGroups, ...allFilteredUsers];
-
-      return allItems.sort((a, b) => {
-        const timeA = lastMessages[a._id]?.time
-          ? new Date(lastMessages[a._id].time).getTime()
+      return [...filteredGroups, ...allFilteredUsers].sort((a, b) => {
+        const timeA = effectiveLastMessages[a._id]?.time
+          ? new Date(effectiveLastMessages[a._id].time).getTime()
           : 0;
-        const timeB = lastMessages[b._id]?.time
-          ? new Date(lastMessages[b._id].time).getTime()
+        const timeB = effectiveLastMessages[b._id]?.time
+          ? new Date(effectiveLastMessages[b._id].time).getTime()
           : 0;
         return timeB - timeA;
       });
     }
 
-    // Show users WITH conversations (even if empty after clear)
     const filteredUsers = users
       .filter((user) => {
-        const lastMsg = lastMessages[user._id];
-        const convId = lastMsg?.conversationId;
-
-        //  Show if has conversationId (even if no messages)
+        const convId = effectiveLastMessages[user._id]?.conversationId;
         if (!convId) return false;
-
         const isArchived = archivedConversations.has(convId);
-
-        if (showArchived) {
-          return isArchived;
-        } else {
-          return !isArchived;
-        }
+        return showArchived ? isArchived : !isArchived;
       })
       .map((user) => ({ ...user, isGroup: false }));
 
@@ -192,64 +225,47 @@ export default function Sidebar({
         const isArchived = group.archivedBy?.some(
           (a) => a.userId === currentUserId,
         );
-
-        if (showArchived) {
-          return isArchived;
-        } else {
-          return !isArchived;
-        }
+        return showArchived ? isArchived : !isArchived;
       })
       .map((group) => ({ ...group, isGroup: true }));
 
-    const allItems = [...filteredGroups, ...filteredUsers];
-
-    return allItems.sort((a, b) => {
+    return [...filteredGroups, ...filteredUsers].sort((a, b) => {
       if (!showArchived) {
-        let convIdA, convIdB, aPinned, bPinned;
-
+        let aPinned = false;
+        let bPinned = false;
         if (a.isGroup) {
-          convIdA = a._id;
           aPinned = a.pinnedBy?.some((p) => p.userId === currentUserId);
         } else {
-          convIdA = lastMessages[a._id]?.conversationId;
+          const convIdA = effectiveLastMessages[a._id]?.conversationId;
           aPinned = convIdA && pinnedConversations.has(convIdA);
         }
-
         if (b.isGroup) {
-          convIdB = b._id;
           bPinned = b.pinnedBy?.some((p) => p.userId === currentUserId);
         } else {
-          convIdB = lastMessages[b._id]?.conversationId;
+          const convIdB = effectiveLastMessages[b._id]?.conversationId;
           bPinned = convIdB && pinnedConversations.has(convIdB);
         }
-
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
       }
 
-      // Try multiple sources for timestamp
       const getTimestamp = (item) => {
-        const lastMsg = item.isGroup
-          ? lastMessages[`group_${item._id}`]
-          : lastMessages[item._id];
-        if (lastMsg?._updated) return lastMsg._updated;
-        if (lastMsg?.time) return new Date(lastMsg.time).getTime();
-        if (item.isGroup && item.updatedAt)
-          return new Date(item.updatedAt).getTime();
+        const msg = item.isGroup
+          ? effectiveLastMessages[`group_${item._id}`]
+          : effectiveLastMessages[item._id];
+        if (msg?._updated) return msg._updated;
+        if (msg?.time) return new Date(msg.time).getTime();
         if (item.updatedAt) return new Date(item.updatedAt).getTime();
         return 0;
       };
 
-      const timestampA = getTimestamp(a);
-      const timestampB = getTimestamp(b);
-
-      return timestampB - timestampA; // Latest first
+      return getTimestamp(b) - getTimestamp(a);
     });
   }, [
     users,
     groups,
     searchQuery,
-    lastMessages,
+    effectiveLastMessages,
     pinnedConversations,
     archivedConversations,
     showArchived,
@@ -259,14 +275,12 @@ export default function Sidebar({
   const onlineCount = memoizedItems.filter(
     (item) => !item.isGroup && onlineUsers.includes(item._id),
   ).length;
-
   const totalUnread = Object.values(unreadCounts).reduce(
     (sum, count) => sum + count,
     0,
   );
-
   const archivedCount = users.filter((user) => {
-    const convId = lastMessages[user._id]?.conversationId;
+    const convId = effectiveLastMessages[user._id]?.conversationId;
     return convId && archivedConversations.has(convId);
   }).length;
 
@@ -292,24 +306,24 @@ export default function Sidebar({
   const handleSendRequest = async (userId) => {
     try {
       await sendFriendRequest(userId);
-
       setAlertDialog({
         isOpen: true,
         title: "Friend Request Sent!",
         message: "Your friend request has been sent successfully.",
         type: "success",
       });
-
       setAllUsers(allUsers.filter((u) => u._id !== userId));
+      setSearchDirectoryResults((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, requestSent: true } : u)),
+      );
       setTimeout(() => {
         setShowAddFriendModal(false);
-        setSearchUsers("");
+        setSearchUserQuery("");
         setAllUsers([]);
       }, 1000);
     } catch (err) {
       const errorMessage =
         err.response?.data?.message || "Failed to send request";
-
       setAlertDialog({
         isOpen: true,
         title: "Cannot Send Request",
@@ -319,7 +333,7 @@ export default function Sidebar({
     }
   };
 
-  const loadPendingRequests = async () => {
+  const openPendingRequests = async () => {
     try {
       await dispatch(fetchPendingRequests()).unwrap();
       setShowRequestsModal(true);
@@ -339,7 +353,8 @@ export default function Sidebar({
       });
       setTimeout(() => {
         setShowRequestsModal(false);
-        window.location.reload();
+        dispatch(fetchFriendsList());
+        dispatch(fetchPendingRequests());
       }, 1000);
     } catch (err) {
       setAlertDialog({
@@ -360,9 +375,7 @@ export default function Sidebar({
         message: "Friend request has been rejected.",
         type: "info",
       });
-      setTimeout(() => {
-        setShowRequestsModal(false);
-      }, 1000);
+      setTimeout(() => setShowRequestsModal(false), 1000);
     } catch (err) {
       setAlertDialog({
         isOpen: true,
@@ -373,7 +386,7 @@ export default function Sidebar({
     }
   };
 
-  const loadBlockedUsers = async () => {
+  const openBlockedUsers = async () => {
     try {
       await dispatch(fetchBlockedUsers()).unwrap();
       setShowBlockedModal(true);
@@ -391,14 +404,9 @@ export default function Sidebar({
         message: "User has been unblocked successfully.",
         type: "success",
       });
-
-      const remainingBlocked = blockedUsers.filter(
-        (b) => b.blocked._id !== userId,
-      );
+      const remainingBlocked = blockedUsers.filter((b) => b.blocked._id !== userId);
       if (remainingBlocked.length === 0) {
-        setTimeout(() => {
-          setShowBlockedModal(false);
-        }, 1000);
+        setTimeout(() => setShowBlockedModal(false), 1000);
       }
     } catch (err) {
       setAlertDialog({
@@ -410,12 +418,142 @@ export default function Sidebar({
     }
   };
 
-  const handleProfileClick = () => {
-    onOpenProfileSettings();
+  const handleOpenProfileSettings = (view = "all") => {
+    setProfileSettingsView(view);
+    setShowProfileSettings(true);
   };
-  const handleViewMyStatus = () => {
-    onViewMyStatus();
+
+  const handleProfileImageUpdate = (newImageUrl, isCoverPhoto = false) => {
+    if (isCoverPhoto) {
+      setSharedCoverPhoto(newImageUrl);
+      dispatch(setUser({ ...currentUser, coverPhoto: newImageUrl }));
+      return;
+    }
+    dispatch(setUser({ ...currentUser, profileImage: newImageUrl }));
   };
+
+  const handleArchiveConversation = async (conversationId, isArchived) => {
+    try {
+      const isGroup = groups.some((g) => g._id === conversationId);
+      const result = await dispatch(
+        archiveConversation({ conversationId, isArchived, isGroup }),
+      ).unwrap();
+      setArchivedConversations((prev) => {
+        const next = new Set(prev);
+        if (result.isArchived) next.add(conversationId);
+        else next.delete(conversationId);
+        return next;
+      });
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to update archive status",
+        type: "error",
+      });
+    }
+  };
+
+  const handlePinConversation = async (conversationId, isPinned) => {
+    try {
+      const isGroup = groups.some((g) => g._id === conversationId);
+      const result = await dispatch(
+        pinConversation({ conversationId, isPinned, isGroup }),
+      ).unwrap();
+      setPinnedConversations((prev) => {
+        const next = new Set(prev);
+        if (result.isPinned) next.add(conversationId);
+        else next.delete(conversationId);
+        return next;
+      });
+    } catch (err) {
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: err.message || "Failed to update pin status",
+        type: "error",
+      });
+    }
+  };
+
+  const handleConversationDeleted = (userId) => {
+    const conversationIdToRemove = effectiveLastMessages[userId]?.conversationId;
+    if (conversationIdToRemove) {
+      dispatch(
+        deleteConversation({
+          conversationId: conversationIdToRemove,
+          otherUserId: userId,
+        }),
+      );
+      setPinnedConversations((prev) => {
+        const next = new Set(prev);
+        next.delete(conversationIdToRemove);
+        return next;
+      });
+      setArchivedConversations((prev) => {
+        const next = new Set(prev);
+        next.delete(conversationIdToRemove);
+        return next;
+      });
+    }
+    dispatch(setSelectedUserId(null));
+  };
+
+  const handleOpenStatusManager = (mode = "create") => {
+    setStatusManagerMode(mode);
+    setShowStatusManager(true);
+  };
+
+  const handleOpenStatusViewer = (userStatusOrIndex) => {
+    if (!allStatuses || allStatuses.length === 0) return;
+    let targetIndex = 0;
+    if (typeof userStatusOrIndex === "object" && userStatusOrIndex?.user?._id) {
+      targetIndex = allStatuses.findIndex(
+        (status) => status.user._id === userStatusOrIndex.user._id,
+      );
+      if (targetIndex === -1) return;
+    } else if (typeof userStatusOrIndex === "number") {
+      targetIndex = userStatusOrIndex;
+    } else {
+      return;
+    }
+    if (targetIndex < 0 || targetIndex >= allStatuses.length) return;
+    setStatusViewerIndex(targetIndex);
+    setShowStatusViewer(true);
+  };
+
+  const handleStatusCreated = async () => {
+    try {
+      const data = await loadAllStatuses();
+      setAllStatuses(data);
+    } catch (err) {
+      console.error("Reload statuses error:", err);
+    }
+  };
+
+  function ProfileImageWithAuth({
+    imageUrl,
+    username,
+    size = "w-8 h-8",
+    textSize = "text-sm",
+  }) {
+    const { imageSrc, loading } = useAuthImage(imageUrl);
+    return (
+      <div className={`${size} rounded-full overflow-hidden`}>
+        {loading ? (
+          <div className="w-full h-full bg-gray-300 animate-pulse" />
+        ) : imageSrc ? (
+          <img src={imageSrc} alt={username} className="w-full h-full object-cover" />
+        ) : (
+          <div
+            className={`w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white ${textSize} font-bold`}
+          >
+            {username?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -430,30 +568,18 @@ export default function Sidebar({
           onClick={onCloseMobileSidebar}
           className="md:hidden absolute top-1 right-1 p-1 text-white hover:text-gray-300 z-[70] bg-black/30 rounded-full backdrop-blur-sm"
         >
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
         <div className="bg-gradient-to-r from-[#2563EB] to-[#9333EA] p-3">
-          {/* Top row: Profile + Username + Three Dots */}
           <div className="flex items-center justify-between mb-2 gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
               <div className="relative flex-shrink-0">
                 <div
                   className="relative w-9 h-9 rounded-full overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border-2 border-white/30"
-                  onClick={handleProfileClick}
+                  onClick={() => handleOpenProfileSettings()}
                 >
                   {imageLoading ? (
                     <div className="w-full h-full bg-gray-700 animate-pulse" />
@@ -477,7 +603,6 @@ export default function Sidebar({
               </h2>
             </div>
 
-            {/* Three dots menu */}
             <div className="relative flex-shrink-0 ml-auto">
               <button
                 onClick={(e) => {
@@ -487,121 +612,40 @@ export default function Sidebar({
                 className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white flex items-center justify-center"
                 title="Settings & More"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                  />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
                 </svg>
               </button>
-
               {showProfileMenu && (
                 <>
-                  {/*  Full-screen backdrop */}
-                  <div
-                    className="fixed inset-0 z-[90] bg-black/20"
-                    onClick={() => setShowProfileMenu(false)}
-                    style={{
-                      position: "fixed",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                    }}
-                  />
-                  {/*  Dropdown menu */}
+                  <div className="fixed inset-0 z-[90] bg-black/20" onClick={() => setShowProfileMenu(false)} />
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-300 rounded-lg shadow-2xl z-[91] overflow-hidden">
                     <button
                       onClick={() => {
-                        onOpenProfileSettings("settings");
+                        handleOpenProfileSettings("settings");
                         setShowProfileMenu(false);
                       }}
-                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm"
+                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors text-sm"
                     >
-                      <svg
-                        className="w-5 h-5 text-blue-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                      <span className="font-medium">Settings</span>
+                      Settings
                     </button>
-
                     <button
                       onClick={() => {
-                        onOpenProfileSettings("password");
+                        handleOpenProfileSettings("password");
                         setShowProfileMenu(false);
-                        setTimeout(() => {
-                          const passwordSection = document.querySelector(
-                            '[data-section="password"]',
-                          );
-                          if (passwordSection) {
-                            passwordSection.scrollIntoView({
-                              behavior: "smooth",
-                              block: "start",
-                            });
-                          }
-                        }, 300);
                       }}
-                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                      className="w-full px-4 py-3 text-left text-gray-900 hover:bg-gray-100 transition-colors text-sm border-t border-gray-200"
                     >
-                      <svg
-                        className="w-5 h-5 text-purple-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                        />
-                      </svg>
-                      <span className="font-medium">Change Password</span>
+                      Change Password
                     </button>
-
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);
                         onLogout();
                       }}
-                      className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 text-sm border-t border-gray-200"
+                      className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors text-sm border-t border-gray-200"
                     >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                        />
-                      </svg>
-                      <span className="font-medium">Logout</span>
+                      Logout
                     </button>
                   </div>
                 </>
@@ -609,10 +653,9 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Second row: Action buttons */}
           <div className="flex items-center justify-between gap-0.5 mb-2 px-0">
             <button
-              onClick={() => onToggleArchived(!showArchived)}
+              onClick={() => setShowArchived(!showArchived)}
               className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
               title={showArchived ? "Back to Chats" : "Archived Chats"}
             >
@@ -651,12 +694,8 @@ export default function Sidebar({
                 </span>
               )}
             </button>
-
             <button
-              onClick={() => {
-                loadBlockedUsers();
-                setShowBlockedModal(true);
-              }}
+              onClick={openBlockedUsers}
               className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white relative flex-shrink-0"
               title="Blocked Users"
             >
@@ -679,12 +718,8 @@ export default function Sidebar({
                 </span>
               )}
             </button>
-
             <button
-              onClick={() => {
-                loadPendingRequests();
-                setShowRequestsModal(true);
-              }}
+              onClick={openPendingRequests}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors text-yellow-400 hover:text-yellow-300 relative flex-shrink-0"
               title="Friend Requests"
             >
@@ -707,27 +742,6 @@ export default function Sidebar({
                 </span>
               )}
             </button>
-
-            <button
-              onClick={() => setShowAddFriendModal(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-blue-400 hover:text-blue-300 flex-shrink-0"
-              title="Add Friend"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                />
-              </svg>
-            </button>
-
             <button
               onClick={() => setShowCreateGroup(true)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors text-green-400 hover:text-green-300 flex-shrink-0"
@@ -743,7 +757,6 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Tab Buttons  */}
           <div className="flex gap-1 mb-2">
             <button
               onClick={() => setActiveTab("chats")}
@@ -767,130 +780,78 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Search box */}
           <div className="relative">
             <input
               type="text"
-              placeholder={
-                showArchived ? "Search archived..." : "Search conversations..."
-              }
+              placeholder={showArchived ? "Search archived..." : "Search conversations..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-8 py-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs sm:text-sm placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-all rounded-lg"
+              className="w-full pl-3 pr-3 py-2 bg-white/10 border border-white/20 text-white text-xs sm:text-sm placeholder-white/60 rounded-lg"
             />
-            <svg
-              className="w-4 h-4 text-white/60 absolute left-3 top-2.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-2.5 text-white/60 hover:text-white transition-colors"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Users Count & Stats */}
         <div className="px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
           <p className="text-xs text-gray-900 font-bold">
-            {showArchived ? (
-              // ARCHIVED VIEW
-              <>
-                {archivedCount} archived{" "}
-                {archivedCount === 1 ? "chat" : "chats"}
-              </>
-            ) : (
-              //  MAIN VIEW
-              <>
-                {memoizedItems.length}{" "}
-                {memoizedItems.length === 1 ? "contact" : "contacts"}
-                {searchQuery && ` found`} • {onlineCount} online
-                {totalUnread > 0 && (
-                  <span className="text-red-400 ml-2">
-                    • {totalUnread} unread
-                  </span>
-                )}
-              </>
-            )}
+            {searchQuery.trim() ? searchDirectoryResults.length : memoizedItems.length} contacts
+            {" • "}
+            {onlineCount} online
+            {totalUnread > 0 && <span className="text-red-400 ml-2">• {totalUnread} unread</span>}
           </p>
         </div>
+
         {activeTab === "chats" ? (
           <div className="flex-1 overflow-y-auto">
-            {memoizedItems.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-700 bg-opacity-30 flex items-center justify-center">
-                  {searchQuery ? (
-                    <svg
-                      className="w-8 h-8 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            {searchQuery.trim() ? (
+              <div className="py-2 space-y-2 px-2">
+                {searchDirectoryResults.map((person) => (
+                  <div
+                    key={person._id}
+                    onClick={() => {
+                      if (!person.isFriend) return;
+                      onSelectUser(person);
+                      onCloseMobileSidebar();
+                    }}
+                    className={`bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between ${
+                      person.isFriend ? "cursor-pointer hover:bg-gray-100 transition-colors" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ProfileImageWithAuth
+                        imageUrl={person.profileImage}
+                        username={person.username}
+                        size="w-10 h-10"
+                        textSize="text-sm"
                       />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-8 h-8 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <p className="text-gray-400 text-sm">
-                  {showArchived
-                    ? "No archived chats"
-                    : searchQuery
-                      ? `No friends found for "${searchQuery}"`
-                      : "No contacts yet"}
-                </p>
-                <p className="text-gray-500 text-xs mt-1">
-                  {searchQuery
-                    ? "Try searching by username or email"
-                    : "Start by adding some friends!"}
-                </p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{person.username}</p>
+                        <p className="text-xs text-gray-500 truncate">{person.email}</p>
+                      </div>
+                    </div>
+                    {!person.isFriend ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendRequest(person._id);
+                        }}
+                        disabled={person.requestSent}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md disabled:opacity-60"
+                      >
+                        {person.requestSent ? "Sent" : "Send Request"}
+                      </button>
+                    ) : (
+                      <span className="px-3 py-1.5 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
+                        Message
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="py-2">
                 {memoizedItems.map((item) => {
                   if (item.isGroup) {
-                    const lastMsg = lastMessages[`group_${item._id}`];
+                    const lastMsg = effectiveLastMessages[`group_${item._id}`];
                     const formattedText = formatLastMessageText(lastMsg);
                     return (
                       <GroupItem
@@ -898,14 +859,10 @@ export default function Sidebar({
                         group={item}
                         selected={selectedUserId === item._id}
                         onClick={() => onSelectUser({ ...item, isGroup: true })}
-                        onPinConversation={onPinConversation}
-                        onArchiveConversation={onArchiveConversation}
-                        isPinned={item.pinnedBy?.some(
-                          (p) => p.userId === currentUserId,
-                        )}
-                        isArchived={item.archivedBy?.some(
-                          (a) => a.userId === currentUserId,
-                        )}
+                        onPinConversation={handlePinConversation}
+                        onArchiveConversation={handleArchiveConversation}
+                        isPinned={item.pinnedBy?.some((p) => p.userId === currentUserId)}
+                        isArchived={item.archivedBy?.some((a) => a.userId === currentUserId)}
                         conversationId={item._id}
                         currentUserId={currentUserId}
                         unreadCount={unreadCounts[item._id] || 0}
@@ -913,60 +870,51 @@ export default function Sidebar({
                         lastMessageTime={lastMsg?.time || null}
                         lastMessageSender={lastMsg?.sender || null}
                         lastMessageStatus={lastMsg?.status || "sent"}
-                        onGroupUpdate={(updatedGroup) => {
-                          onGroupUpdate(updatedGroup);
-                        }}
-                        onGroupDeleted={() => {
-                          window.location.reload();
-                        }}
-                      />
-                    );
-                  } else {
-                    const lastMsg = lastMessages[item._id];
-                    const formattedText = formatLastMessageText(lastMsg);
-
-                    const conversationId = lastMsg?.conversationId;
-                    const isPinned =
-                      conversationId && pinnedConversations.has(conversationId);
-                    const isArchived =
-                      conversationId &&
-                      archivedConversations.has(conversationId);
-                    return (
-                      <UserItem
-                        key={item._id}
-                        user={item}
-                        selected={item._id === selectedUserId}
-                        onClick={() => onSelectUser(item)}
-                        isOnline={onlineUsers.includes(item._id)}
-                        unreadCount={unreadCounts[item._id] || 0}
-                        lastMessage={formattedText}
-                        lastMessageTime={lastMsg?.time || null}
-                        lastMessageSender={lastMsg?.sender || null}
-                        lastMessageStatus={lastMsg?.status || "sent"}
-                        currentUserId={currentUserId}
-                        onRelationshipChange={() => window.location.reload()}
-                        isPinned={isPinned}
-                        conversationId={conversationId}
-                        onPinConversation={onPinConversation}
-                        isArchived={isArchived}
-                        onArchiveConversation={onArchiveConversation}
-                        onConversationDeleted={onConversationDeleted}
+                        onGroupUpdate={(updatedGroup) => dispatch(updateGroup(updatedGroup))}
+                        onGroupDeleted={() => dispatch(fetchGroups())}
                       />
                     );
                   }
+
+                  const lastMsg = effectiveLastMessages[item._id];
+                  const formattedText = formatLastMessageText(lastMsg);
+                  const conversationId = lastMsg?.conversationId;
+                  const isPinned = conversationId && pinnedConversations.has(conversationId);
+                  const isArchived = conversationId && archivedConversations.has(conversationId);
+                  return (
+                    <UserItem
+                      key={item._id}
+                      user={item}
+                      selected={item._id === selectedUserId}
+                      onClick={() => onSelectUser(item)}
+                      isOnline={onlineUsers.includes(item._id)}
+                      unreadCount={unreadCounts[item._id] || 0}
+                      lastMessage={formattedText}
+                      lastMessageTime={lastMsg?.time || null}
+                      lastMessageSender={lastMsg?.sender || null}
+                      lastMessageStatus={lastMsg?.status || "sent"}
+                      currentUserId={currentUserId}
+                      onRelationshipChange={() => dispatch(fetchFriendsList())}
+                      isPinned={isPinned}
+                      conversationId={conversationId}
+                      onPinConversation={handlePinConversation}
+                      isArchived={isArchived}
+                      onArchiveConversation={handleArchiveConversation}
+                      onConversationDeleted={handleConversationDeleted}
+                    />
+                  );
                 })}
               </div>
             )}
           </div>
         ) : (
-          // STATUS TAB - Status Rings List
           <div className="flex-1 overflow-y-auto">
             <StatusRingsList
-              onOpenViewer={onOpenStatusViewer}
+              onOpenViewer={handleOpenStatusViewer}
               currentUserId={currentUserId}
-              onCreateStatus={onOpenStatusManager}
-              onViewMyStatus={onViewMyStatus}
-              currentUserForStatus={currentUserForStatus}
+              onCreateStatus={handleOpenStatusManager}
+              onViewMyStatus={() => handleOpenStatusManager("myStatus")}
+              currentUserForStatus={currentUser}
               socket={socket}
             />
           </div>
@@ -997,7 +945,6 @@ export default function Sidebar({
         blockedUsers={blockedUsers}
         onUnblock={handleUnblockUser}
       />
-
       <FriendRequestModal
         isOpen={showRequestsModal}
         onClose={() => setShowRequestsModal(false)}
@@ -1024,6 +971,31 @@ export default function Sidebar({
         onSearch={handleSearchUsers}
         onSendRequest={handleSendRequest}
       />
+      {showProfileSettings && (
+        <ProfileSetting
+          currentUser={currentUser}
+          onClose={() => setShowProfileSettings(false)}
+          onProfileImageUpdate={handleProfileImageUpdate}
+          coverPhotoUrl={sharedCoverPhoto || currentUser?.coverPhoto}
+          initialView={profileSettingsView}
+        />
+      )}
+      {showStatusManager && (
+        <StatusManager
+          currentUser={currentUser}
+          onClose={() => setShowStatusManager(false)}
+          onStatusCreated={handleStatusCreated}
+          mode={statusManagerMode}
+        />
+      )}
+      {showStatusViewer && allStatuses.length > 0 && (
+        <StatusViewer
+          statuses={allStatuses}
+          currentUserId={currentUserId}
+          onClose={() => setShowStatusViewer(false)}
+          initialUserIndex={statusViewerIndex}
+        />
+      )}
     </>
   );
 }

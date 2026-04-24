@@ -135,6 +135,9 @@ router.post("/facebook", authController.facebookCallback);
 router.post("/verify-otp", authController.verifyOTP);
 router.post("/resend-otp", authController.resendOTP);
 router.post("/public-key", verifyToken, authController.updatePublicKey);
+router.post("/key-backup", verifyToken, authController.upsertKeyBackup);
+router.get("/key-backup", verifyToken, authController.getKeyBackup);
+router.post("/public-key/rotate", verifyToken, authController.rotateEncryptionKeys);
 router.get("/2fa/status", verifyToken, authController.get2FAStatus);
 router.post("/2fa/totp/setup/start", verifyToken, authController.startTOTPSetup);
 router.post(

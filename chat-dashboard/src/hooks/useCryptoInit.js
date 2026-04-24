@@ -22,19 +22,32 @@ export default function useCryptoInit() {
         
         // Only generate if we don't have it locally
         if (!privateKeyStr || !publicKeyStr) {
-          console.log("Generating new E2EE keypair...");
-          const keyPair = await generateKeyPair();
-          const pubKeyB64 = await exportPublicKey(keyPair.publicKey);
-          const privKeyB64 = await exportPrivateKey(keyPair.privateKey);
+          const cloudBackupRes = await axiosInstance.get(
+            `${API_BASE_URL}/api/auth/key-backup`,
+          );
+          const cloudBackup = cloudBackupRes?.data?.keyBackup;
+          if (cloudBackup?.publicKey && cloudBackup?.privateKey) {
+            localStorage.setItem(`chat_pk_${userId}`, cloudBackup.publicKey);
+            localStorage.setItem(`chat_sk_${userId}`, cloudBackup.privateKey);
+            await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
+              publicKey: cloudBackup.publicKey,
+            });
+            console.log("E2EE keypair restored from cloud backup.");
+          } else {
+            console.log("Generating new E2EE keypair...");
+            const keyPair = await generateKeyPair();
+            const pubKeyB64 = await exportPublicKey(keyPair.publicKey);
+            const privKeyB64 = await exportPrivateKey(keyPair.privateKey);
 
-          localStorage.setItem(`chat_pk_${userId}`, pubKeyB64);
-          localStorage.setItem(`chat_sk_${userId}`, privKeyB64);
+            localStorage.setItem(`chat_pk_${userId}`, pubKeyB64);
+            localStorage.setItem(`chat_sk_${userId}`, privKeyB64);
 
-          // Upload public key to server
-          await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
-            publicKey: pubKeyB64
-          });
-          console.log("E2EE keypair generated and public key uploaded.");
+            // Upload public key to server
+            await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
+              publicKey: pubKeyB64
+            });
+            console.log("E2EE keypair generated and public key uploaded.");
+          }
         }
       } catch (err) {
         console.error("Failed to initialize E2EE keys", err);

@@ -23,7 +23,7 @@ const Loader = ({ contentClassName, className }) => {
           animationDuration: '1.5s',
         }}
         className={cn(
-          'size-8 animate-spin text-[var(-text-color-light)] dark:text-[var(--text-color)]',
+          'size-8 animate-spin text-[var(--text-color-light)] dark:text-[var(--text-color)]',
           currentVariant === 'skillGames2' &&
             'text-[var(--dark-1)] dark:text-[var(--text-1)]',
           className,

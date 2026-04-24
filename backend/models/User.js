@@ -57,6 +57,20 @@ publicKey: {
   type: String,
   default: ""
 },
+keyBackup: {
+  publicKey: {
+    type: String,
+    default: "",
+  },
+  privateKey: {
+    type: String,
+    default: "",
+  },
+  updatedAt: {
+    type: Date,
+    default: null,
+  },
+},
 twoFactorEnabled: {
   type: Boolean,
   default: false

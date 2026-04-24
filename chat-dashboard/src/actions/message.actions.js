@@ -53,11 +53,7 @@ export const handleDeleteForEveryone = async (
     setShowOptions(false);
   } catch (err) {
     console.error("Delete for everyone error:", err);
-    if (err.response?.status === 400) {
-      alert("Cannot delete for everyone after 5 minutes");
-    } else {
-      alert("Failed to delete message");
-    }
+    alert("Failed to delete message");
   }
 };
 

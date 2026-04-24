@@ -151,6 +151,7 @@ export const processFileUpload = async (
   conversationId,
   userId,
   isVoiceMessageFlag,
+  encryptionMeta = {},
 ) => {
 
   // Calculate audio duration for audio files
@@ -159,6 +160,10 @@ export const processFileUpload = async (
 
   // Override with explicit flag from request
   const isVoiceMessage = isVoiceMessageFlag === "true" || audioIsVoice;
+  const isEncrypted = encryptionMeta?.isEncrypted === true;
+  const encryptionIv = encryptionMeta?.iv || "";
+  const encryptionAlgorithm = encryptionMeta?.algorithm || "";
+  const originalFileType = encryptionMeta?.originalFileType || file.mimetype;
 
   // Calculate hash
   const fileHash = await calculateFileHash(file.path);
@@ -176,10 +181,14 @@ export const processFileUpload = async (
     return {
       url: `/api/file/get/${existingAttachment.serverFileName}`,
       filename: file.originalname,
-      fileType: existingAttachment.fileType,
+      fileType: existingAttachment.originalFileType || existingAttachment.fileType,
       fileSize: existingAttachment.sizeInKilobytes * 1024,
       duration: existingAttachment.duration || 0,
       isVoiceMessage: existingAttachment.isVoiceMessage || false,
+      isEncrypted: existingAttachment.isEncrypted || false,
+      encryptionData: existingAttachment.encryptionData || { iv: "", algorithm: "" },
+      originalFileType:
+        existingAttachment.originalFileType || existingAttachment.fileType,
       attachmentId: existingAttachment._id,
       isDuplicate: true,
       message: "File already exists, reused existing file",
@@ -197,6 +206,12 @@ export const processFileUpload = async (
     uploadedBy: userId,
     duration: audioDuration,
     isVoiceMessage: isVoiceMessage,
+    isEncrypted,
+    encryptionData: {
+      iv: encryptionIv,
+      algorithm: encryptionAlgorithm,
+    },
+    originalFileType,
     status: "completed",
   });
 
@@ -204,10 +219,16 @@ export const processFileUpload = async (
   return {
     url: `/api/file/get/${file.filename}`,
     filename: file.originalname,
-    fileType: file.mimetype,
+    fileType: originalFileType,
     fileSize: file.size,
     duration: audioDuration || 0,
     isVoiceMessage: isVoiceMessage || false,
+    isEncrypted,
+    encryptionData: {
+      iv: encryptionIv,
+      algorithm: encryptionAlgorithm,
+    },
+    originalFileType,
     attachmentId: attachment._id,
     isDuplicate: false,
   };

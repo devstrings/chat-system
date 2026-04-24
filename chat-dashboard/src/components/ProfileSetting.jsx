@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import AlertDialog from "@/components/base/AlertDialog";
 import {
@@ -23,8 +24,11 @@ import {
   listPersonalAccessTokens,
   createPersonalAccessToken,
   revokePersonalAccessToken,
+  saveKeyBackupToCloud,
+  fetchKeyBackupFromCloud,
+  rotateEncryptionKeys,
 } from "@/actions/profileSettings.actions";
-import { refreshKeyPair } from "@/utils/cryptoUtils";
+import { refreshKeyPair, decryptSharedKey } from "@/utils/cryptoUtils";
 import axiosInstance from "@/lib/axiosInstance";
 import API_BASE_URL from "@/config/api";
 
@@ -50,6 +54,7 @@ export default function ProfileSettings({
   coverPhotoUrl,
   initialView = "all",
 }) {
+  const sharedKeys = useSelector((state) => state.chat.sharedKeys || {});
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alertDialog, setAlertDialog] = useState({
@@ -106,6 +111,7 @@ export default function ProfileSettings({
   );
 
   const fileInputRef = useRef(null);
+  const keyImportInputRef = useRef(null);
   const photoMenuRef = useRef(null);
 
   //Check if user has local auth
@@ -297,11 +303,7 @@ const handleRemoveImage = async () => {
     setHasPassword(true);
 
     await checkLocalAuthHandler();
-
-    setTimeout(() => {
-      setPasswordSuccess("Password set successfully! Refreshing...");
-      window.location.reload();
-    }, 1000);
+    setPasswordSuccess("Password set successfully!");
   } catch (err) {
     console.error("Set Password Error:", err.response?.data);
     setPasswordError(err.response?.data?.message || "Failed to set password");
@@ -388,7 +390,7 @@ const handleAcceptRequest = async (requestId) => {
       message: "Friend request accepted!",
       type: "success",
     });
-    setTimeout(() => window.location.reload(), 1500);
+    await Promise.all([loadPendingRequestsHandler(), loadBlockedUsersHandler()]);
   } catch (err) {
     console.error("Accept failed:", err);
     setAlertDialog({
@@ -424,15 +426,62 @@ const handleRejectRequest = async (requestId) => {
 const handleRefreshE2EEKeys = async () => {
   try {
     const userId = currentUser._id || currentUser.id;
+    const currentPrivateKey = localStorage.getItem(`chat_sk_${userId}`);
+
+    const conversationKeysMap = new Map();
+    Object.entries(sharedKeys || {}).forEach(([conversationId, sharedKey]) => {
+      if (typeof sharedKey === "string" && sharedKey.length > 0) {
+        conversationKeysMap.set(conversationId, sharedKey);
+      }
+    });
+
+    if (currentPrivateKey) {
+      try {
+        const friendsRes = await axiosInstance.get(`${API_BASE_URL}/api/friends/list`);
+        const friends = Array.isArray(friendsRes.data) ? friendsRes.data : [];
+        for (const friend of friends) {
+          try {
+            const convRes = await axiosInstance.post(
+              `${API_BASE_URL}/api/messages/conversation`,
+              { otherUserId: friend._id, skipCreate: true },
+            );
+            const conv = convRes.data;
+            if (!conv?._id || !conv?.sharedEncryptedKeys) continue;
+            const encryptedForMe = conv.sharedEncryptedKeys[userId];
+            if (!encryptedForMe) continue;
+            const plainSharedKey = await decryptSharedKey(
+              encryptedForMe,
+              currentPrivateKey,
+            );
+            if (plainSharedKey) {
+              conversationKeysMap.set(conv._id, plainSharedKey);
+            }
+          } catch (error) {
+            // Ignore per-conversation lookup errors and continue.
+          }
+        }
+      } catch (error) {
+        // Keep using locally loaded keys if friends/conversations fetch fails.
+      }
+    }
+
     const newPubKey = await refreshKeyPair(userId);
-    await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
-      publicKey: newPubKey
+    const conversationKeys = Array.from(conversationKeysMap.entries()).map(
+      ([conversationId, sharedKey]) => ({
+        conversationId,
+        sharedKey,
+      }),
+    );
+    await rotateEncryptionKeys({
+      publicKey: newPubKey,
+      conversationKeys,
     });
     setAlertDialog({
       isOpen: true,
-      title: "Keys Refreshed!",
-      message: "Your E2EE keys have been refreshed successfully.",
-      type: "success",
+      title: "Keys Refreshed",
+      message:
+        "New encryption keys are active and existing conversations were re-keyed. Please back up your new key now.",
+      type: "info",
     });
   } catch (err) {
     console.error("Failed to refresh E2EE keys:", err);
@@ -442,6 +491,127 @@ const handleRefreshE2EEKeys = async () => {
       message: "Failed to refresh E2EE keys.",
       type: "error",
     });
+  }
+};
+
+const handleDownloadKeyBackup = () => {
+  try {
+    const userId = currentUser?._id || currentUser?.id;
+    const publicKey = localStorage.getItem(`chat_pk_${userId}`);
+    const privateKey = localStorage.getItem(`chat_sk_${userId}`);
+    if (!publicKey || !privateKey) {
+      setAlertDialog({
+        isOpen: true,
+        title: "No keys found",
+        message: "No local keypair found to download.",
+        type: "error",
+      });
+      return;
+    }
+
+    const payload = {
+      version: 1,
+      userId,
+      exportedAt: new Date().toISOString(),
+      publicKey,
+      privateKey,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `chat-e2ee-key-backup-${userId}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (error) {
+    console.error("Download key backup failed:", error);
+  }
+};
+
+const handleBackupToCloud = async () => {
+  try {
+    const userId = currentUser?._id || currentUser?.id;
+    const publicKey = localStorage.getItem(`chat_pk_${userId}`);
+    const privateKey = localStorage.getItem(`chat_sk_${userId}`);
+    if (!publicKey || !privateKey) {
+      throw new Error("No local keypair found");
+    }
+    await saveKeyBackupToCloud({ publicKey, privateKey });
+    setAlertDialog({
+      isOpen: true,
+      title: "Backup saved",
+      message: "Your encryption keypair is backed up to cloud.",
+      type: "success",
+    });
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Backup failed",
+      message: err.message || "Unable to save key backup to cloud.",
+      type: "error",
+    });
+  }
+};
+
+const handleRestoreFromCloud = async () => {
+  try {
+    const userId = currentUser?._id || currentUser?.id;
+    const keyBackup = await fetchKeyBackupFromCloud();
+    if (!keyBackup?.publicKey || !keyBackup?.privateKey) {
+      throw new Error("No cloud backup found");
+    }
+    localStorage.setItem(`chat_pk_${userId}`, keyBackup.publicKey);
+    localStorage.setItem(`chat_sk_${userId}`, keyBackup.privateKey);
+    await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
+      publicKey: keyBackup.publicKey,
+    });
+    setAlertDialog({
+      isOpen: true,
+      title: "Backup restored",
+      message: "Encryption keypair restored from cloud.",
+      type: "success",
+    });
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Restore failed",
+      message: err.message || "Unable to restore key backup from cloud.",
+      type: "error",
+    });
+  }
+};
+
+const handleImportKeyFile = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const userId = currentUser?._id || currentUser?.id;
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed?.publicKey || !parsed?.privateKey) {
+      throw new Error("Invalid key backup file");
+    }
+    localStorage.setItem(`chat_pk_${userId}`, parsed.publicKey);
+    localStorage.setItem(`chat_sk_${userId}`, parsed.privateKey);
+    await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
+      publicKey: parsed.publicKey,
+    });
+    setAlertDialog({
+      isOpen: true,
+      title: "Key imported",
+      message: "Encryption keypair imported successfully.",
+      type: "success",
+    });
+  } catch (err) {
+    setAlertDialog({
+      isOpen: true,
+      title: "Import failed",
+      message: err.message || "Unable to import key file.",
+      type: "error",
+    });
+  } finally {
+    event.target.value = "";
   }
 };
 
@@ -1360,12 +1530,45 @@ const handleRevokePAT = async (tokenId) => {
               <p className="text-gray-600 text-sm mb-4">
                 Your messages are secured with End-to-End Encryption. You can refresh your encryption keys here. Old messages will remain readable on this device.
               </p>
-              <button
-                onClick={handleRefreshE2EEKeys}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Refresh Keys
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleRefreshE2EEKeys}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Refresh Keys
+                </button>
+                <button
+                  onClick={handleDownloadKeyBackup}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Download Key Backup
+                </button>
+                <button
+                  onClick={() => keyImportInputRef.current?.click()}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Import Key File
+                </button>
+                <button
+                  onClick={handleBackupToCloud}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Backup to Cloud
+                </button>
+                <button
+                  onClick={handleRestoreFromCloud}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Restore from Cloud
+                </button>
+              </div>
+              <input
+                ref={keyImportInputRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={handleImportKeyFile}
+              />
             </div>
           )}
 

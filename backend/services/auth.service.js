@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "#models/User";
 import AuthProvider from "#models/AuthProvider";
+import Conversation from "#models/Conversation";
 import config from "#config/index";
 import crypto from "crypto";
 import { redisClient } from "#config/redis";
@@ -12,6 +13,7 @@ import { sendOTPEmail } from "#config/email";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import PersonalAccessToken from "#models/PersonalAccessToken";
+import { encryptWithPublicKey } from "../utils/crypto.js";
 // Token generation helpers
 const generateAccessToken = (userId, username) => {
   return jwt.sign({ id: userId, username }, config.jwtSecret, {
@@ -607,6 +609,76 @@ export const updatePublicKeyService = async (userId, publicKey) => {
   await user.save();
 
   return { message: "Public key updated successfully" };
+};
+
+export const upsertKeyBackupService = async (userId, publicKey, privateKey) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  if (!publicKey || !privateKey) {
+    throw new AppError("Both publicKey and privateKey are required", 400);
+  }
+
+  user.keyBackup = {
+    publicKey,
+    privateKey,
+    updatedAt: new Date(),
+  };
+  await user.save();
+
+  return { message: "Key backup saved to cloud" };
+};
+
+export const getKeyBackupService = async (userId) => {
+  const user = await User.findById(userId).select("keyBackup");
+  if (!user) throw new AppError("User not found", 404);
+
+  return {
+    keyBackup: user.keyBackup || null,
+  };
+};
+
+export const rotateEncryptionKeysService = async (
+  userId,
+  publicKey,
+  conversationKeys = [],
+) => {
+  if (!publicKey) throw new AppError("publicKey is required", 400);
+  if (!Array.isArray(conversationKeys)) {
+    throw new AppError("conversationKeys must be an array", 400);
+  }
+
+  const user = await User.findById(userId);
+  if (!user) throw new AppError("User not found", 404);
+  user.publicKey = publicKey;
+  await user.save();
+
+  let updatedConversations = 0;
+
+  for (const item of conversationKeys) {
+    const conversationId = item?.conversationId;
+    const sharedKey = item?.sharedKey;
+    if (!conversationId || !sharedKey) continue;
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) continue;
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId.toString(),
+    );
+    if (!isParticipant) continue;
+
+    const encryptedKey = encryptWithPublicKey(publicKey, sharedKey);
+    if (!encryptedKey) continue;
+
+    conversation.sharedEncryptedKeys.set(userId.toString(), encryptedKey);
+    await conversation.save();
+    updatedConversations += 1;
+  }
+
+  return {
+    message: "Encryption key rotated successfully",
+    updatedConversations,
+  };
 };
 
 export const get2FAStatusService = async (userId) => {

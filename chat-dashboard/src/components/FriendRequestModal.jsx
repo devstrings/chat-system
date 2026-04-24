@@ -1,5 +1,6 @@
 import React from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
+import BaseModal from "@/components/base/BaseModal";
 
 
 export default function FriendRequestModal({
@@ -9,20 +10,9 @@ export default function FriendRequestModal({
   onAccept,
   onReject,
 }) {
-  if (!isOpen) return null;
-
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-        onClick={onClose}
-      />
-
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div
-          className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <BaseModal isOpen={isOpen} onClose={onClose} cssClass="max-w-md p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-md overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -83,9 +73,8 @@ export default function FriendRequestModal({
               </div>
             )}
           </div>
-        </div>
       </div>
-    </>
+    </BaseModal>
   );
 }
 

@@ -355,12 +355,7 @@ export const validateMessageEditTime = (req, res, next) => {
 };
 
 export const validateMessageDeleteTime = (req, res, next) => {
-  const message = req.validatedMessage;
-  const messageAge = Date.now() - new Date(message.createdAt).getTime();
-
-  if (messageAge > MESSAGE_DELETE_LIMIT_MS) {
-    return sendError(res, 400, "Cannot delete for everyone after 5 minutes");
-  }
+  // Sender is allowed to delete for everyone without a time window.
   next();
 };
 

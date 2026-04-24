@@ -1,11 +1,22 @@
 import * as Dialog from '@radix-ui/react-dialog';
 
-import SpinWheelBackground from '@/components/category/skill-games/spinWheel/SpinWheelBackground';
 import { cn } from '@/lib/utils';
 
-const BaseModal = ({ children, isOpen, cssClass, showSpinWheelBackground }) => {
+const BaseModal = ({
+  children,
+  isOpen,
+  onClose,
+  cssClass,
+  showSpinWheelBackground,
+}) => {
+  const handleOpenChange = (open) => {
+    if (!open && onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog.Root open={isOpen}>
+    <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[rgba(103,103,103,0.30)] backdrop-blur-[6px] data-[state=open]:animate-overlayShow">
           {/* Only show SpinWheel background if flag is true */}

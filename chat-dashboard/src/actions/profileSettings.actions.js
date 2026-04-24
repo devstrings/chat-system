@@ -172,3 +172,24 @@ export const revokePersonalAccessToken = async (tokenId) => {
   const response = await axiosInstance.delete(`/api/auth/personal-access-tokens/${tokenId}`);
   return response.data;
 };
+
+export const saveKeyBackupToCloud = async ({ publicKey, privateKey }) => {
+  const response = await axiosInstance.post("/api/auth/key-backup", {
+    publicKey,
+    privateKey,
+  });
+  return response.data;
+};
+
+export const fetchKeyBackupFromCloud = async () => {
+  const response = await axiosInstance.get("/api/auth/key-backup");
+  return response.data?.keyBackup || null;
+};
+
+export const rotateEncryptionKeys = async ({ publicKey, conversationKeys }) => {
+  const response = await axiosInstance.post("/api/auth/public-key/rotate", {
+    publicKey,
+    conversationKeys,
+  });
+  return response.data;
+};

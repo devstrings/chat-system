@@ -1,13 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Message from "@/components/Message";
 import ConfirmationDialog from "@/components/base/ConfirmationDialog";
 import {
   fetchMessages,
   updateMessageStatus,
-  bulkDeleteMessages,
   clearMessages,
 } from "@/store/slices/chatSlice";
-
 import { useDispatch, useSelector } from "react-redux";
 import Button from "@/components/base/Button";
 import {
@@ -17,6 +15,7 @@ import {
   toggleSelectionMode,
   confirmBulkDelete,
 } from "@/actions/chatWindow.actions";
+
 export default function ChatWindow({
   conversationId,
   currentUserId,
@@ -67,20 +66,14 @@ export default function ChatWindow({
     dispatch(fetchMessages({ conversationId, currentUserId }));
   }, [dispatch, conversationId, currentUserId]);
 
-  // CHAT CLEARED SOCKET LISTENER
   useEffect(() => {
     if (!socket || !conversationId) return;
     const handleChatCleared = (data) => {
-      console.log("chatCleared received:", data);
-
       if (
         data.conversationId === conversationId &&
         data.clearedFor === currentUserId
       ) {
-        console.log("Clearing chat window");
         dispatch(clearMessages(conversationId));
-
-        //  reset selection mode if active
         if (isSelectionMode) {
           setIsSelectionMode(false);
           setSelectedMessages(new Set());
@@ -163,21 +156,38 @@ export default function ChatWindow({
       setDeleteDialog,
     );
 
-  const filteredMessages = searchQuery
-    ? messages.filter((msg) => {
-        if (msg.isPlaceholder) return false;
-        //  Skip deleted messages
-        if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
-          return false;
-        return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
-      })
-    : messages.filter((msg) => {
-        if (msg.isPlaceholder) return false;
-        // Skip deleted messages
-        if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
-          return false;
-        return true;
-      });
+  const filteredMessages = useMemo(() => {
+    return searchQuery
+      ? messages.filter((msg) => {
+          if (msg.isPlaceholder) return false;
+          if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
+            return false;
+          return msg.text?.toLowerCase().includes(searchQuery.toLowerCase());
+        })
+      : messages.filter((msg) => {
+          if (msg.isPlaceholder) return false;
+          if (msg.isDeletedForMe === true || msg.isDeletedForEveryone === true)
+            return false;
+          return true;
+        });
+  }, [messages, searchQuery]);
+
+  const groupedMessages = useMemo(
+    () =>
+      filteredMessages.reduce((groups, msg) => {
+        const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+
+        if (!groups[date]) groups[date] = [];
+        groups[date].push(msg);
+        return groups;
+      }, {}),
+    [filteredMessages],
+  );
 
   if (loading) {
     return (
@@ -245,19 +255,6 @@ export default function ChatWindow({
     );
   }
 
-  const groupedMessages = filteredMessages.reduce((groups, msg) => {
-    const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    if (!groups[date]) groups[date] = [];
-    groups[date].push(msg);
-    return groups;
-  }, {});
-
   return (
     <>
       <div className="flex-1 flex flex-col bg-gray-50 min-h-0">
@@ -297,7 +294,7 @@ export default function ChatWindow({
               {selectedMessages.size < filteredMessages.length ? (
                 <Button
                   onClick={() =>
-                    selectAllMessages(setSelectedMessages, messages)
+                    selectAllMessages(setSelectedMessages, filteredMessages)
                   }
                   className="px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
                 >
@@ -427,7 +424,6 @@ export default function ChatWindow({
             </div>
           ))}
 
-          {/* TYPING INDICATOR  */}
           {typingUsers.size > 0 && selectedUser && (
             <div className="flex items-start gap-2 mb-3 px-2 md:px-0">
               <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-[10px] md:text-xs font-semibold flex-shrink-0 shadow-md">

@@ -17,6 +17,7 @@ import {
   updateMessage,
   incrementUnreadCount,
   updateLastMessage,
+  fetchConversation,
 } from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
@@ -74,18 +75,18 @@ const socketMiddleware = (store) => {
         store.dispatch(setConnected(true));
       });
 
-    socket.on("disconnect", (reason) => {
-  console.warn(" Socket disconnected:", reason);
-  store.dispatch(setConnected(false));
+      socket.on("disconnect", (reason) => {
+        console.warn(" Socket disconnected:", reason);
+        store.dispatch(setConnected(false));
 
-  if (reason === "io server disconnect") {
-    const freshToken = localStorage.getItem("accessToken");
-    if (freshToken && socket) {
-      socket.auth = { token: freshToken };
-      socket.connect();
-    }
-  }
-});
+        if (reason === "io server disconnect") {
+          const freshToken = localStorage.getItem("accessToken");
+          if (freshToken && socket) {
+            socket.auth = { token: freshToken };
+            socket.connect();
+          }
+        }
+      });
 
       socket.on("connect_error", (err) => {
         console.error(" Socket connection error:", err.message);
@@ -120,7 +121,6 @@ const socketMiddleware = (store) => {
 
       // INDIVIDUAL CHAT MESSAGES
       socket.on("receiveMessage", async (msg) => {
-        msg.text = await decryptMessageHelper(msg, currentUserId);
         const senderId = msg.sender?._id || msg.sender;
         const receiverId = msg.receiver?._id || msg.receiver;
 
@@ -128,6 +128,24 @@ const socketMiddleware = (store) => {
           senderId?.toString() === currentUserId
             ? receiverId?.toString()
             : senderId?.toString();
+
+        let state = store.getState();
+        let sharedKey = state.chat.sharedKeys[msg.conversationId];
+
+        // Receiver may get socket message before shared key is loaded in Redux.
+        if (msg.encryptionData?.isSharedKey && !sharedKey && otherUserId) {
+          try {
+            await store.dispatch(
+              fetchConversation({ otherUserId, skipCreate: true }),
+            );
+            state = store.getState();
+            sharedKey = state.chat.sharedKeys[msg.conversationId];
+          } catch (error) {
+            console.warn("Failed to preload shared key for incoming message", error);
+          }
+        }
+
+        msg.text = await decryptMessageHelper(msg, currentUserId, sharedKey);
 
         // Conversation messages update
         store.dispatch(
@@ -195,8 +213,8 @@ const socketMiddleware = (store) => {
                 _updated: newLast
                   ? new Date(newLast.createdAt).getTime()
                   : new Date(
-                      state.chat.lastMessages[otherUserId]?.time,
-                    ).getTime(),
+                    state.chat.lastMessages[otherUserId]?.time,
+                  ).getTime(),
               },
               userId: otherUserId,
               isGroup: false,
@@ -300,7 +318,8 @@ const socketMiddleware = (store) => {
 
       //  GROUP CHAT MESSAGES
       socket.on("receiveGroupMessage", async (msg) => {
-        msg.text = await decryptMessageHelper(msg, currentUserId);
+        // Group chats currently rely on per-message keys; keep fallback null.
+        msg.text = await decryptMessageHelper(msg, currentUserId, null);
         // Group messages update
         store.dispatch(
           addGroupMessage({

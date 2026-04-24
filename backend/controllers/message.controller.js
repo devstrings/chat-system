@@ -34,8 +34,8 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
 export const sendMessage = asyncHandler(async (req, res) => {
   let { conversationId, groupId, text, attachments, encryptionData, replyTo } = req.body;
   const currentUserId = req.user.id;
-  
-    if (!groupId && conversationId && !req.validatedConversation) {
+
+  if (!groupId && conversationId && !req.validatedConversation) {
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
@@ -45,7 +45,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     }
     req.validatedConversation = conversation;
   }
-  
+
   const attachmentIds = attachments?.map((att) => att.attachmentId) || [];
   const io = req.app.get("webSocket");
 
@@ -67,7 +67,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
     await message.populate("sender", "username email profileImage");
     await message.populate({
       path: "attachments",
-      select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+      select:
+        "fileName fileType originalFileType sizeInKilobytes serverFileName duration isVoiceMessage isEncrypted encryptionData",
     });
 
     group.lastMessage = text || " Attachment";
@@ -80,26 +81,39 @@ export const sendMessage = asyncHandler(async (req, res) => {
       messageObj.attachments = messageObj.attachments.map((att) => ({
         url: `/api/file/get/${att.serverFileName}`,
         filename: att.fileName,
-        fileType: att.fileType,
+        fileType: att.originalFileType || att.fileType,
         fileSize: att.sizeInKilobytes * 1024,
         attachmentId: att._id,
         duration: att.duration || 0,
         isVoiceMessage: att.isVoiceMessage || false,
+        isEncrypted: att.isEncrypted || false,
+        encryptionData: att.encryptionData || { iv: "", algorithm: "" },
       }));
     }
 
-  if (io) {
-  group.members.forEach((member) => {
-    messageObj.receiver = member._id;
-    io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
-  });
-}
+    if (io) {
+      group.members.forEach((member) => {
+        messageObj.receiver = member._id;
+        io.to(member._id.toString()).emit("receiveGroupMessage", messageObj);
+      });
+    }
 
     return res.json(messageObj);
   }
 
   // --- INDIVIDUAL MESSAGE ---
   const conversation = req.validatedConversation;
+  const otherUserId = conversation.participants
+    .find((p) => p.toString() !== currentUserId.toString())
+    ?.toString();
+  const friendship = await messageService.checkFriendship(
+    currentUserId.toString(),
+    otherUserId,
+  );
+  if (!friendship) {
+    return res.status(403).json({ message: "Not friends" });
+  }
+
   const message = await Message.create({
     conversationId,
     sender: currentUserId,
@@ -113,7 +127,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
   await message.populate("sender", "username email profileImage");
   await message.populate({
     path: "attachments",
-    select: "fileName fileType sizeInKilobytes serverFileName duration isVoiceMessage",
+    select:
+      "fileName fileType originalFileType sizeInKilobytes serverFileName duration isVoiceMessage isEncrypted encryptionData",
   });
   conversation.lastMessage = text || "📎 Attachment";
   conversation.lastMessageTime = new Date();
@@ -124,21 +139,20 @@ export const sendMessage = asyncHandler(async (req, res) => {
     messageObj.attachments = messageObj.attachments.map((att) => ({
       url: `/api/file/get/${att.serverFileName}`,
       filename: att.fileName,
-      fileType: att.fileType,
+      fileType: att.originalFileType || att.fileType,
       fileSize: att.sizeInKilobytes * 1024,
       attachmentId: att._id,
       duration: att.duration || 0,
       isVoiceMessage: att.isVoiceMessage || false,
+      isEncrypted: att.isEncrypted || false,
+      encryptionData: att.encryptionData || { iv: "", algorithm: "" },
     }));
   }
-if (io) {
-  const otherUserId = conversation.participants.find(
-    (p) => p.toString() !== currentUserId,
-  );
-  // Add receiver field to messageObj
-  messageObj.receiver = otherUserId;
-  io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
-}
+  if (io) {
+    // Add receiver field to messageObj
+    messageObj.receiver = otherUserId;
+    io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
+  }
   res.json(messageObj);
 });
 
@@ -179,7 +193,7 @@ export const clearChat = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const currentUserId = req.user.id;
   const result = await messageService.processClearChat(conversationId, currentUserId);
-const io = req.app.get("webSocket");
+  const io = req.app.get("webSocket");
   if (io) {
     // NAYA
     const userSocket = [...io.sockets.sockets.values()].find(
@@ -226,7 +240,7 @@ export const deleteConversation = asyncHandler(async (req, res) => {
         deletedBy: currentUserId,
         otherUserId: result.userId,
       });
-      
+
       userSocket.emit("chatCleared", {
         conversationId: result.conversationId.toString(),
         clearedFor: currentUserId,
