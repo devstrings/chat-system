@@ -31,7 +31,7 @@ import {
   updateMessageStatus,
   updateMessage,
   updateGroupMessageInSidebar,
-  decryptAndStoreSharedKey
+  decryptAndStoreSharedKey,
 } from "@/store/slices/chatSlice";
 import {
   addGroupMessage,
@@ -73,7 +73,9 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   );
   const { friends: users } = useSelector((state) => state.user);
   const { groups } = useSelector((state) => state.group);
-  const { unreadCounts, lastMessages, sharedKeys } = useSelector((state) => state.chat);
+  const { unreadCounts, lastMessages, sharedKeys } = useSelector(
+    (state) => state.chat,
+  );
   const [loading, setLoading] = useState(true);
 
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -102,17 +104,17 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   const hasInitialized = useRef(false);
   const lastMessagesRef = useRef({});
   const hasRestored = useRef(false);
-const hasLoadedUserMessages = useRef(false);
-const hasLoadedGroupMessages = useRef(false);
+  const hasLoadedUserMessages = useRef(false);
+  const hasLoadedGroupMessages = useRef(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [savedSelectedGroupId] = useState(
     () => localStorage.getItem("selectedGroupId") || null,
   );
-const [isGroupChat, setIsGroupChat] = useState(() => {
-  const savedGroupId = localStorage.getItem("selectedGroupId");
-  const savedIsGroupChat = localStorage.getItem("isGroupChat") === "true";
-  return savedGroupId && savedIsGroupChat;
-});
+  const [isGroupChat, setIsGroupChat] = useState(() => {
+    const savedGroupId = localStorage.getItem("selectedGroupId");
+    const savedIsGroupChat = localStorage.getItem("isGroupChat") === "true";
+    return savedGroupId && savedIsGroupChat;
+  });
 
   const { imageSrc: selectedGroupImage } = useAuthImage(
     isGroupChat ? selectedGroup?.groupImage : null,
@@ -187,29 +189,41 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
     console.log(" Setting up sidebar socket listeners");
 
     //  Individual message received
-   const handleSidebarMessage = async (msg) => {
-  const senderId = msg.sender?._id || msg.sender;
-  const receiverId = msg.receiver?._id || msg.receiver;
+    const handleSidebarMessage = async (msg) => {
+      const senderId = msg.sender?._id || msg.sender;
+      const receiverId = msg.receiver?._id || msg.receiver;
 
-  console.log(" Message received:", { senderId, receiverId, currentUserId, msgId: msg._id });
+      console.log(" Message received:", {
+        senderId,
+        receiverId,
+        currentUserId,
+        msgId: msg._id,
+      });
 
-  let otherUserId;
+      let otherUserId;
 
-  if (senderId === currentUserId || senderId?.toString() === currentUserId) {
-    otherUserId = receiverId;
-  } else {
-    otherUserId = senderId;
-  }
+      if (
+        senderId === currentUserId ||
+        senderId?.toString() === currentUserId
+      ) {
+        otherUserId = receiverId;
+      } else {
+        otherUserId = senderId;
+      }
 
-  if (!otherUserId) {
-    return;
-  }
+      if (!otherUserId) {
+        return;
+      }
 
       console.log(` Updating Redux for userId: "${otherUserId}"`);
 
       // Decrypt message
       const currentSharedKey = sharedKeys[msg.conversationId];
-      msg.text = await decryptMessageHelper(msg, currentUserId, currentSharedKey);
+      msg.text = await decryptMessageHelper(
+        msg,
+        currentUserId,
+        currentSharedKey,
+      );
 
       //  UPDATE REDUX
       dispatch(
@@ -222,26 +236,26 @@ const [isGroupChat, setIsGroupChat] = useState(() => {
       );
 
       // Notification
-     if (msg.sender?._id !== currentUserId) {
-  playNotificationSound();
-  const senderIdStr =
-    msg.sender?._id?.toString() || msg.sender?.toString();
-  const selectedIdStr = selectedUserRef.current?._id?.toString();
-if (selectedIdStr !== senderIdStr) {
-  dispatch(incrementUnreadCount(otherUserId));
-  showNotification(
-    msg.sender?.username || "New Message",
-    msg.text || "📎 Attachment",
-    {
-      avatar: msg.sender?.profileImage || null,
-      senderId: msg.sender?._id,
-      senderObj: msg.sender,
-      isGroup: false,
-    },
-  );
-} else {
-  dispatch(clearUnreadCount(otherUserId));
-}
+      if (msg.sender?._id !== currentUserId) {
+        playNotificationSound();
+        const senderIdStr =
+          msg.sender?._id?.toString() || msg.sender?.toString();
+        const selectedIdStr = selectedUserRef.current?._id?.toString();
+        if (selectedIdStr !== senderIdStr) {
+          dispatch(incrementUnreadCount(otherUserId));
+          showNotification(
+            msg.sender?.username || "New Message",
+            msg.text || "📎 Attachment",
+            {
+              avatar: msg.sender?.profileImage || null,
+              senderId: msg.sender?._id,
+              senderObj: msg.sender,
+              isGroup: false,
+            },
+          );
+        } else {
+          dispatch(clearUnreadCount(otherUserId));
+        }
       } else {
       }
     };
@@ -251,7 +265,10 @@ if (selectedIdStr !== senderIdStr) {
       console.log(" [SIDEBAR] Group message:", msg._id);
 
       // Group messages haven't migrated to shared keys yet, but decryptMessageHelper handles legacy too
-msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
+      msg = {
+        ...msg,
+        text: await decryptMessageHelper(msg, currentUserId, null),
+      };
       // Update group messages in groupSlice
       dispatch(
         addGroupMessage({
@@ -289,7 +306,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //  Status update
     const handleSidebarStatus = (data) => {
-
       dispatch(
         updateMessageStatus({
           conversationId: data.conversationId,
@@ -301,7 +317,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //  Message edited (individual)
     const handleSidebarEdit = (data) => {
-
       dispatch(
         updateMessage({
           conversationId: data.conversationId,
@@ -314,7 +329,6 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
 
     //   Group message edited
     const handleSidebarGroupEdit = (data) => {
-
       // Update in groupSlice (chat window)
       dispatch(
         updateGroupMessage({
@@ -396,7 +410,7 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
       socket.off("call:record", handleCallRecord);
       socket.off("friendRequestReceived", handleFriendRequest);
     };
-  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]); 
+  }, [socket, currentUserId, dispatch, lastMessages, sharedKeys]);
 
   useEffect(() => {
     selectedUserRef.current = selectedUser;
@@ -407,15 +421,15 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
       console.log(" Saved selectedUserId:", selectedUser._id);
     }
   }, [selectedUser]);
- useEffect(() => {
-  if (selectedGroup?._id) {
-    localStorage.setItem("selectedGroupId", selectedGroup._id);
-    localStorage.setItem("isGroupChat", "true");
-    console.log(" Saved selectedGroupId:", selectedGroup._id);
-  } else {
-    localStorage.removeItem("isGroupChat");
-  }
-}, [selectedGroup]);
+  useEffect(() => {
+    if (selectedGroup?._id) {
+      localStorage.setItem("selectedGroupId", selectedGroup._id);
+      localStorage.setItem("isGroupChat", "true");
+      console.log(" Saved selectedGroupId:", selectedGroup._id);
+    } else {
+      localStorage.removeItem("isGroupChat");
+    }
+  }, [selectedGroup]);
   useEffect(() => {
     requestNotificationPermission();
     registerServiceWorker();
@@ -428,8 +442,11 @@ msg = { ...msg, text: await decryptMessageHelper(msg, currentUserId, null) };
     selectedUser?.profileImage,
   );
 
-const handleConversationDeleted = (userId) => {
-    console.log(" [DASHBOARD] Handling conversation deletion for user:", userId);
+  const handleConversationDeleted = (userId) => {
+    console.log(
+      " [DASHBOARD] Handling conversation deletion for user:",
+      userId,
+    );
 
     const conversationIdToRemove = lastMessages[userId]?.conversationId;
     console.log(" Conversation ID to remove:", conversationIdToRemove);
@@ -534,166 +551,246 @@ const handleConversationDeleted = (userId) => {
     }
   }, [urlConversationId, users, groups, loading, lastMessages]);
 
-// USERS MESSAGES LOAD
-useEffect(() => {
-  if (!currentUserId || users.length === 0) return;
-  if (hasLoadedUserMessages.current) return;
-  hasLoadedUserMessages.current = true;
+  // USERS MESSAGES LOAD
+  useEffect(() => {
+    if (!currentUserId || users.length === 0) return;
+    if (hasLoadedUserMessages.current) return;
+    hasLoadedUserMessages.current = true;
 
-  const loadUserMessages = async () => {
-    for (const user of users) {
-      try {
-        const convRes = await apiActions.getConversation(user._id, true);
-        if (!convRes) continue;
-        if (convRes?.deletedBy?.some((d) => d.userId?.toString() === currentUserId?.toString())) continue;
+    const loadUserMessages = async () => {
+      for (const user of users) {
+        try {
+          const convRes = await apiActions.getConversation(user._id, true);
+          if (!convRes) continue;
+          if (
+            convRes?.deletedBy?.some(
+              (d) => d.userId?.toString() === currentUserId?.toString(),
+            )
+          )
+            continue;
 
-        let activeSharedKey = sharedKeys[convRes._id];
-        if (convRes.sharedEncryptedKeys && !activeSharedKey) {
-          try {
-            const result = await dispatch(decryptAndStoreSharedKey({
-              conversationId: convRes._id,
-              sharedEncryptedKeys: convRes.sharedEncryptedKeys,
-              currentUserId
-            })).unwrap();
-            activeSharedKey = result.sharedKey;
-          } catch (err) {
-            console.error("Failed to decrypt key:", err);
+          let activeSharedKey = sharedKeys[convRes._id];
+          if (convRes.sharedEncryptedKeys && !activeSharedKey) {
+            try {
+              const result = await dispatch(
+                decryptAndStoreSharedKey({
+                  conversationId: convRes._id,
+                  sharedEncryptedKeys: convRes.sharedEncryptedKeys,
+                  currentUserId,
+                }),
+              ).unwrap();
+              activeSharedKey = result.sharedKey;
+            } catch (err) {
+              console.error("Failed to decrypt key:", err);
+            }
           }
+
+          const msgRes = await apiActions.getPaginatedConversationMessagesById(
+            convRes._id,
+            1,
+            20,
+          );
+          const messages = await Promise.all(
+            msgRes.map(async (msg) => {
+              msg.text = await decryptMessageHelper(
+                msg,
+                currentUserId,
+                activeSharedKey,
+              );
+              return msg;
+            }),
+          );
+          const visibleMessages = messages.filter(
+            (msg) => !msg.deletedFor?.includes(currentUserId),
+          );
+
+          if (visibleMessages.length > 0) {
+            const lastMsg = visibleMessages[visibleMessages.length - 1];
+            const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+            let processedMsg = { ...lastMsg };
+            if (lastMsg.isCallRecord) {
+              const icon = lastMsg.callType === "video" ? "📹" : "📞";
+              processedMsg.text =
+                lastMsg.callStatus === "missed"
+                  ? `${icon} Missed Call`
+                  : lastMsg.callStatus === "rejected"
+                    ? `${icon} Call Declined`
+                    : lastMsg.callStatus === "cancelled"
+                      ? `${icon} Cancelled`
+                      : lastMsg.callDuration > 0
+                        ? `${icon} ${lastMsg.callDuration}s`
+                        : `${icon} Call`;
+            }
+            dispatch(
+              addMessage({
+                conversationId: convRes._id,
+                message: {
+                  ...processedMsg,
+                  _loadedTimestamp: messageTimestamp,
+                },
+                userId: user._id,
+                isGroup: false,
+              }),
+            );
+
+            const unreadCount = messages.filter(
+              (msg) =>
+                msg.sender._id !== currentUserId && msg.status !== "read",
+            ).length;
+            const isCurrentlyOpen = selectedUserRef.current?._id === user._id;
+            if (unreadCount > 0 && !isCurrentlyOpen) {
+              for (let i = 0; i < unreadCount; i++)
+                dispatch(incrementUnreadCount(user._id));
+            } else if (isCurrentlyOpen) {
+              dispatch(clearUnreadCount(user._id));
+            }
+          } else {
+            dispatch(
+              addMessage({
+                conversationId: convRes._id,
+                message: {
+                  _id: `conv-placeholder-${convRes._id}`,
+                  text: "",
+                  createdAt: new Date().toISOString(),
+                  sender: currentUserId,
+                  status: "sent",
+                  attachments: [],
+                  isPlaceholder: true,
+                },
+                userId: user._id,
+                isGroup: false,
+              }),
+            );
+          }
+        } catch (userErr) {
+          if (userErr.response?.status === 404) continue;
+          console.error(
+            `Error loading messages for user ${user._id}:`,
+            userErr,
+          );
         }
-
-        const msgRes = await apiActions.getPaginatedConversationMessagesById(convRes._id, 1, 20);
-        const messages = await Promise.all(msgRes.map(async msg => {
-          msg.text = await decryptMessageHelper(msg, currentUserId, activeSharedKey);
-          return msg;
-        }));
-        const visibleMessages = messages.filter(msg => !msg.deletedFor?.includes(currentUserId));
-
-        if (visibleMessages.length > 0) {
-          const lastMsg = visibleMessages[visibleMessages.length - 1];
-          const messageTimestamp = new Date(lastMsg.createdAt).getTime();
-          let processedMsg = { ...lastMsg };
-          if (lastMsg.isCallRecord) {
-            const icon = lastMsg.callType === "video" ? "📹" : "📞";
-            processedMsg.text = lastMsg.callStatus === "missed" ? `${icon} Missed Call`
-              : lastMsg.callStatus === "rejected" ? `${icon} Call Declined`
-              : lastMsg.callStatus === "cancelled" ? `${icon} Cancelled`
-              : lastMsg.callDuration > 0 ? `${icon} ${lastMsg.callDuration}s` : `${icon} Call`;
-          }
-          dispatch(addMessage({
-            conversationId: convRes._id,
-            message: { ...processedMsg, _loadedTimestamp: messageTimestamp },
-            userId: user._id,
-            isGroup: false,
-          }));
-
-          const unreadCount = messages.filter(msg => msg.sender._id !== currentUserId && msg.status !== "read").length;
-          const isCurrentlyOpen = selectedUserRef.current?._id === user._id;
-          if (unreadCount > 0 && !isCurrentlyOpen) {
-            for (let i = 0; i < unreadCount; i++) dispatch(incrementUnreadCount(user._id));
-          } else if (isCurrentlyOpen) {
-            dispatch(clearUnreadCount(user._id));
-          }
-        } else {
-          dispatch(addMessage({
-            conversationId: convRes._id,
-            message: { _id: `conv-placeholder-${convRes._id}`, text: "", createdAt: new Date().toISOString(), sender: currentUserId, status: "sent", attachments: [], isPlaceholder: true },
-            userId: user._id,
-            isGroup: false,
-          }));
-        }
-      } catch (userErr) {
-        if (userErr.response?.status === 404) continue;
-        console.error(`Error loading messages for user ${user._id}:`, userErr);
       }
-    }
-  };
-  loadUserMessages();
-}, [currentUserId, users, dispatch]);
+    };
+    loadUserMessages();
+  }, [currentUserId, users, dispatch]);
 
-// GROUPS MESSAGES LOAD
-useEffect(() => {
-  if (!currentUserId || groups.length === 0) return;
-  if (hasLoadedGroupMessages.current) return;
-  hasLoadedGroupMessages.current = true;
+  // GROUPS MESSAGES LOAD
+  useEffect(() => {
+    if (!currentUserId || groups.length === 0) return;
+    if (hasLoadedGroupMessages.current) return;
+    hasLoadedGroupMessages.current = true;
 
-  const loadGroupMessages = async () => {
-    for (const group of groups) {
-      try {
-        console.log("Group load:", group._id, "targetKey will be:", `group_${group._id}`);
-        const result = await loadGroupLastMessages(group._id, currentUserId);
-        const messages = result.messages;
-        console.log("Group messages count:", messages.length);
+    const loadGroupMessages = async () => {
+      for (const group of groups) {
+        try {
+          console.log(
+            "Group load:",
+            group._id,
+            "targetKey will be:",
+            `group_${group._id}`,
+          );
+          const result = await loadGroupLastMessages(group._id, currentUserId);
+          const messages = result.messages;
+          console.log("Group messages count:", messages.length);
 
-        if (messages.length > 0) {
-          const lastMsg = messages[messages.length - 1];
-          const messageTimestamp = new Date(lastMsg.createdAt).getTime();
-          let processedMsg = { ...lastMsg };
-          if (lastMsg.isCallRecord) {
-            const icon = lastMsg.callType === "video" ? "📹" : "📞";
-            processedMsg.text = lastMsg.callStatus === "missed" ? `${icon} Missed Call`
-              : lastMsg.callStatus === "rejected" ? `${icon} Call Declined`
-              : lastMsg.callStatus === "cancelled" ? `${icon} Cancelled`
-              : lastMsg.callDuration > 0 ? `${icon} ${lastMsg.callDuration}s` : `${icon} Call`;
+          if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            const messageTimestamp = new Date(lastMsg.createdAt).getTime();
+            let processedMsg = { ...lastMsg };
+            if (lastMsg.isCallRecord) {
+              const icon = lastMsg.callType === "video" ? "📹" : "📞";
+              processedMsg.text =
+                lastMsg.callStatus === "missed"
+                  ? `${icon} Missed Call`
+                  : lastMsg.callStatus === "rejected"
+                    ? `${icon} Call Declined`
+                    : lastMsg.callStatus === "cancelled"
+                      ? `${icon} Cancelled`
+                      : lastMsg.callDuration > 0
+                        ? `${icon} ${lastMsg.callDuration}s`
+                        : `${icon} Call`;
+            }
+            dispatch(
+              addMessage({
+                conversationId: group._id,
+                message: {
+                  ...processedMsg,
+                  _loadedTimestamp: messageTimestamp,
+                },
+                userId: group._id,
+                isGroup: true,
+              }),
+            );
+          } else {
+            dispatch(
+              addMessage({
+                conversationId: group._id,
+                message: {
+                  _id: `group-placeholder-${group._id}`,
+                  text: "",
+                  createdAt: group.createdAt || new Date().toISOString(),
+                  sender: currentUserId,
+                  status: "sent",
+                  attachments: [],
+                  isPlaceholder: true,
+                },
+                userId: group._id,
+                isGroup: true,
+              }),
+            );
           }
-          dispatch(addMessage({
-            conversationId: group._id,
-            message: { ...processedMsg, _loadedTimestamp: messageTimestamp },
-            userId: group._id,
-            isGroup: true,
-          }));
-        } else {
-          dispatch(addMessage({
-            conversationId: group._id,
-            message: { _id: `group-placeholder-${group._id}`, text: "", createdAt: group.createdAt || new Date().toISOString(), sender: currentUserId, status: "sent", attachments: [], isPlaceholder: true },
-            userId: group._id,
-            isGroup: true,
-          }));
+        } catch (err) {
+          console.error(`Error loading messages for group ${group._id}:`, err);
         }
-      } catch (err) {
-        console.error(`Error loading messages for group ${group._id}:`, err);
       }
-    }
-  };
-  loadGroupMessages();
-}, [currentUserId, groups, dispatch]);
+    };
+    loadGroupMessages();
+  }, [currentUserId, groups, dispatch]);
   useEffect(() => {
     if (!socket || !currentUserId) return;
     socket.emit("joinUserRoom", currentUserId);
   }, [socket, currentUserId]);
   // Get conversation
-useEffect(() => {
-  if (!selectedUser || !selectedUser._id) {
+  useEffect(() => {
+    if (!selectedUser || !selectedUser._id) {
+      setConversationId(null);
+      return;
+    }
+
     setConversationId(null);
-    return;
-  }
 
-  setConversationId(null);
+    const getConversation = async () => {
+      try {
+        const result = await dispatch(
+          fetchConversation({ otherUserId: selectedUser._id }),
+        ).unwrap();
 
-  const getConversation = async () => {
-    try {
-      const result = await dispatch(
-        fetchConversation({ otherUserId: selectedUser._id }),
-      ).unwrap();
+        setConversationId(result._id);
+        dispatch(clearUnreadCount(selectedUser._id));
+        dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
 
-      setConversationId(result._id);
-dispatch(clearUnreadCount(selectedUser._id));
-dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
+        if (urlConversationId === selectedUser._id) {
+          navigate(`/conversation/${result._id}`, { replace: true });
+        }
 
-      if (urlConversationId === selectedUser._id) {
-        navigate(`/conversation/${result._id}`, { replace: true });
+        if (socket) {
+          socket.emit("markAsRead", { conversationId: result._id });
+        }
+      } catch (err) {
+        console.error("Get conversation error:", err);
+        setConversationId(null);
       }
+    };
 
-      if (socket) {
-        socket.emit("markAsRead", { conversationId: result._id });
-      }
-   } catch (err) {
-  console.error("Get conversation error:", err);
-  setConversationId(null);
-}
-  };
-
-  getConversation();
-}, [selectedUser?._id, conversationKey, socket, dispatch, navigate, urlConversationId]);
+    getConversation();
+  }, [
+    selectedUser?._id,
+    conversationKey,
+    socket,
+    dispatch,
+    navigate,
+    urlConversationId,
+  ]);
   useEffect(() => {
     if (!socket) return;
 
@@ -836,8 +933,6 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
                           </div>
                         )}
                       </div>
-
-                  
                     </div>
 
                     {/* NAME & STATUS */}
@@ -1075,28 +1170,27 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-      <button
-  onClick={() => {
-    setSearchInChat("");
-    setShowSearchBox(false);
-  }}
-  className="absolute right-3 top-3 text-black hover:text-gray-700 transition-colors"
->
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    
+                    <button
+                      onClick={() => {
+                        setSearchInChat("");
+                        setShowSearchBox(false);
+                      }}
+                      className="absolute right-3 top-3 text-black hover:text-gray-700 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1104,62 +1198,62 @@ dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
               {isGroupChat ? (
                 //  GROUP CHAT
                 <>
-      <GroupChatWindow
-  group={selectedGroup}
-  currentUserId={currentUserId}
-  searchQuery={searchInChat}
-  isSelectionMode={isSelectionMode}
-  setIsSelectionMode={setIsSelectionMode}
-  selectedMessages={selectedMessages}
-  setSelectedMessages={setSelectedMessages}
-  onReply={(msg) => setReplyTo(msg)}
-/>
-<MessageInput
-  groupId={selectedGroup._id}
-  isGroup={true}
-  replyTo={replyTo}
-  onCancelReply={() => setReplyTo(null)}
-/>
+                  <GroupChatWindow
+                    group={selectedGroup}
+                    currentUserId={currentUserId}
+                    searchQuery={searchInChat}
+                    isSelectionMode={isSelectionMode}
+                    setIsSelectionMode={setIsSelectionMode}
+                    selectedMessages={selectedMessages}
+                    setSelectedMessages={setSelectedMessages}
+                    onReply={(msg) => setReplyTo(msg)}
+                  />
+                  <MessageInput
+                    groupId={selectedGroup._id}
+                    isGroup={true}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
+                  />
                 </>
-          ) : (
+              ) : (
                 <>
-                {!selectedUser ? (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="text-center text-gray-400 text-sm">
-      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-      Loading...
-    </div>
-  </div>
-) : !conversationId ? (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="text-center text-gray-400 text-sm">
-      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-      Initializing conversation...
-    </div>
-  </div>
-) : (
-  <>
-    <ChatWindow
-      conversationId={conversationId}
-      currentUserId={currentUserId}
-      searchQuery={searchInChat}
-      selectedUser={selectedUser}
-      onUpdateLastMessageStatus={(updateData) => {}}
-      isSelectionMode={isSelectionMode}
-      setIsSelectionMode={setIsSelectionMode}
-      selectedMessages={selectedMessages}
-      setSelectedMessages={setSelectedMessages}
-      onReply={(msg) => setReplyTo(msg)}
-    />
-    <MessageInput
-      conversationId={conversationId}
-      selectedUser={selectedUser}
-      isGroup={false}
-      replyTo={replyTo}
-      onCancelReply={() => setReplyTo(null)}
-    />
-  </>
-)}
+                  {!selectedUser ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center text-gray-400 text-sm">
+                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        Loading...
+                      </div>
+                    </div>
+                  ) : !conversationId ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center text-gray-400 text-sm">
+                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        Initializing conversation...
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <ChatWindow
+                        conversationId={conversationId}
+                        currentUserId={currentUserId}
+                        searchQuery={searchInChat}
+                        selectedUser={selectedUser}
+                        onUpdateLastMessageStatus={(updateData) => {}}
+                        isSelectionMode={isSelectionMode}
+                        setIsSelectionMode={setIsSelectionMode}
+                        selectedMessages={selectedMessages}
+                        setSelectedMessages={setSelectedMessages}
+                        onReply={(msg) => setReplyTo(msg)}
+                      />
+                      <MessageInput
+                        conversationId={conversationId}
+                        selectedUser={selectedUser}
+                        isGroup={false}
+                        replyTo={replyTo}
+                        onCancelReply={() => setReplyTo(null)}
+                      />
+                    </>
+                  )}
                 </>
               )}
             </>
