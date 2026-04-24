@@ -49,6 +49,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [replyTo, setReplyTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
   // Redux state
   const { currentUserId } = useSelector((state) => state.auth);
   const { friends: users } = useSelector((state) => state.user);
@@ -899,12 +900,12 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
                     setSelectedMessages={setSelectedMessages}
                     onReply={(msg) => setReplyTo(msg)}
                   />
-                  <MessageInput
-                    groupId={selectedGroup._id}
-                    isGroup={true}
-                    replyTo={replyTo}
-                    onCancelReply={() => setReplyTo(null)}
-                  />
+    <MessageInput
+  groupId={selectedGroup._id}
+  isGroup={true}
+  replyTo={replyTo}
+  onCancelReply={() => setReplyTo(null)}
+/>
                 </>
               ) : (
                 <>
@@ -936,13 +937,16 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
                         setSelectedMessages={setSelectedMessages}
                         onReply={(msg) => setReplyTo(msg)}
                       />
-                      <MessageInput
-                        conversationId={conversationId}
-                        selectedUser={selectedUser}
-                        isGroup={false}
-                        replyTo={replyTo}
-                        onCancelReply={() => setReplyTo(null)}
-                      />
+                   <MessageInput
+  conversationId={conversationId}
+  selectedUser={selectedUser}
+  isGroup={false}
+  replyTo={replyTo}
+  onCancelReply={() => setReplyTo(null)}
+  editingMessage={editingMessage}
+  onCancelEdit={() => setEditingMessage(null)}
+  onEditMessage={(msg) => setEditingMessage(msg)}
+/>
                     </>
                   )}
                 </>

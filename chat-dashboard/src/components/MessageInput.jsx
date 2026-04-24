@@ -20,6 +20,9 @@ export default function MessageInput({
   selectedUser = null,
   replyTo = null,
   onCancelReply = () => {},
+  editingMessage = null,
+  onCancelEdit = () => {},
+  onEditMessage = () => {},
 }) {
   const dispatch = useDispatch();
   const { sharedKeys } = useSelector((state) => state.chat);
@@ -50,6 +53,9 @@ export default function MessageInput({
   const micButtonRef = useRef(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartXRef = useRef(0);
+  const conversationMessages = useSelector(
+    (state) => state.chat.conversations[conversationId]?.messages || [],
+  );
   const emojis = getEmojisList();
   const focusComposer = () => {
     requestAnimationFrame(() => {
@@ -161,6 +167,13 @@ export default function MessageInput({
     };
   }, [socket, conversationId, groupId, isGroup, mediaRecorder]);
   useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.text || "");
+    } else {
+      setText("");
+    }
+  }, [editingMessage]);
+  useEffect(() => {
     if (!isRecording) return;
 
     recordingTimeRef.current = 0;
@@ -179,6 +192,17 @@ export default function MessageInput({
 
     if (!isGroup && !conversationId) {
       alert("Conversation not ready yet. Please wait a moment.");
+      return;
+    }
+    if (editingMessage && attachments.length === 0) {
+      if (!text.trim()) return;
+      socket?.emit("editMessage", {
+        messageId: editingMessage._id,
+        text: text.trim(),
+        conversationId: editingMessage.conversationId,
+      });
+      setText("");
+      onCancelEdit();
       return;
     }
     if (isGroup && !groupId) {
@@ -390,6 +414,49 @@ export default function MessageInput({
 
   return (
     <div className="bg-white border-t border-gray-200 p-3 md:p-4">
+      {editingMessage && (
+        <div className="flex items-center gap-2 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg px-3 py-2 mb-2 max-w-4xl mx-auto">
+          <svg
+            className="w-4 h-4 text-yellow-500 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-yellow-600">
+              Editing Message
+            </p>
+            <p className="text-xs text-gray-500 truncate">
+              {editingMessage.text}
+            </p>
+          </div>
+          <button
+            onClick={onCancelEdit}
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       {replyTo && (
         <div className="flex items-center gap-2 bg-blue-50 border-l-4 border-blue-500 rounded-lg px-3 py-2 mb-2 max-w-4xl mx-auto">
           <svg
@@ -585,6 +652,26 @@ export default function MessageInput({
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
+                  }
+                  if (e.key === "ArrowUp" && !text.trim()) {
+                    e.preventDefault();
+                    const lastOwnMsg = [...conversationMessages]
+                      .reverse()
+                      .find(
+                        (msg) =>
+                          !msg.isPlaceholder &&
+                          !msg.isCallRecord &&
+                          msg.text &&
+                          (msg.sender?._id === currentUserId ||
+                            msg.sender === currentUserId),
+                      );
+                    if (lastOwnMsg) {
+                      const age =
+                        Date.now() - new Date(lastOwnMsg.createdAt).getTime();
+                      if (age <= 15 * 60 * 1000) {
+                        onEditMessage(lastOwnMsg);
+                      }
+                    }
                   }
                 }}
                 placeholder={
