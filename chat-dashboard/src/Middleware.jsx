@@ -85,7 +85,7 @@ export default function Middleware({ children }) {
             const targetId = item.isGroup
               ? item._id
               : lastMessages[item._id]?.conversationId || item._id;
-            dispatch(setSelectedUserId(item.isGroup ? null : item._id));
+dispatch(setSelectedUserId(item._id));
             navigate(`/conversation/${targetId}`);
           }}
           currentUsername={currentUser?.username || ""}

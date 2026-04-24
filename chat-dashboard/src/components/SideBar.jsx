@@ -84,9 +84,11 @@ export default function Sidebar({
   const dispatch = useDispatch();
   const socket = useSelector((state) => state.socket.socket);
   const onlineUsers = useSelector((state) => state.socket.onlineUsers);
-  const { pendingRequests, blockedUsers, friends: users } = useSelector(
-    (state) => state.user,
-  );
+  const {
+    pendingRequests,
+    blockedUsers,
+    friends: users,
+  } = useSelector((state) => state.user);
   const { currentUser } = useSelector((state) => state.auth);
   const { groups } = useSelector((state) => state.group);
   const { unreadCounts, lastMessages } = useSelector((state) => state.chat);
@@ -404,7 +406,9 @@ export default function Sidebar({
         message: "User has been unblocked successfully.",
         type: "success",
       });
-      const remainingBlocked = blockedUsers.filter((b) => b.blocked._id !== userId);
+      const remainingBlocked = blockedUsers.filter(
+        (b) => b.blocked._id !== userId,
+      );
       if (remainingBlocked.length === 0) {
         setTimeout(() => setShowBlockedModal(false), 1000);
       }
@@ -477,7 +481,8 @@ export default function Sidebar({
   };
 
   const handleConversationDeleted = (userId) => {
-    const conversationIdToRemove = effectiveLastMessages[userId]?.conversationId;
+    const conversationIdToRemove =
+      effectiveLastMessages[userId]?.conversationId;
     if (conversationIdToRemove) {
       dispatch(
         deleteConversation({
@@ -543,7 +548,11 @@ export default function Sidebar({
         {loading ? (
           <div className="w-full h-full bg-gray-300 animate-pulse" />
         ) : imageSrc ? (
-          <img src={imageSrc} alt={username} className="w-full h-full object-cover" />
+          <img
+            src={imageSrc}
+            alt={username}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div
             className={`w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white ${textSize} font-bold`}
@@ -568,8 +577,18 @@ export default function Sidebar({
           onClick={onCloseMobileSidebar}
           className="md:hidden absolute top-1 right-1 p-1 text-white hover:text-gray-300 z-[70] bg-black/30 rounded-full backdrop-blur-sm"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
@@ -612,13 +631,26 @@ export default function Sidebar({
                 className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white flex items-center justify-center"
                 title="Settings & More"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 5v.01M12 12v.01M12 19v.01"
+                  />
                 </svg>
               </button>
               {showProfileMenu && (
                 <>
-                  <div className="fixed inset-0 z-[90] bg-black/20" onClick={() => setShowProfileMenu(false)} />
+                  <div
+                    className="fixed inset-0 z-[90] bg-black/20"
+                    onClick={() => setShowProfileMenu(false)}
+                  />
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-300 rounded-lg shadow-2xl z-[91] overflow-hidden">
                     <button
                       onClick={() => {
@@ -742,6 +774,7 @@ export default function Sidebar({
                 </span>
               )}
             </button>
+
             <button
               onClick={() => setShowCreateGroup(true)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors text-green-400 hover:text-green-300 flex-shrink-0"
@@ -783,7 +816,9 @@ export default function Sidebar({
           <div className="relative">
             <input
               type="text"
-              placeholder={showArchived ? "Search archived..." : "Search conversations..."}
+              placeholder={
+                showArchived ? "Search archived..." : "Search conversations..."
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-3 pr-3 py-2 bg-white/10 border border-white/20 text-white text-xs sm:text-sm placeholder-white/60 rounded-lg"
@@ -793,10 +828,15 @@ export default function Sidebar({
 
         <div className="px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
           <p className="text-xs text-gray-900 font-bold">
-            {searchQuery.trim() ? searchDirectoryResults.length : memoizedItems.length} contacts
+            {searchQuery.trim()
+              ? searchDirectoryResults.length
+              : memoizedItems.length}{" "}
+            contacts
             {" • "}
             {onlineCount} online
-            {totalUnread > 0 && <span className="text-red-400 ml-2">• {totalUnread} unread</span>}
+            {totalUnread > 0 && (
+              <span className="text-red-400 ml-2">• {totalUnread} unread</span>
+            )}
           </p>
         </div>
 
@@ -813,7 +853,9 @@ export default function Sidebar({
                       onCloseMobileSidebar();
                     }}
                     className={`bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between ${
-                      person.isFriend ? "cursor-pointer hover:bg-gray-100 transition-colors" : ""
+                      person.isFriend
+                        ? "cursor-pointer hover:bg-gray-100 transition-colors"
+                        : ""
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -824,8 +866,12 @@ export default function Sidebar({
                         textSize="text-sm"
                       />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{person.username}</p>
-                        <p className="text-xs text-gray-500 truncate">{person.email}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {person.username}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {person.email}
+                        </p>
                       </div>
                     </div>
                     {!person.isFriend ? (
@@ -861,8 +907,12 @@ export default function Sidebar({
                         onClick={() => onSelectUser({ ...item, isGroup: true })}
                         onPinConversation={handlePinConversation}
                         onArchiveConversation={handleArchiveConversation}
-                        isPinned={item.pinnedBy?.some((p) => p.userId === currentUserId)}
-                        isArchived={item.archivedBy?.some((a) => a.userId === currentUserId)}
+                        isPinned={item.pinnedBy?.some(
+                          (p) => p.userId === currentUserId,
+                        )}
+                        isArchived={item.archivedBy?.some(
+                          (a) => a.userId === currentUserId,
+                        )}
                         conversationId={item._id}
                         currentUserId={currentUserId}
                         unreadCount={unreadCounts[item._id] || 0}
@@ -870,7 +920,9 @@ export default function Sidebar({
                         lastMessageTime={lastMsg?.time || null}
                         lastMessageSender={lastMsg?.sender || null}
                         lastMessageStatus={lastMsg?.status || "sent"}
-                        onGroupUpdate={(updatedGroup) => dispatch(updateGroup(updatedGroup))}
+                        onGroupUpdate={(updatedGroup) =>
+                          dispatch(updateGroup(updatedGroup))
+                        }
                         onGroupDeleted={() => dispatch(fetchGroups())}
                       />
                     );
@@ -879,8 +931,10 @@ export default function Sidebar({
                   const lastMsg = effectiveLastMessages[item._id];
                   const formattedText = formatLastMessageText(lastMsg);
                   const conversationId = lastMsg?.conversationId;
-                  const isPinned = conversationId && pinnedConversations.has(conversationId);
-                  const isArchived = conversationId && archivedConversations.has(conversationId);
+                  const isPinned =
+                    conversationId && pinnedConversations.has(conversationId);
+                  const isArchived =
+                    conversationId && archivedConversations.has(conversationId);
                   return (
                     <UserItem
                       key={item._id}

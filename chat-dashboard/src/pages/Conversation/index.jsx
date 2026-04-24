@@ -16,16 +16,14 @@ import useConversationSocketListeners from "@/pages/Conversation/hooks/useConver
 import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import { useDispatch, useSelector } from "react-redux";
 import AlertDialog from "@/components/base/AlertDialog";
-import {
-  fetchFriendsList,
-} from "@/store/slices/userSlice";
+import { fetchFriendsList } from "@/store/slices/userSlice";
 import { fetchGroups } from "@/store/slices/groupSlice";
 import {
   fetchConversation,
   clearUnreadCount,
   addMessage,
   incrementUnreadCount,
-  decryptAndStoreSharedKey
+  decryptAndStoreSharedKey,
 } from "@/store/slices/chatSlice";
 import apiActions from "@/store/apiActions";
 import {
@@ -142,6 +140,12 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
+
+  useEffect(() => {
+  if (isGroupChat && selectedGroup?._id) {
+    dispatch({ type: "chat/setSelectedUserId", payload: selectedGroup._id });
+  }
+}, [isGroupChat, selectedGroup?._id, dispatch]);
   useEffect(() => {
     if (selectedUser?._id) {
       localStorage.setItem("selectedUserId", selectedUser._id);
@@ -474,7 +478,7 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
           navigate(`/conversation/${result._id}`, { replace: true });
         }
 
-     if (socket) {
+        if (socket) {
           socket.emit("markAsRead", { conversationId: result._id });
         }
       } catch (err) {
@@ -900,12 +904,12 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
                     setSelectedMessages={setSelectedMessages}
                     onReply={(msg) => setReplyTo(msg)}
                   />
-    <MessageInput
-  groupId={selectedGroup._id}
-  isGroup={true}
-  replyTo={replyTo}
-  onCancelReply={() => setReplyTo(null)}
-/>
+                  <MessageInput
+                    groupId={selectedGroup._id}
+                    isGroup={true}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
+                  />
                 </>
               ) : (
                 <>
@@ -937,16 +941,16 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
                         setSelectedMessages={setSelectedMessages}
                         onReply={(msg) => setReplyTo(msg)}
                       />
-                   <MessageInput
-  conversationId={conversationId}
-  selectedUser={selectedUser}
-  isGroup={false}
-  replyTo={replyTo}
-  onCancelReply={() => setReplyTo(null)}
-  editingMessage={editingMessage}
-  onCancelEdit={() => setEditingMessage(null)}
-  onEditMessage={(msg) => setEditingMessage(msg)}
-/>
+                      <MessageInput
+                        conversationId={conversationId}
+                        selectedUser={selectedUser}
+                        isGroup={false}
+                        replyTo={replyTo}
+                        onCancelReply={() => setReplyTo(null)}
+                        editingMessage={editingMessage}
+                        onCancelEdit={() => setEditingMessage(null)}
+                        onEditMessage={(msg) => setEditingMessage(msg)}
+                      />
                     </>
                   )}
                 </>
