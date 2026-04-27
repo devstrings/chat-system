@@ -76,7 +76,14 @@ export const sendMessage = asyncHandler(async (req, res) => {
     group.lastMessageSender = currentUserId;
     await group.save();
 
-    const messageObj = message.toObject();
+  const messageObj = message.toObject();
+    
+    if (messageObj.encryptionData?.keys instanceof Map) {
+      messageObj.encryptionData.keys = Object.fromEntries(
+        messageObj.encryptionData.keys
+      );
+    }
+
     if (messageObj.attachments?.length > 0) {
       messageObj.attachments = messageObj.attachments.map((att) => ({
         url: `/api/file/get/${att.serverFileName}`,

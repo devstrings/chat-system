@@ -53,9 +53,9 @@ export const fetchGroupMessages = createAsyncThunk(
 
       const decryptedMessages = await Promise.all(
         filteredMessages.map(async (msg) => {
-          msg.text = await decryptMessageHelper(msg, currentUserId);
+          msg.text = await decryptMessageHelper(msg, currentUserId, null);
           return msg;
-        })
+        }),
       );
 
       return { groupId, messages: decryptedMessages };

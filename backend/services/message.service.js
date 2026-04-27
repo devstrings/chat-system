@@ -175,6 +175,12 @@ export const transformMessages = (messages, currentUserId) => {
   const transformedMessages = messages.map((msg) => {
     const messageObj = msg.toObject();
 
+    if (messageObj.encryptionData?.keys instanceof Map) {
+      messageObj.encryptionData.keys = Object.fromEntries(
+        messageObj.encryptionData.keys
+      );
+    }
+
     messageObj.isDeletedForMe = msg.deletedFor?.includes(currentUserId);
     messageObj.isDeletedForEveryone = msg.deletedForEveryone;
 
@@ -585,6 +591,12 @@ export const fetchGroupMessages = async (groupId, limit, skip) => {
 export const transformGroupMessages = (messages) => {
   const transformedMessages = messages.map((msg) => {
     const messageObj = msg.toObject();
+
+    if (messageObj.encryptionData?.keys instanceof Map) {
+      messageObj.encryptionData.keys = Object.fromEntries(
+        messageObj.encryptionData.keys
+      );
+    }
 
     if (messageObj.attachments && messageObj.attachments.length > 0) {
       messageObj.attachments = messageObj.attachments.map((att) => ({

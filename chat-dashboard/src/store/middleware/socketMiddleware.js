@@ -51,7 +51,6 @@ const socketMiddleware = (store) => {
         return next(action);
       }
 
-      console.log(" Initializing socket connection...");
       socket = io(SOCKET_URL, {
         auth: { token: accessToken },
         path: "/webSocket",
@@ -71,7 +70,6 @@ const socketMiddleware = (store) => {
 
       //  CONNECTION EVENTS
       socket.on("connect", () => {
-        console.log("Socket connected:", socket.id);
         store.dispatch(setConnected(true));
       });
 
@@ -115,15 +113,16 @@ const socketMiddleware = (store) => {
       });
 
       socket.on("userOffline", (data) => {
-        console.log(" User went offline:", data.userId);
         store.dispatch(removeOnlineUser(data.userId));
       });
 
       // INDIVIDUAL CHAT MESSAGES
       socket.on("receiveMessage", async (msg) => {
+        if (msg.encryptionData?.keys instanceof Map) {
+          msg.encryptionData.keys = Object.fromEntries(msg.encryptionData.keys);
+        }
         const senderId = msg.sender?._id || msg.sender;
         const receiverId = msg.receiver?._id || msg.receiver;
-
         const otherUserId =
           senderId?.toString() === currentUserId
             ? receiverId?.toString()
@@ -141,7 +140,10 @@ const socketMiddleware = (store) => {
             state = store.getState();
             sharedKey = state.chat.sharedKeys[msg.conversationId];
           } catch (error) {
-            console.warn("Failed to preload shared key for incoming message", error);
+            console.warn(
+              "Failed to preload shared key for incoming message",
+              error,
+            );
           }
         }
 
@@ -157,22 +159,18 @@ const socketMiddleware = (store) => {
           }),
         );
 
-        // Unread sirf receiver ke liye
+        // Unread
         if (senderId?.toString() !== currentUserId) {
           store.dispatch(incrementUnreadCount(senderId?.toString()));
         }
       });
 
       socket.on("messageStatusUpdate", (data) => {
-        console.log(" Message status update:", data);
         store.dispatch(updateMessageStatus(data));
       });
 
-      socket.on("messagesMarkedRead", (data) => {
-        console.log(" Messages marked read:", data.conversationId);
-      });
+      socket.on("messagesMarkedRead", (data) => {});
 
-      // NAYA CODE
       socket.on("messageDeleted", (data) => {
         console.log(" Message deleted:", data.messageId);
         store.dispatch(
@@ -213,8 +211,8 @@ const socketMiddleware = (store) => {
                 _updated: newLast
                   ? new Date(newLast.createdAt).getTime()
                   : new Date(
-                    state.chat.lastMessages[otherUserId]?.time,
-                  ).getTime(),
+                      state.chat.lastMessages[otherUserId]?.time,
+                    ).getTime(),
               },
               userId: otherUserId,
               isGroup: false,
@@ -224,7 +222,6 @@ const socketMiddleware = (store) => {
       });
 
       socket.on("messageDeletedForEveryone", (data) => {
-        // Pehle message remove karo
         store.dispatch(
           removeMessageForEveryone({
             conversationId: data.conversationId,
@@ -232,7 +229,6 @@ const socketMiddleware = (store) => {
           }),
         );
 
-        // Ab updated state lo
         setTimeout(() => {
           const state = store.getState();
           const messages =
@@ -318,7 +314,9 @@ const socketMiddleware = (store) => {
 
       //  GROUP CHAT MESSAGES
       socket.on("receiveGroupMessage", async (msg) => {
-        // Group chats currently rely on per-message keys; keep fallback null.
+        if (msg.encryptionData?.keys instanceof Map) {
+          msg.encryptionData.keys = Object.fromEntries(msg.encryptionData.keys);
+        }
         msg.text = await decryptMessageHelper(msg, currentUserId, null);
         // Group messages update
         store.dispatch(
@@ -350,7 +348,6 @@ const socketMiddleware = (store) => {
       });
 
       socket.on("groupMessageDeletedForEveryone", (data) => {
-        console.log(" Group message deleted for everyone:", data.messageId);
         store.dispatch(
           deleteGroupMessage({
             groupId: data.groupId,
@@ -360,7 +357,6 @@ const socketMiddleware = (store) => {
       });
 
       socket.on("groupUserTyping", (data) => {
-        console.log("⌨ Group typing:", data);
         store.dispatch(
           updateGroupTyping({
             groupId: data.groupId,
@@ -376,23 +372,19 @@ const socketMiddleware = (store) => {
 
       // TYPING INDICATORS
       socket.on("userTyping", (data) => {
-        console.log("⌨ User typing:", data);
         // Handle typing indicator in UI
       });
 
       //  STATUS EVENTS
       socket.on("newStatus", (data) => {
-        console.log(" New status:", data);
         // Handle status update
       });
 
       socket.on("statusDeleted", (data) => {
-        console.log(" Status deleted:", data);
         // Handle status deletion
       });
 
       socket.on("statusViewed", (data) => {
-        console.log("Status viewed:", data);
         // Handle status view
       });
 

@@ -4,9 +4,7 @@ import { checkAuth, logout } from "@/store/slices/authSlice";
 import { Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "@/components/SideBar";
 import useCryptoInit from "@/hooks/useCryptoInit";
-import {
-  setSelectedUserId,
-} from "@/store/slices/chatSlice";
+import { setSelectedUserId } from "@/store/slices/chatSlice";
 
 export default function Middleware({ children }) {
   const dispatch = useDispatch();
@@ -85,7 +83,7 @@ export default function Middleware({ children }) {
             const targetId = item.isGroup
               ? item._id
               : lastMessages[item._id]?.conversationId || item._id;
-dispatch(setSelectedUserId(item._id));
+            dispatch(setSelectedUserId(item._id));
             navigate(`/conversation/${targetId}`);
           }}
           currentUsername={currentUser?.username || ""}
@@ -98,7 +96,9 @@ dispatch(setSelectedUserId(item._id));
 
         {/* Children (Conversation page) get sidebar open handler */}
         <div className="flex-1 flex flex-col min-w-0">
-          {children}
+          {React.cloneElement(children, {
+            onOpenMobileSidebar: () => setIsMobileSidebarOpen(true),
+          })}
         </div>
       </div>
     </>

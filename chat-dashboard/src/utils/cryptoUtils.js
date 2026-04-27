@@ -119,9 +119,12 @@ export async function encryptMessage(text, publicKeysObj, existingKey = null) {
   const rawAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
 
   // 5. Encrypt the AES key for each participant's public key
-  const encryptedKeys = {};
+const encryptedKeys = {};
+  let encryptedCount = 0;
   for (const [userId, pubKeyB64] of Object.entries(publicKeysObj)) {
-    if (!pubKeyB64) continue;
+    if (!pubKeyB64) {
+      continue;
+    }
     try {
       const rsaPubKey = await importPublicKey(pubKeyB64);
       const encryptedAesKey = await window.crypto.subtle.encrypt(
@@ -131,10 +134,14 @@ export async function encryptMessage(text, publicKeysObj, existingKey = null) {
         rsaPubKey,
         rawAesKey
       );
-      encryptedKeys[userId] = btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedAesKey)));
+  encryptedKeys[userId] = btoa(String.fromCharCode.apply(null, new Uint8Array(encryptedAesKey)));
+      encryptedCount++;
     } catch (err) {
       console.error(`Failed to encrypt for user ${userId}`, err);
     }
+  }
+
+  if (encryptedCount === 0) {
   }
 
   return {
@@ -209,14 +216,15 @@ export async function decryptMessage(cipherText, encryptedAesKeyB64, ivB64, priv
 // Helper to decrypt a full message object
 export async function decryptMessageHelper(msg, currentUserId, sharedKey = null) {
   if (msg && msg.encryptionData && msg.encryptionData.iv) {
-    // 1. If using conversation-level shared key
     if (msg.encryptionData.isSharedKey && sharedKey) {
       return await decryptMessage(msg.text, null, msg.encryptionData.iv, null, sharedKey);
     }
-
-    // 2. Fallback to per-message keys (backward compatibility)
-    if (msg.encryptionData.keys) {
-      const encryptedAesKey = msg.encryptionData.keys[currentUserId];
+if (msg.encryptionData.keys) {
+      const keys = msg.encryptionData.keys;
+      const encryptedAesKey =
+        typeof keys.get === "function"
+          ? keys.get(currentUserId)
+          : keys[currentUserId];
       if (encryptedAesKey) {
         // Try current private key first
         const privKey = localStorage.getItem(`chat_sk_${currentUserId}`);

@@ -20,15 +20,14 @@ export const processCreateGroup = async (
     members: [creatorId, ...memberIds],
   });
 
-  await group.populate("members", "username email profileImage");
-
+  await group.populate("members", "username email profileImage publicKey");
   return group;
 };
 
 // GET USER'S GROUPS SERVICE
 export const fetchUserGroups = async (userId) => {
   const groups = await Group.find({ members: userId })
-    .populate("members", "username email profileImage")
+    .populate("members", "username email profileImage publicKey")
     .populate("lastMessageSender", "username")
     .populate("creator", "username")
     .sort({ lastMessageTime: -1 });
@@ -39,7 +38,7 @@ export const fetchUserGroups = async (userId) => {
 // GET GROUP DETAILS SERVICE
 export const fetchGroupDetails = async (groupId) => {
   const group = await Group.findById(groupId)
-    .populate("members", "username email profileImage")
+    .populate("members", "username email profileImage publicKey")
     .populate("admins", "username email")
     .populate("creator", "username email");
 
@@ -59,7 +58,8 @@ export const processUpdateGroup = async (groupId, name, description) => {
   }
 
   await group.save();
-  await group.populate("members admins creator", "username email profileImage");
+  await group.populate("members", "username email profileImage publicKey");
+  await group.populate("admins creator", "username email profileImage");
 
   return group;
 };
@@ -120,12 +120,14 @@ export const processAddGroupMembers = async (groupId, memberIds) => {
   );
 
   if (newMembers.length === 0) {
-throw new AppError("All users are already members", 400);  }
+    throw new AppError("All users are already members", 400);
+  }
 
   // Add members back (even if previously removed)
   group.members.push(...newMembers);
   await group.save();
-  await group.populate("members admins creator", "username email profileImage");
+  await group.populate("members", "username email profileImage publicKey");
+  await group.populate("admins creator", "username email profileImage");
 
   return group;
 };
@@ -138,11 +140,11 @@ export const processRemoveGroupMember = async (groupId, memberId) => {
   group.admins = group.admins.filter((a) => a.toString() !== memberId);
 
   await group.save();
-  await group.populate("members admins creator", "username email profileImage");
+  await group.populate("members", "username email profileImage publicKey");
+  await group.populate("admins creator", "username email profileImage");
 
   return group;
 };
-
 // LEAVE GROUP SERVICE
 export const processLeaveGroup = async (groupId, userId) => {
   const group = await Group.findById(groupId);
@@ -284,7 +286,6 @@ export const processClearGroupChat = async (groupId, userId) => {
     lastMessageSender: null,
   });
 
-
   return {
     message: "Group chat cleared for you",
     deletedCount: result.modifiedCount,
@@ -322,7 +323,8 @@ export const findGroupImageFile = (filename) => {
   }
 
   if (!filePath) {
-throw new AppError("Image not found", 404);  }
+    throw new AppError("Image not found", 404);
+  }
 
   return filePath;
 };

@@ -236,7 +236,7 @@ export default function MessageInput({
           });
         }
 
-        const sharedKey = sharedKeys[conversationId];
+        const sharedKey = isGroup ? null : sharedKeys[conversationId];
         const encrypted = await encryptMessage(
           textToEncrypt,
           publicKeysObj,
@@ -272,7 +272,7 @@ export default function MessageInput({
                 },
               }
             : null,
-             otherUserId: selectedUser?._id,
+          otherUserId: selectedUser?._id,
         }),
       ).unwrap();
 
