@@ -272,6 +272,7 @@ export default function MessageInput({
                 },
               }
             : null,
+             otherUserId: selectedUser?._id,
         }),
       ).unwrap();
 

@@ -213,13 +213,14 @@ export default function Sidebar({
       });
     }
 
-    const filteredUsers = users
-      .filter((user) => {
-        const convId = effectiveLastMessages[user._id]?.conversationId;
-        if (!convId) return false;
-        const isArchived = archivedConversations.has(convId);
-        return showArchived ? isArchived : !isArchived;
-      })
+const filteredUsers = users.filter((user) => {
+  const convId = effectiveLastMessages[user._id]?.conversationId;
+  if (!convId) return false;
+  const lastMsg = effectiveLastMessages[user._id];
+  if (lastMsg?.isPlaceholder) return false;  
+  const isArchived = archivedConversations.has(convId);
+  return showArchived ? isArchived : !isArchived;
+})
       .map((user) => ({ ...user, isGroup: false }));
 
     const filteredGroups = groups

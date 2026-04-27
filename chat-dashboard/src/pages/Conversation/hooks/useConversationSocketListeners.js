@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { fetchFriendsList, fetchPendingRequests } from "@/store/slices/userSlice";
-import { addMessage } from "@/store/slices/chatSlice";
+import { addMessage, deleteConversation  } from "@/store/slices/chatSlice";
 import apiActions from "@/store/apiActions";
 import { decryptMessageHelper } from "@/utils/cryptoUtils";
 import { playNotificationSound } from "@/actions/dashboard.actions";
@@ -116,11 +116,16 @@ export default function useConversationSocketListeners({
       );
     };
 
+    const handleConversationDeleted = ({ conversationId, otherUserId }) => {
+      dispatch(deleteConversation({ conversationId, otherUserId }));
+    };
+
     socket.on("friendRequestReceived", handleFriendRequest);
     socket.on("friendRequestAccepted", handleFriendRequestAccepted);
     socket.on("receiveMessage", handleSidebarMessage);
     socket.on("receiveGroupMessage", handleSidebarGroupMessage);
     socket.on("call:record", handleCallRecord);
+    socket.on("conversationDeleted", handleConversationDeleted);
 
     return () => {
       socket.off("receiveMessage", handleSidebarMessage);
@@ -128,6 +133,7 @@ export default function useConversationSocketListeners({
       socket.off("call:record", handleCallRecord);
       socket.off("friendRequestReceived", handleFriendRequest);
       socket.off("friendRequestAccepted", handleFriendRequestAccepted);
+      socket.off("conversationDeleted", handleConversationDeleted);
     };
   }, [
     socket,

@@ -223,6 +223,7 @@ export const clearChat = asyncHandler(async (req, res) => {
     conversationId: result.conversationId,
   });
 });
+
 // DELETE CONVERSATION CONTROLLER
 export const deleteConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
@@ -231,22 +232,52 @@ export const deleteConversation = asyncHandler(async (req, res) => {
   const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
   const io = req.app.get("webSocket");
   if (io) {
-    const userSocket = [...io.sockets.sockets.values()].find(
-      (s) => s.user && s.user.id === currentUserId,
-    );
-    if (userSocket) {
-      userSocket.emit("conversationDeleted", {
-        conversationId: result.conversationId.toString(),
-        deletedBy: currentUserId,
-        otherUserId: result.userId,
-      });
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (result.bothDeleted) {
+   
+      const participants = await Conversation.findById(conversationId) 
+        || conversation; // fallback
+      
+      if (participants?.participants) {
+        for (const participantId of participants.participants) {
+          const participantSocket = [...io.sockets.sockets.values()].find(
+            (s) => s.user && s.user.id === participantId.toString(),
+          );
+          if (participantSocket) {
+            participantSocket.emit("conversationDeleted", {
+              conversationId: result.conversationId.toString(),
+              deletedBy: currentUserId,
+              otherUserId: result.userId,
+            });
+            
+            participantSocket.emit("chatCleared", {
+              conversationId: result.conversationId.toString(),
+              clearedFor: participantId.toString(),
+              clearedBy: currentUserId,
+              action: "conversationDeleted"
+            });
+          }
+        }
+      }
+    } else {
+      const userSocket = [...io.sockets.sockets.values()].find(
+        (s) => s.user && s.user.id === currentUserId,
+      );
+      if (userSocket) {
+        userSocket.emit("conversationDeleted", {
+          conversationId: result.conversationId.toString(),
+          deletedBy: currentUserId,
+          otherUserId: result.userId,
+        });
 
-      userSocket.emit("chatCleared", {
-        conversationId: result.conversationId.toString(),
-        clearedFor: currentUserId,
-        clearedBy: currentUserId,
-        action: "conversationDeleted"
-      });
+        userSocket.emit("chatCleared", {
+          conversationId: result.conversationId.toString(),
+          clearedFor: currentUserId,
+          clearedBy: currentUserId,
+          action: "conversationDeleted"
+        });
+      }
     }
   }
   res.json(result);

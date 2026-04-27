@@ -192,28 +192,30 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
     loadInitialData();
   }, [dispatch, navigate]);
 
-  useEffect(() => {
-    if (loading) return;
-    if (hasRestored.current) return;
-    if (!savedSelectedUserId && !savedSelectedGroupId) return;
-    if (users.length === 0 && groups.length === 0) return;
+useEffect(() => {
+  if (loading) return;
+  if (hasRestored.current) return;
+  if (!savedSelectedUserId && !savedSelectedGroupId) return;
+  if (users.length === 0 && groups.length === 0) return;
 
-    if (savedSelectedGroupId && isGroupChat) {
-      const group = groups.find((g) => g._id === savedSelectedGroupId);
-      if (group) {
-        setSelectedGroup(group);
-        setIsGroupChat(true);
-        hasRestored.current = true;
-      }
-    } else if (savedSelectedUserId) {
-      const user = users.find((u) => u._id === savedSelectedUserId);
-      if (user) {
-        setSelectedUser(user);
-        setIsGroupChat(false);
-        hasRestored.current = true;
-      }
+  if (urlConversationId && urlConversationId !== "home") return;
+
+  if (savedSelectedGroupId && isGroupChat) {
+    const group = groups.find((g) => g._id === savedSelectedGroupId);
+    if (group) {
+      setSelectedGroup(group);
+      setIsGroupChat(true);
+      hasRestored.current = true;
     }
-  }, [users, groups, loading]);
+  } else if (savedSelectedUserId) {
+    const user = users.find((u) => u._id === savedSelectedUserId);
+    if (user) {
+      setSelectedUser(user);
+      setIsGroupChat(false);
+      hasRestored.current = true;
+    }
+  }
+}, [users, groups, loading]);
   useEffect(() => {
     if (loading) return;
     if (!urlConversationId || urlConversationId === "home") {
@@ -349,24 +351,24 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
             } else if (isCurrentlyOpen) {
               dispatch(clearUnreadCount(user._id));
             }
-          } else {
-            dispatch(
-              addMessage({
-                conversationId: convRes._id,
-                message: {
-                  _id: `conv-placeholder-${convRes._id}`,
-                  text: "",
-                  createdAt: new Date().toISOString(),
-                  sender: currentUserId,
-                  status: "sent",
-                  attachments: [],
-                  isPlaceholder: true,
-                },
-                userId: user._id,
-                isGroup: false,
-              }),
-            );
-          }
+          // } else {
+          //   dispatch(
+          //     addMessage({
+          //       conversationId: convRes._id,
+          //       message: {
+          //         _id: `conv-placeholder-${convRes._id}`,
+          //         text: "",
+          //         createdAt: new Date().toISOString(),
+          //         sender: currentUserId,
+          //         status: "sent",
+          //         attachments: [],
+          //         isPlaceholder: true,
+          //       },
+          //       userId: user._id,
+          //       isGroup: false,
+          //     }),
+          //   );
+}
         } catch (userErr) {
           if (userErr.response?.status === 404) continue;
           console.error(

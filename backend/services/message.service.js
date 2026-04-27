@@ -36,9 +36,7 @@ export const findExistingConversation = async (currentUserId, otherUserId) => {
 
   if (activeConversation) return activeConversation;
 
-  return await Conversation.findOne({
-    participants: { $all: [currentUserId, otherUserId] },
-  }).sort({ createdAt: -1 }); 
+
 };
 
 
