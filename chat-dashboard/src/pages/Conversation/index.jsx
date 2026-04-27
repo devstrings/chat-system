@@ -142,11 +142,6 @@ export default function Conversation({ onOpenMobileSidebar = () => {} }) {
   }, [selectedUser]);
 
   useEffect(() => {
-  if (isGroupChat && selectedGroup?._id) {
-    dispatch({ type: "chat/setSelectedUserId", payload: selectedGroup._id });
-  }
-}, [isGroupChat, selectedGroup?._id, dispatch]);
-  useEffect(() => {
     if (selectedUser?._id) {
       localStorage.setItem("selectedUserId", selectedUser._id);
       console.log(" Saved selectedUserId:", selectedUser._id);
@@ -351,23 +346,7 @@ useEffect(() => {
             } else if (isCurrentlyOpen) {
               dispatch(clearUnreadCount(user._id));
             }
-          // } else {
-          //   dispatch(
-          //     addMessage({
-          //       conversationId: convRes._id,
-          //       message: {
-          //         _id: `conv-placeholder-${convRes._id}`,
-          //         text: "",
-          //         createdAt: new Date().toISOString(),
-          //         sender: currentUserId,
-          //         status: "sent",
-          //         attachments: [],
-          //         isPlaceholder: true,
-          //       },
-          //       userId: user._id,
-          //       isGroup: false,
-          //     }),
-          //   );
+         
 }
         } catch (userErr) {
           if (userErr.response?.status === 404) continue;
@@ -474,7 +453,7 @@ useEffect(() => {
 
         setConversationId(result._id);
         dispatch(clearUnreadCount(selectedUser._id));
-        dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
+        // dispatch({ type: "chat/setSelectedUserId", payload: selectedUser._id });
 
         if (urlConversationId === selectedUser._id) {
           navigate(`/conversation/${result._id}`, { replace: true });

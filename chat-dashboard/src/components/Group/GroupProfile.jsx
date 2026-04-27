@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { useDispatch } from "react-redux";
 import {
@@ -349,6 +349,19 @@ export default function GroupProfile({
 
   const { imageSrc: groupImage } = useAuthImage(group.groupImage, "group");
 
+  const searchTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (searchUsers.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      handleSearchUsers(searchUsers, group, setSearchResults, setLoading);
+    }, 400);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [searchUsers]);
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
     title: "",
@@ -410,39 +423,89 @@ export default function GroupProfile({
   };
 
   // Upload group image
-const onImageUpload = () =>
-    handleImageUpload(selectedImage, group, onGroupUpdate, setSelectedImage, setImagePreview, setAlertDialog, setUploading);
+  const onImageUpload = () =>
+    handleImageUpload(
+      selectedImage,
+      group,
+      onGroupUpdate,
+      setSelectedImage,
+      setImagePreview,
+      setAlertDialog,
+      setUploading,
+    );
 
   // Remove group image
- const onRemoveImage = () =>
+  const onRemoveImage = () =>
     handleRemoveImage(group, onGroupUpdate, setConfirmDialog, setAlertDialog);
 
   // Update group name
-const onUpdateGroupName = () =>
-    handleUpdateGroupName(groupName, group, onGroupUpdate, setIsEditingName, setAlertDialog);
+  const onUpdateGroupName = () =>
+    handleUpdateGroupName(
+      groupName,
+      group,
+      onGroupUpdate,
+      setIsEditingName,
+      setAlertDialog,
+    );
 
   // Search users
- const onSearchUsers = () =>
+  const onSearchUsers = () =>
     handleSearchUsers(searchUsers, group, setSearchResults, setLoading);
 
   //  Add member
   const onAddMember = (userId) =>
-    handleAddMember(userId, group, dispatch, onGroupUpdate, setSearchResults, setSearchUsers, setAlertDialog);
+    handleAddMember(
+      userId,
+      group,
+      dispatch,
+      onGroupUpdate,
+      setSearchResults,
+      setSearchUsers,
+      setAlertDialog,
+    );
   // Remove member
-const onRemoveMember = (memberId) =>
-    handleRemoveMember(memberId, group, dispatch, onMemberRemoved, setConfirmDialog, setAlertDialog);
+  const onRemoveMember = (memberId) =>
+    handleRemoveMember(
+      memberId,
+      group,
+      dispatch,
+      onMemberRemoved,
+      setConfirmDialog,
+      setAlertDialog,
+    );
   //  make ADMIN FUNCTION
-const onMakeAdmin = (memberId) =>
+  const onMakeAdmin = (memberId) =>
     handleMakeAdmin(memberId, group, dispatch, onGroupUpdate, setAlertDialog);
   // Remove Admin Function
- const onRemoveAdmin = (memberId) =>
-    handleRemoveAdmin(memberId, group, dispatch, onGroupUpdate, setConfirmDialog, setAlertDialog);
+  const onRemoveAdmin = (memberId) =>
+    handleRemoveAdmin(
+      memberId,
+      group,
+      dispatch,
+      onGroupUpdate,
+      setConfirmDialog,
+      setAlertDialog,
+    );
   // Exit group
- const onExitGroup = () =>
-    handleExitGroup(group, onGroupDeleted, onClose, setConfirmDialog, setAlertDialog);
+  const onExitGroup = () =>
+    handleExitGroup(
+      group,
+      onGroupDeleted,
+      onClose,
+      setConfirmDialog,
+      setAlertDialog,
+    );
   // Delete group
-const onDeleteGroup = () =>
-    handleDeleteGroup(group, currentUserId, onGroupDeleted, onClose, setConfirmDialog, setAlertDialog, setShowAddMember);
+  const onDeleteGroup = () =>
+    handleDeleteGroup(
+      group,
+      currentUserId,
+      onGroupDeleted,
+      onClose,
+      setConfirmDialog,
+      setAlertDialog,
+      setShowAddMember,
+    );
 
   return (
     <>
@@ -552,7 +615,7 @@ const onDeleteGroup = () =>
 
                   {(groupImage || imagePreview) && (
                     <button
-onClick={onRemoveImage}
+                      onClick={onRemoveImage}
                       className="absolute bottom-0 left-0 p-2.5 bg-red-500 hover:bg-red-600 rounded-full shadow-lg border-2 border-white transition-all transform hover:scale-110"
                     >
                       <svg
@@ -578,7 +641,7 @@ onClick={onRemoveImage}
             {selectedImage && isAdmin && (
               <div className="flex gap-2 mb-4">
                 <button
-onClick={onImageUpload}
+                  onClick={onImageUpload}
                   disabled={uploading}
                   className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
                 >
@@ -606,7 +669,7 @@ onClick={onImageUpload}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center text-xl font-bold"
                 />
                 <button
-onClick={onUpdateGroupName}
+                  onClick={onUpdateGroupName}
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-semibold"
                 >
                   Save
@@ -701,22 +764,17 @@ onClick={onUpdateGroupName}
 
                 {showAddMember && (
                   <div className="mt-3 p-4 bg-gray-50 rounded-xl">
-                    <div className="flex gap-2 mb-3">
+                    <div className="relative mb-3">
                       <input
                         type="text"
-                        placeholder="Search users..."
+                        placeholder="Type to search (min 2 chars)..."
                         value={searchUsers}
                         onChange={(e) => setSearchUsers(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && onSearchUsers()}
-                        className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-3 py-2 pr-8 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
-                      <button
-  onClick={onSearchUsers}
-                          disabled={loading}
-                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold disabled:opacity-50"
-                      >
-                        {loading ? "..." : "Search"}
-                      </button>
+                      {loading && (
+                        <div className="absolute right-2 top-2.5 w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                      )}
                     </div>
 
                     {searchResults.length > 0 && (
@@ -728,7 +786,7 @@ onClick={onUpdateGroupName}
                           >
                             <span className="font-medium">{user.username}</span>
                             <button
-onClick={() => onAddMember(user._id)}
+                              onClick={() => onAddMember(user._id)}
                               className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold"
                             >
                               Add
@@ -773,9 +831,9 @@ onClick={() => onAddMember(user._id)}
                       currentUserId={currentUserId}
                       currentUserIsAdmin={isAdmin}
                       currentUserIsCreator={isCreator}
-                   onRemove={() => onRemoveMember(member._id)}
-onMakeAdmin={onMakeAdmin}
-onRemoveAdmin={onRemoveAdmin}
+                      onRemove={() => onRemoveMember(member._id)}
+                      onMakeAdmin={onMakeAdmin}
+                      onRemoveAdmin={onRemoveAdmin}
                     />
                   );
                 })}
@@ -786,7 +844,7 @@ onRemoveAdmin={onRemoveAdmin}
             <div className="space-y-3">
               {isCreator ? (
                 <button
-onClick={onDeleteGroup}
+                  onClick={onDeleteGroup}
                   className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                   <svg
@@ -806,7 +864,8 @@ onClick={onDeleteGroup}
                 </button>
               ) : (
                 <button
-onClick={onExitGroup}                  className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                  onClick={onExitGroup}
+                  className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
                 >
                   <svg
                     className="w-5 h-5"
