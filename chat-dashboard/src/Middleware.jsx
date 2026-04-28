@@ -75,8 +75,7 @@ export default function Middleware({ children }) {
             onClick={() => setIsMobileSidebarOpen(false)}
           />
         )}
-
-        <Sidebar
+<Sidebar
           selectedUserId={selectedUserId}
           onSelectUser={(item) => {
             setIsMobileSidebarOpen(false);
@@ -92,12 +91,26 @@ export default function Middleware({ children }) {
           lastMessages={lastMessages}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onCloseMobileSidebar={() => setIsMobileSidebarOpen(false)}
+          onCloseChat={() => {
+            dispatch(setSelectedUserId(null));
+            localStorage.removeItem("selectedUserId");
+            localStorage.removeItem("selectedGroupId");
+            localStorage.removeItem("isGroupChat");
+            navigate("/conversation/home");
+          }}
         />
 
         {/* Children (Conversation page) get sidebar open handler */}
         <div className="flex-1 flex flex-col min-w-0">
           {React.cloneElement(children, {
             onOpenMobileSidebar: () => setIsMobileSidebarOpen(true),
+            onCloseChat: () => {
+              dispatch(setSelectedUserId(null));
+              localStorage.removeItem("selectedUserId");
+              localStorage.removeItem("selectedGroupId");
+              localStorage.removeItem("isGroupChat");
+              navigate("/conversation/home");
+            },
           })}
         </div>
       </div>

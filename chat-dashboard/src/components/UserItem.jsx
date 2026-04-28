@@ -35,6 +35,7 @@ const UserItem = memo(function UserItem({
   onPinConversation = () => {},
   onArchiveConversation = () => {},
   onConversationDeleted = () => {},
+   onCloseChat = () => {},
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
@@ -661,6 +662,22 @@ const UserItem = memo(function UserItem({
 
                   {/* Options List */}
                   <div className="p-1 max-h-[60vh] overflow-y-auto">
+                         {/* Close Chat */}
+                    {relationshipStatus === "friends" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowOptionsModal(false);
+                          onCloseChat();
+                        }}
+                        className="w-full px-2.5 py-2 text-left text-gray-800 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2 text-xs sm:text-sm"
+                      >
+                        <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span className="font-medium">Close Chat</span>
+                      </button>
+                    )}
                     {/* Pin/Unpin */}
                     {relationshipStatus === "friends" && conversationId && (
                       <button

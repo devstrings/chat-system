@@ -49,6 +49,7 @@ export default function Sidebar({
   isMobileSidebarOpen = false,
   lastMessages: middlewareLastMessages = {},
   onCloseMobileSidebar = () => {},
+  onCloseChat = () => {},
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchDirectoryResults, setSearchDirectoryResults] = useState([]);
@@ -925,6 +926,7 @@ const filteredUsers = users.filter((user) => {
                           dispatch(updateGroup(updatedGroup))
                         }
                         onGroupDeleted={() => dispatch(fetchGroups())}
+                         onCloseChat={onCloseChat}
                       />
                     );
                   }
@@ -937,11 +939,12 @@ const filteredUsers = users.filter((user) => {
                   const isArchived =
                     conversationId && archivedConversations.has(conversationId);
                   return (
-                    <UserItem
+        <UserItem
                       key={item._id}
                       user={item}
                       selected={item._id === selectedUserId}
                       onClick={() => onSelectUser(item)}
+                      onCloseChat={onCloseChat}
                       isOnline={onlineUsers.includes(item._id)}
                       unreadCount={unreadCounts[item._id] || 0}
                       lastMessage={formattedText}

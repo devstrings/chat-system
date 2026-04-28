@@ -32,8 +32,8 @@ import {
   requestNotificationPermission,
   registerServiceWorker,
 } from "@/actions/dashboard.actions";
-export default function Conversation({ onOpenMobileSidebar = () => {} }) {
-  const [selectedUser, setSelectedUser] = useState(null);
+export default function Conversation({ onOpenMobileSidebar = () => {}, onCloseChat = () => {} }) {
+    const [selectedUser, setSelectedUser] = useState(null);
   const [savedSelectedUserId] = useState(
     () => localStorage.getItem("selectedUserId") || null,
   );

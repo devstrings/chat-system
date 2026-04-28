@@ -22,6 +22,7 @@ export default function GroupItem({
   lastMessageStatus = "sent",
   onGroupUpdate = () => { },
   onGroupDeleted = () => { },
+    onCloseChat = () => { },
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -236,6 +237,7 @@ const handleLeaveGroup = () => {
         </div>
 
         {/* Three Dots Menu */}
+ {/* Three Dots Menu */}
         <div className="relative flex-shrink-0">
           <button
             onClickCapture={(e) => {
@@ -429,15 +431,26 @@ const handleLeaveGroup = () => {
                   <span className="font-medium">Clear Chat</span>
                 </button>
               )}
-
+<button
+                onClickCapture={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setTimeout(() => onCloseChat(), 50);
+                }}
+                className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span className="font-medium">Close Chat</span>
+              </button>
               <button
                 onClickCapture={(e) => {
                   e.stopPropagation();
                   setShowMenu(false);
                   setTimeout(() => handleLeaveGroup(), 50);
                 }}
-                className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              >
+                className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm">
                 <svg
                   className="w-4 h-4 flex-shrink-0"
                   fill="none"
