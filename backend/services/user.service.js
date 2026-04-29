@@ -71,7 +71,7 @@ export const checkIfUserIsBlocked = async (currentUserId, targetUserId) => {
 // FETCH USER BY ID SERVICE
 export const fetchUserById = async (userId) => {
   const user = await User.findById(userId).select(
-    "username email _id profileImage",
+    "username email _id profileImage publicKey",
   );
 
   return user;

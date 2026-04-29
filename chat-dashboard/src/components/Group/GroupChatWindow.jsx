@@ -8,16 +8,22 @@ import {
   clearGroupChatMessages,
   updateGroupMessage,
 } from "@/store/slices/groupSlice";
-import { toggleMessageSelection, selectAllMessages, deselectAllMessages, handleBulkDelete } from "@/actions/groupChat.actions";
+import {
+  toggleMessageSelection,
+  selectAllMessages,
+  deselectAllMessages,
+  handleBulkDelete,
+} from "@/actions/groupChat.actions";
+import ForwardModal from "@/components/ForwardModal";
 export default function GroupChatWindow({
   group,
   currentUserId,
   searchQuery = "",
   isSelectionMode = false,
-  setIsSelectionMode = () => { },
+  setIsSelectionMode = () => {},
   selectedMessages = new Set(),
-  setSelectedMessages = () => { },
-  onReply = () => { },
+  setSelectedMessages = () => {},
+  onReply = () => {},
 }) {
   //  Redux setup
   const dispatch = useDispatch();
@@ -29,7 +35,7 @@ export default function GroupChatWindow({
 
   const messagesEndRef = useRef(null);
   const [typingUsers, setTypingUsers] = useState(new Set());
-
+  const [forwardMessage, setForwardMessage] = useState(null);
 
   //  Fetch messages
   useEffect(() => {
@@ -128,8 +134,8 @@ export default function GroupChatWindow({
   // Filter messages
   const filteredMessages = searchQuery
     ? messages.filter((msg) =>
-      msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
+        msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
     : messages;
 
   // Group messages by date
@@ -243,21 +249,29 @@ export default function GroupChatWindow({
           <div className="flex items-center gap-2">
             {selectedMessages.size < filteredMessages.length ? (
               <button
-onClick={() => selectAllMessages(setSelectedMessages, messages)}
+                onClick={() => selectAllMessages(setSelectedMessages, messages)}
                 className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
               >
                 All
               </button>
             ) : (
               <button
-onClick={() => deselectAllMessages(setSelectedMessages)}
+                onClick={() => deselectAllMessages(setSelectedMessages)}
                 className="px-2 md:px-3 py-1 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
               >
                 None
               </button>
             )}
             <button
-onClick={() => handleBulkDelete(socket, selectedMessages, group._id, setIsSelectionMode, setSelectedMessages)}
+              onClick={() =>
+                handleBulkDelete(
+                  socket,
+                  selectedMessages,
+                  group._id,
+                  setIsSelectionMode,
+                  setSelectedMessages,
+                )
+              }
               disabled={selectedMessages.size === 0}
               className="px-3 md:px-4 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 text-xs md:text-sm"
             >
@@ -308,9 +322,12 @@ onClick={() => handleBulkDelete(socket, selectedMessages, group._id, setIsSelect
                   isGroupMessage={true}
                   isSelectionMode={isSelectionMode}
                   isSelected={selectedMessages.has(msg._id)}
-onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messageId)}
+                  onToggleSelect={(messageId) =>
+                    toggleMessageSelection(setSelectedMessages, messageId)
+                  }
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
                   onReply={onReply}
+                  onForward={(msg) => setForwardMessage(msg)}
                 />
               </div>
             ))}
@@ -336,7 +353,6 @@ onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messa
                     style={{ animationDelay: "300ms" }}
                   />
                 </div>
-
               </div>
             </div>
           </div>
@@ -344,6 +360,12 @@ onToggleSelect={(messageId) => toggleMessageSelection(setSelectedMessages, messa
 
         <div ref={messagesEndRef} />
       </div>
+      {forwardMessage && (
+        <ForwardModal
+          message={forwardMessage}
+          onClose={() => setForwardMessage(null)}
+        />
+      )}
     </div>
   );
 }

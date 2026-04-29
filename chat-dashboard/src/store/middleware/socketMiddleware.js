@@ -116,11 +116,12 @@ const socketMiddleware = (store) => {
         store.dispatch(removeOnlineUser(data.userId));
       });
 
-      // INDIVIDUAL CHAT MESSAGES
+          // INDIVIDUAL CHAT MESSAGES
       socket.on("receiveMessage", async (msg) => {
         if (msg.encryptionData?.keys instanceof Map) {
           msg.encryptionData.keys = Object.fromEntries(msg.encryptionData.keys);
         }
+        
         const senderId = msg.sender?._id || msg.sender;
         const receiverId = msg.receiver?._id || msg.receiver;
         const otherUserId =
@@ -128,26 +129,39 @@ const socketMiddleware = (store) => {
             ? receiverId?.toString()
             : senderId?.toString();
 
-        let state = store.getState();
-        let sharedKey = state.chat.sharedKeys[msg.conversationId];
-
-        // Receiver may get socket message before shared key is loaded in Redux.
-        if (msg.encryptionData?.isSharedKey && !sharedKey && otherUserId) {
-          try {
-            await store.dispatch(
-              fetchConversation({ otherUserId, skipCreate: true }),
-            );
-            state = store.getState();
-            sharedKey = state.chat.sharedKeys[msg.conversationId];
-          } catch (error) {
-            console.warn(
-              "Failed to preload shared key for incoming message",
-              error,
-            );
+        //  Check if this is a shared key message or per-user keys
+        const isSharedKeyMessage = msg.encryptionData?.isSharedKey === true;
+        
+        let decryptedText = msg.text;
+        
+        try {
+          if (isSharedKeyMessage) {
+            // Group or shared key conversation
+            let state = store.getState();
+            let sharedKey = state.chat.sharedKeys[msg.conversationId];
+            
+            if (!sharedKey && otherUserId) {
+              try {
+                await store.dispatch(
+                  fetchConversation({ otherUserId, skipCreate: true }),
+                );
+                state = store.getState();
+                sharedKey = state.chat.sharedKeys[msg.conversationId];
+              } catch (error) {
+                console.warn("Failed to preload shared key for incoming message", error);
+              }
+            }
+            decryptedText = await decryptMessageHelper(msg, currentUserId, sharedKey);
+          } else {
+            // Single chat - ALWAYS pass null to use keys Map
+            decryptedText = await decryptMessageHelper(msg, currentUserId, null);
           }
+          
+          msg.text = decryptedText;
+        } catch (err) {
+          console.error("Decryption failed in receiveMessage:", err);
+          msg.text = "[Encrypted message]";
         }
-
-        msg.text = await decryptMessageHelper(msg, currentUserId, sharedKey);
 
         // Conversation messages update
         store.dispatch(
@@ -164,7 +178,6 @@ const socketMiddleware = (store) => {
           store.dispatch(incrementUnreadCount(senderId?.toString()));
         }
       });
-
       socket.on("messageStatusUpdate", (data) => {
         store.dispatch(updateMessageStatus(data));
       });

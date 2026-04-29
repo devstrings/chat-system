@@ -4,15 +4,23 @@ import Group from "#models/Group";
 import Conversation from "#models/Conversation";
 import asyncHandler from "express-async-handler";
 
-
 export const getOrCreateConversation = asyncHandler(async (req, res) => {
   const currentUserId = req.user.id;
   const { otherUserId, skipCreate } = req.body;
-  const existingConversation = await messageService.findExistingConversation(currentUserId, otherUserId);
+  const existingConversation = await messageService.findExistingConversation(
+    currentUserId,
+    otherUserId,
+  );
   const isNewConversation = !existingConversation && !skipCreate;
-  const conversation = await messageService.processGetOrCreateConversation(currentUserId, otherUserId, skipCreate);
+  const conversation = await messageService.processGetOrCreateConversation(
+    currentUserId,
+    otherUserId,
+    skipCreate,
+  );
   if (!conversation && skipCreate) {
-    return res.status(404).json({ message: "No conversation found", exists: false });
+    return res
+      .status(404)
+      .json({ message: "No conversation found", exists: false });
   }
   if (isNewConversation && conversation) {
     const io = req.app.get("webSocket");
@@ -30,9 +38,9 @@ export const getOrCreateConversation = asyncHandler(async (req, res) => {
   res.json(conversation);
 });
 
-
 export const sendMessage = asyncHandler(async (req, res) => {
-  let { conversationId, groupId, text, attachments, encryptionData, replyTo } = req.body;
+  let { conversationId, groupId, text, attachments, encryptionData, replyTo } =
+    req.body;
   const currentUserId = req.user.id;
 
   if (!groupId && conversationId && !req.validatedConversation) {
@@ -41,7 +49,9 @@ export const sendMessage = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "Conversation not found" });
     }
     if (!conversation.participants.includes(currentUserId)) {
-      return res.status(403).json({ message: "Not a participant in this conversation" });
+      return res
+        .status(403)
+        .json({ message: "Not a participant in this conversation" });
     }
     req.validatedConversation = conversation;
   }
@@ -62,8 +72,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
       isGroupMessage: true,
       status: "sent",
       replyTo: replyTo || null,
+      isForwarded: req.body.isForwarded || false,
     });
-
     await message.populate("sender", "username email profileImage");
     await message.populate({
       path: "attachments",
@@ -76,11 +86,11 @@ export const sendMessage = asyncHandler(async (req, res) => {
     group.lastMessageSender = currentUserId;
     await group.save();
 
-  const messageObj = message.toObject();
-    
+    const messageObj = message.toObject();
+
     if (messageObj.encryptionData?.keys instanceof Map) {
       messageObj.encryptionData.keys = Object.fromEntries(
-        messageObj.encryptionData.keys
+        messageObj.encryptionData.keys,
       );
     }
 
@@ -130,6 +140,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     status: "sent",
     isGroupMessage: false,
     replyTo: replyTo || null,
+    isForwarded: req.body.isForwarded || false,
   });
   await message.populate("sender", "username email profileImage");
   await message.populate({
@@ -158,7 +169,9 @@ export const sendMessage = asyncHandler(async (req, res) => {
   if (io) {
     // Add receiver field to messageObj
     messageObj.receiver = otherUserId;
-    io.to(currentUserId).to(otherUserId.toString()).emit("receiveMessage", messageObj);
+    io.to(currentUserId)
+      .to(otherUserId.toString())
+      .emit("receiveMessage", messageObj);
   }
   res.json(messageObj);
 });
@@ -179,19 +192,31 @@ export const getMessages = asyncHandler(async (req, res) => {
   const otherUserId = conversation.participants
     .find((p) => p.toString() !== currentUserId.toString())
     ?.toString();
-  const friendship = await messageService.checkFriendship(currentUserId.toString(), otherUserId);
+  const friendship = await messageService.checkFriendship(
+    currentUserId.toString(),
+    otherUserId,
+  );
   if (!friendship) {
     return res.status(403).json({ message: "Not friends" });
   }
-  const messages = await messageService.fetchMessages(conversationId, currentUserId, limit, skip);
-  const transformedMessages = messageService.transformMessages(messages, currentUserId);
+  const messages = await messageService.fetchMessages(
+    conversationId,
+    currentUserId,
+    limit,
+    skip,
+  );
+  const transformedMessages = messageService.transformMessages(
+    messages,
+    currentUserId,
+  );
   res.json(transformedMessages);
 });
 
 // GET USER CONVERSATIONS CONTROLLER
 export const getUserConversations = asyncHandler(async (req, res) => {
   const currentUserId = req.user.id;
-  const conversations = await messageService.fetchUserConversations(currentUserId);
+  const conversations =
+    await messageService.fetchUserConversations(currentUserId);
   res.json(conversations);
 });
 
@@ -199,12 +224,15 @@ export const getUserConversations = asyncHandler(async (req, res) => {
 export const clearChat = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const currentUserId = req.user.id;
-  const result = await messageService.processClearChat(conversationId, currentUserId);
+  const result = await messageService.processClearChat(
+    conversationId,
+    currentUserId,
+  );
   const io = req.app.get("webSocket");
   if (io) {
     // NAYA
     const userSocket = [...io.sockets.sockets.values()].find(
-      (s) => s.user && s.user.id === currentUserId
+      (s) => s.user && s.user.id === currentUserId,
     );
 
     if (userSocket) {
@@ -236,16 +264,19 @@ export const deleteConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const currentUserId = req.user.id;
   const { otherUserId } = req.body;
-  const result = await messageService.processDeleteConversation(conversationId, currentUserId, otherUserId);
+  const result = await messageService.processDeleteConversation(
+    conversationId,
+    currentUserId,
+    otherUserId,
+  );
   const io = req.app.get("webSocket");
   if (io) {
     const conversation = await Conversation.findById(conversationId);
-    
+
     if (result.bothDeleted) {
-   
-      const participants = await Conversation.findById(conversationId) 
-        || conversation; // fallback
-      
+      const participants =
+        (await Conversation.findById(conversationId)) || conversation; // fallback
+
       if (participants?.participants) {
         for (const participantId of participants.participants) {
           const participantSocket = [...io.sockets.sockets.values()].find(
@@ -257,12 +288,12 @@ export const deleteConversation = asyncHandler(async (req, res) => {
               deletedBy: currentUserId,
               otherUserId: result.userId,
             });
-            
+
             participantSocket.emit("chatCleared", {
               conversationId: result.conversationId.toString(),
               clearedFor: participantId.toString(),
               clearedBy: currentUserId,
-              action: "conversationDeleted"
+              action: "conversationDeleted",
             });
           }
         }
@@ -282,7 +313,7 @@ export const deleteConversation = asyncHandler(async (req, res) => {
           conversationId: result.conversationId.toString(),
           clearedFor: currentUserId,
           clearedBy: currentUserId,
-          action: "conversationDeleted"
+          action: "conversationDeleted",
         });
       }
     }
@@ -294,14 +325,18 @@ export const deleteConversation = asyncHandler(async (req, res) => {
 export const deleteMessageForMe = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const currentUserId = req.user.id;
-  const result = await messageService.processDeleteMessageForMe(messageId, currentUserId);
+  const result = await messageService.processDeleteMessageForMe(
+    messageId,
+    currentUserId,
+  );
   res.json(result);
 });
 
 // DELETE MESSAGE FOR EVERYONE CONTROLLER
 export const deleteMessageForEveryone = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const result = await messageService.processDeleteMessageForEveryone(messageId);
+  const result =
+    await messageService.processDeleteMessageForEveryone(messageId);
   res.json(result);
 });
 
@@ -309,7 +344,10 @@ export const deleteMessageForEveryone = asyncHandler(async (req, res) => {
 export const bulkDeleteMessages = asyncHandler(async (req, res) => {
   const { messageIds } = req.body;
   const currentUserId = req.user.id;
-  const result = await messageService.processBulkDeleteMessages(messageIds, currentUserId);
+  const result = await messageService.processBulkDeleteMessages(
+    messageIds,
+    currentUserId,
+  );
   res.json(result);
 });
 
@@ -317,7 +355,10 @@ export const bulkDeleteMessages = asyncHandler(async (req, res) => {
 export const pinConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const userId = req.user.id;
-  const result = await messageService.processPinConversation(conversationId, userId);
+  const result = await messageService.processPinConversation(
+    conversationId,
+    userId,
+  );
   res.json(result);
 });
 
@@ -325,14 +366,18 @@ export const pinConversation = asyncHandler(async (req, res) => {
 export const unpinConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const userId = req.user.id;
-  const result = await messageService.processUnpinConversation(conversationId, userId);
+  const result = await messageService.processUnpinConversation(
+    conversationId,
+    userId,
+  );
   res.json(result);
 });
 
 // GET PINNED CONVERSATIONS CONTROLLER
 export const getPinnedConversations = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const pinnedConversations = await messageService.fetchPinnedConversations(userId);
+  const pinnedConversations =
+    await messageService.fetchPinnedConversations(userId);
   res.json(pinnedConversations);
 });
 
@@ -340,21 +385,28 @@ export const getPinnedConversations = asyncHandler(async (req, res) => {
 export const archiveConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const userId = req.user.id;
-  const result = await messageService.processArchiveConversation(conversationId, userId);
+  const result = await messageService.processArchiveConversation(
+    conversationId,
+    userId,
+  );
   res.json(result);
 });
 // UNARCHIVE CONVERSATION CONTROLLER
 export const unarchiveConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const userId = req.user.id;
-  const result = await messageService.processUnarchiveConversation(conversationId, userId);
+  const result = await messageService.processUnarchiveConversation(
+    conversationId,
+    userId,
+  );
   res.json(result);
 });
 
 // GET ARCHIVED CONVERSATIONS CONTROLLER
 export const getArchivedConversations = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const archivedConversations = await messageService.fetchArchivedConversations(userId);
+  const archivedConversations =
+    await messageService.fetchArchivedConversations(userId);
   res.json(archivedConversations);
 });
 
@@ -363,7 +415,11 @@ export const getGroupMessages = asyncHandler(async (req, res) => {
   const { groupId } = req.params;
   const limit = parseInt(req.query.limit) || 50;
   const skip = parseInt(req.query.skip) || 0;
-  const messages = await messageService.fetchGroupMessages(groupId, limit, skip);
+  const messages = await messageService.fetchGroupMessages(
+    groupId,
+    limit,
+    skip,
+  );
   const transformedMessages = messageService.transformGroupMessages(messages);
   res.json(transformedMessages);
 });

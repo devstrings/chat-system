@@ -1,15 +1,15 @@
-import { useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import axiosInstance from '@/lib/axiosInstance';
-import API_BASE_URL from '@/config/api';
+import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import axiosInstance from "@/lib/axiosInstance";
+import API_BASE_URL from "@/config/api";
 import {
   generateKeyPair,
   exportPublicKey,
-  exportPrivateKey
-} from '@/utils/cryptoUtils';
+  exportPrivateKey,
+} from "@/utils/cryptoUtils";
 
 export default function useCryptoInit() {
-  const { currentUser } = useSelector(state => state.auth);
+  const { currentUser } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -19,8 +19,7 @@ export default function useCryptoInit() {
         const userId = currentUser._id || currentUser.id;
         const privateKeyStr = localStorage.getItem(`chat_sk_${userId}`);
         const publicKeyStr = localStorage.getItem(`chat_pk_${userId}`);
-        
-        // Only generate if we don't have it locally
+
         if (!privateKeyStr || !publicKeyStr) {
           const cloudBackupRes = await axiosInstance.get(
             `${API_BASE_URL}/api/auth/key-backup`,
@@ -32,9 +31,7 @@ export default function useCryptoInit() {
             await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
               publicKey: cloudBackup.publicKey,
             });
-            console.log("E2EE keypair restored from cloud backup.");
           } else {
-            console.log("Generating new E2EE keypair...");
             const keyPair = await generateKeyPair();
             const pubKeyB64 = await exportPublicKey(keyPair.publicKey);
             const privKeyB64 = await exportPrivateKey(keyPair.privateKey);
@@ -42,11 +39,31 @@ export default function useCryptoInit() {
             localStorage.setItem(`chat_pk_${userId}`, pubKeyB64);
             localStorage.setItem(`chat_sk_${userId}`, privKeyB64);
 
-            // Upload public key to server
             await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
-              publicKey: pubKeyB64
+              publicKey: pubKeyB64,
             });
-            console.log("E2EE keypair generated and public key uploaded.");
+
+            await axiosInstance.post(`${API_BASE_URL}/api/auth/key-backup`, {
+              publicKey: pubKeyB64,
+              privateKey: privKeyB64,
+            });
+          }
+        }
+
+        if (privateKeyStr && publicKeyStr) {
+          try {
+            const cloudBackupRes = await axiosInstance.get(
+              `${API_BASE_URL}/api/auth/key-backup`,
+            );
+            const cloudBackup = cloudBackupRes?.data?.keyBackup;
+            if (!cloudBackup?.privateKey) {
+              await axiosInstance.post(`${API_BASE_URL}/api/auth/key-backup`, {
+                publicKey: publicKeyStr,
+                privateKey: privateKeyStr,
+              });
+            }
+          } catch (err) {
+            console.error("Failed to sync key backup", err);
           }
         }
       } catch (err) {

@@ -89,3 +89,28 @@ export const removeCoverPhoto = asyncHandler(async (req, res) => {
   if (!result) return res.status(404).json({ message: "User not found" });
   res.json({ message: "Cover photo removed successfully", user: result });
 });
+// GET USER PUBLIC KEY CONTROLLER FOR E2EE
+export const getUserPublicKey = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  
+  const user = await userService.fetchUserById(userId);
+  
+  if (!user) {
+    return res.status(404).json({ 
+      success: false, 
+      message: "User not found" 
+    });
+  }
+  
+  if (!user.publicKey) {
+    return res.status(404).json({ 
+      success: false, 
+      message: "Public key not found for this user" 
+    });
+  }
+  
+  res.json({ 
+    success: true, 
+    publicKey: user.publicKey 
+  });
+});

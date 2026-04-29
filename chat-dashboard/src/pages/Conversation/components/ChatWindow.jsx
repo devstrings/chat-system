@@ -15,6 +15,7 @@ import {
   toggleSelectionMode,
   confirmBulkDelete,
 } from "@/actions/chatWindow.actions";
+import ForwardModal from "@/components/ForwardModal";
 
 export default function ChatWindow({
   conversationId,
@@ -46,6 +47,7 @@ export default function ChatWindow({
     isOpen: false,
     count: 0,
   });
+  const [forwardMessage, setForwardMessage] = useState(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -418,6 +420,7 @@ export default function ChatWindow({
                     }
                     onEnterSelectionMode={() => setIsSelectionMode(true)}
                     onReply={onReply}
+                    onForward={(msg) => setForwardMessage(msg)}
                   />
                 );
               })}
@@ -453,7 +456,12 @@ export default function ChatWindow({
           <div ref={messagesEndRef} />
         </div>
       </div>
-
+      {forwardMessage && (
+        <ForwardModal
+          message={forwardMessage}
+          onClose={() => setForwardMessage(null)}
+        />
+      )}
       <ConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={() => setDeleteDialog({ ...deleteDialog, isOpen: false })}

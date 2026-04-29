@@ -54,10 +54,31 @@ export const fetchConversation = createAsyncThunk(
             }),
           ).unwrap();
         } catch (err) {
-          console.warn(
-            "Key decryption failed, continuing without shared key:",
-            err,
-          );
+          try {
+            const currentPublicKey = localStorage.getItem(
+              `chat_pk_${currentUserId}`,
+            );
+            if (currentPublicKey) {
+              await axiosInstance.post(`${API_BASE_URL}/api/auth/public-key`, {
+                publicKey: currentPublicKey,
+              });
+            }
+            const retryRes = await axiosInstance.post(
+              `${API_BASE_URL}/api/messages/conversation`,
+              { otherUserId, skipCreate: false },
+            );
+            if (retryRes.data?.sharedEncryptedKeys) {
+              await dispatch(
+                decryptAndStoreSharedKey({
+                  conversationId: conversation._id,
+                  sharedEncryptedKeys: retryRes.data.sharedEncryptedKeys,
+                  currentUserId,
+                }),
+              ).unwrap();
+            }
+          } catch (retryErr) {
+            console.warn("Key retry failed:", retryErr);
+          }
         }
       }
 
@@ -111,6 +132,7 @@ export const sendMessage = createAsyncThunk(
       attachments,
       encryptionData,
       replyTo,
+      isForwarded = false,
     },
     { rejectWithValue },
   ) => {
@@ -120,6 +142,7 @@ export const sendMessage = createAsyncThunk(
         attachments,
         encryptionData,
         replyTo,
+        isForwarded,
         ...(isGroup ? { groupId } : { conversationId }),
       };
       const response = await axiosInstance.post(

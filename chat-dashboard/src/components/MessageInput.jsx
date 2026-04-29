@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { encryptMessage } from "@/utils/cryptoUtils";
 import { sendMessage } from "@/store/slices/chatSlice";
+import axiosInstance from "@/lib/axiosInstance";
+import API_BASE_URL from "@/config/api";
 import {
   uploadFile,
   uploadVoiceMessage,
@@ -222,13 +224,43 @@ export default function MessageInput({
         text.trim() || (attachments.length > 0 ? "📎 Attachment" : "");
       if (textToEncrypt) {
         const publicKeysObj = {};
-        publicKeysObj[currentUserId] = localStorage.getItem(
-          `chat_pk_${currentUserId}`,
-        );
 
-        if (!isGroup && selectedUser && selectedUser.publicKey) {
-          publicKeysObj[selectedUser._id] = selectedUser.publicKey;
+        //  Add sender's own key
+        const myPublicKey = localStorage.getItem(`chat_pk_${currentUserId}`);
+        if (myPublicKey) {
+          publicKeysObj[currentUserId] = myPublicKey;
+        } else {
+          console.error(" My public key missing!");
+        }
+
+        // Handle single chat with fallback for missing publicKey
+        if (!isGroup && selectedUser) {
+          let receiverPublicKey = selectedUser.publicKey;
+
+          //  FALLBACK
+          if (!receiverPublicKey && selectedUser._id) {
+            console.warn(" Receiver public key missing, fetching...");
+            try {
+              const response = await axiosInstance.get(
+                `${API_BASE_URL}/api/users/${selectedUser._id}/public-key`,
+              );
+              receiverPublicKey = response.data.publicKey;
+              selectedUser.publicKey = receiverPublicKey; // Cache for next time
+            } catch (err) {
+              console.error("Failed to fetch receiver public key:", err);
+            }
+          }
+
+          if (receiverPublicKey) {
+            publicKeysObj[selectedUser._id] = receiverPublicKey;
+          } else {
+            console.error(" Cannot encrypt: Receiver public key missing");
+            alert("Unable to encrypt message. Receiver public key not found.");
+            setSending(false);
+            return;
+          }
         } else if (isGroup && selectedGroup && selectedGroup.members) {
+          // Group chat
           selectedGroup.members.forEach((member) => {
             if (member.publicKey) {
               publicKeysObj[member._id] = member.publicKey;

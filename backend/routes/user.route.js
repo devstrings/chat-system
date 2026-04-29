@@ -124,5 +124,12 @@ router.delete("/profile/remove-cover", verifyToken, userController.removeCoverPh
  *     tags: [Users]
  */
 router.get("/:id", verifyToken, validateUserNotBlocked, userController.getUserById);
-
+/**
+ * @swagger
+ * /users/public-key/{userId}:
+ *   get:
+ *     summary: Get user's public key for end-to-end encryption
+ *     tags: [Users]
+ */
+router.get("/:userId/public-key", verifyToken, userController.getUserPublicKey);
 export default router;
